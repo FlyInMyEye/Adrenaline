@@ -15,7 +15,7 @@ public class MixinNoiseBasedChunkGeneratorRandom {
         method = {"applyCarvers", "spawnOriginalMobs"},
         at = @At(
             value = "NEW",
-            target = "Lnet/minecraft/world/level/levelgen/LegacyRandomSource"
+            target = "net.minecraft.world.level.levelgen.LegacyRandomSource"
         )
     )
     private LegacyRandomSource redirectLegacyRandomSource(long seed) {

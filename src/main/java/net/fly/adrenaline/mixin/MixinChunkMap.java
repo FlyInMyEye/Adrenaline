@@ -20,15 +20,17 @@ public class MixinChunkMap {
     private ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> worldgenMailbox;
 
     @Redirect(
-        method = "scheduleChunkGeneration",
+        method = "m_214956_",
+        remap = false,
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/util/thread/ProcessorHandle;tell(Ljava/lang/Object;)V"
+            target = "Lnet/minecraft/util/thread/ProcessorHandle;m_6937_(Ljava/lang/Object;)V",
+            remap = false
         )
     )
     private void redirectWorldgenDispatch(
         ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance,
-        ChunkTaskPriorityQueueSorter.Message<Runnable> message
+        Object message
     ) {
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());

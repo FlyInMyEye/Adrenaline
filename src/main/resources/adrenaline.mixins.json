@@ -9,8 +9,8 @@
     "MixinMessageAccessor",
     "MixinNoiseBasedChunkGenerator",
     "MixinNoiseBasedChunkGeneratorRandom",
-    "MixinWorldgenRandom",
-    "MixinBlock"
+    "MixinBlock",
+    "MixinStructureTemplatePalette"
   ],
   "client": [],
   "server": [],

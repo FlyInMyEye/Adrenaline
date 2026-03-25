@@ -3,7 +3,6 @@ package net.fly.adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkWorkerPool;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -19,14 +18,11 @@ public class AdrenalineMod {
     public AdrenalineMod() {
         AdrenalineConfig.init();
 
-        MinecraftForge.EVENT_BUS.register(this);
-    }
-
-    @SubscribeEvent
-    public void onServerStarting(ServerStartingEvent event) {
         int threads = AdrenalineConfig.resolvedWorkerThreads();
         ChunkWorkerPool.init(threads);
         LOGGER.info("Adrenaline worker pool initialized with {} threads", threads);
+
+        MinecraftForge.EVENT_BUS.register(this);
     }
 
     @SubscribeEvent
