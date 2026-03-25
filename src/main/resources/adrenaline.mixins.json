@@ -1,0 +1,20 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.fly.adrenaline.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "adrenaline.refmap.json",
+  "mixins": [
+    "MixinChunkMap",
+    "MixinMessageAccessor",
+    "MixinNoiseBasedChunkGenerator",
+    "MixinNoiseBasedChunkGeneratorRandom",
+    "MixinWorldgenRandom",
+    "MixinBlock"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
