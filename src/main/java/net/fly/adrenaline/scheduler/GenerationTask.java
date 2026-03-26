@@ -29,6 +29,7 @@ public final class GenerationTask implements Runnable {
             DeferredNotificationBuffer.flush();
         } finally {
             ChunkLockManager.releaseAll(locks);
+            ChunkLockManager.cleanup(center);
         }
     }
 

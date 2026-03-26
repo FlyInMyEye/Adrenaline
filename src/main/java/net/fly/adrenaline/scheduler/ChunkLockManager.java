@@ -36,10 +36,7 @@ public final class ChunkLockManager {
         }
     }
 
-    public static void cleanup(ChunkPos pos) {
-        ReentrantLock lock = LOCKS.remove(pos.toLong());
-        if (lock != null && !lock.isLocked()) {
-            lock.unlock();
-        }
+    public static void cleanup(ChunkPos center) {
+        LOCKS.remove(center.toLong());
     }
 }
