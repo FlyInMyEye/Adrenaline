@@ -27,6 +27,12 @@ mandatory=true
 versionRange="[1.0.0,)"
 ordering="NONE"
 side="BOTH"
+[[dependencies.${mod_id}]]
+modId="datafly"
+mandatory=true
+versionRange="[1.0.0,)"
+ordering="NONE"
+side="BOTH"
 [[mixins]]
 config = "${mod_id}.mixins.json"
 

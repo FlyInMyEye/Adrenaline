@@ -10,7 +10,9 @@
     "MixinNoiseBasedChunkGenerator",
     "MixinNoiseBasedChunkGeneratorRandom",
     "MixinBlock",
-    "MixinStructureTemplatePalette"
+    "MixinStructureTemplatePalette",
+    "MixinIOWorker",
+    "MixinRegionFileStorage"
   ],
   "client": [],
   "server": [],
