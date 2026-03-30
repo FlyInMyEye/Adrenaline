@@ -1,0 +1,6 @@
+0.0.2
+- Added DataFly-backed chunk I/O (ChunkStore) writing chunks to adrenaline_chunks/ with a 20ms coalesce window instead of vanilla region files
+- MixinIOWorker: redirects RegionFileStorage.write to ChunkStore, wires result future back to vanilla's IOWorker
+- MixinRegionFileStorage: intercepts read to check ChunkStore before falling through to vanilla region files
+- ChunkStore.init() now called on ServerStartingEvent
+- Added datafly as a mandatory dependency

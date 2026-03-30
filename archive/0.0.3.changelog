@@ -1,0 +1,7 @@
+0.0.3
+- MixinChunkSerializer: parallel pre-encoding of chunk sections (blocks + biomes) before ChunkSerializer.write(), cached per-chunk via SectionSerializationCache
+- MixinChunkSerializerRead: parallel pre-decoding of section NBT before ChunkSerializer.read()
+- MixinLevelChunk + SectionSerializationCache: interface to store pre-encoded Tag[][] on LevelChunk
+- MixinPalettedContainer: short-circuits pack() for single-value palettes to skip unnecessary work
+- Fixed: spawn stage jobs were bypassing ChunkJobScheduler footprint conflict detection entirely; now correctly routed through the scheduler like all other stages
+- Removed empty MixinChunkMapSave stub
