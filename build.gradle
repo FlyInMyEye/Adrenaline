@@ -117,7 +117,7 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                'MixinConfigs'            : "${mod_id}.mixins.json"
+                'MixinConfigs'            : "${mod_id}.mixins.json,${mod_id}.compat.mixins.json"
         ])
     }
 
@@ -128,6 +128,7 @@ tasks.named('jar', Jar).configure {
 mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
     config "${mod_id}.mixins.json"
+    config "${mod_id}.compat.mixins.json"
 }
 
 
