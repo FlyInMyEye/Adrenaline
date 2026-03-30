@@ -49,14 +49,14 @@ public class MixinChunkMap {
         ChunkPos pos = new ChunkPos(accessor.getPos());
 
         ChunkHolder holder = CURRENT_HOLDER.get();
+
         int writeRadius = (holder != null && isFeatureStage(holder)) ? 1 : 0;
 
         ChunkJobScheduler.get().submit(new ChunkJob(pos, writeRadius, () -> {
             @SuppressWarnings("unchecked")
             Function<ProcessorHandle<Unit>, Runnable> taskFunc =
                 (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
-            ProcessorHandle<Unit> dummy = ProcessorHandle.of("adrenaline-wrap", unit -> {
-            });
+            ProcessorHandle<Unit> dummy = ProcessorHandle.of("adrenaline-wrap", unit -> {});
             Runnable task = taskFunc.apply(dummy);
             task.run();
         }));

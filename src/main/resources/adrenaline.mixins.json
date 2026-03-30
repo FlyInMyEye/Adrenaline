@@ -6,13 +6,17 @@
   "refmap": "adrenaline.refmap.json",
   "mixins": [
     "MixinChunkMap",
+    "MixinChunkSerializer",
+    "MixinChunkSerializerRead",
+    "MixinLevelChunk",
     "MixinMessageAccessor",
     "MixinNoiseBasedChunkGenerator",
     "MixinNoiseBasedChunkGeneratorRandom",
     "MixinBlock",
     "MixinStructureTemplatePalette",
     "MixinIOWorker",
-    "MixinRegionFileStorage"
+    "MixinRegionFileStorage",
+    "MixinPalettedContainer"
   ],
   "client": [],
   "server": [],

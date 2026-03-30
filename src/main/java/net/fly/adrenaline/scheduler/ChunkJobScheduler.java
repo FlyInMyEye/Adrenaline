@@ -7,6 +7,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 
+import net.minecraft.world.level.ChunkPos;
+
 public final class ChunkJobScheduler {
 
     private static final ChunkJobScheduler INSTANCE = new ChunkJobScheduler();
@@ -29,6 +31,13 @@ public final class ChunkJobScheduler {
         return INSTANCE;
     }
 
+    public synchronized void awaitNotActive(ChunkPos pos) throws InterruptedException {
+        long key = pos.toLong();
+        while (activeFootprint.contains(key)) {
+            wait();
+        }
+    }
+
     public synchronized void submit(ChunkJob job) {
         if (conflicts(job.footprint())) {
             conflictPending.add(job);
@@ -43,6 +52,8 @@ public final class ChunkJobScheduler {
     synchronized void onComplete(Set<Long> footprint) {
         activeFootprint.removeAll(footprint);
         activeCount--;
+
+        notifyAll();
 
         Set<ChunkJob> candidates = new HashSet<>();
         for (long key : footprint) {
