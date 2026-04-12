@@ -4,7 +4,9 @@
   "package": "net.fly.adrenaline.compat",
   "compatibilityLevel": "JAVA_17",
   "refmap": "adrenaline.refmap.json",
-  "mixins": [],
+  "mixins": [
+    "blueprint.MixinBlueprintTreeFeature"
+  ],
   "client": [],
   "server": [],
   "injectors": {

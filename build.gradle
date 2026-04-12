@@ -87,6 +87,7 @@ dependencies {
 
     implementation fg.deobf("maven.modrinth:flys-config-lib:k0XWlBZR")
     implementation fg.deobf(files("../DataFly/build/libs/datafly-1.0.0.jar"))
+    compileOnly fg.deobf("maven.modrinth:blueprint:xtEwbO0X")
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
