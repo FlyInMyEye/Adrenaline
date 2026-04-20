@@ -5,7 +5,6 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
-import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.SectionSerializationCache;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -31,6 +30,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ForkJoinPool;
 @Mixin(ChunkSerializer.class)
 public class MixinChunkSerializer {
 
@@ -44,6 +44,7 @@ public class MixinChunkSerializer {
 
     private static volatile Codec<PalettedContainerRO<Holder<Biome>>> CACHED_BIOME_CODEC;
     private static volatile Registry<Biome> CACHED_BIOME_REGISTRY;
+    private static final ForkJoinPool SERIALIZATION_POOL = new ForkJoinPool(AdrenalineConfig.resolvedWorkerThreads());
 
     private static final ThreadLocal<ChunkAccess> SERIALIZING_CHUNK = new ThreadLocal<>();
 
@@ -77,7 +78,7 @@ public class MixinChunkSerializer {
                 sectionTags[idx][1] = biomeCodec
                         .encodeStart(NbtOps.INSTANCE, section.getBiomes())
                         .resultOrPartial(e -> {}).orElse(null);
-            }, ChunkJobScheduler.get().executor()));
+            }, SERIALIZATION_POOL));
         }
 
         try {

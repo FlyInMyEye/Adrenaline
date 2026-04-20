@@ -1,24 +1,48 @@
 package net.fly.adrenaline.client;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class AdrenalineConfigScreen extends Screen {
+
+    private static final ResourceLocation PANEL_TEXTURE = new ResourceLocation("textures/gui/options_background.png");
 
     private final Screen parent;
     private final AdrenalineConfig.Data config;
     private final int availableProcessors;
+    private final List<ScrollableWidget> scrollableWidgets = new ArrayList<>();
+    private final List<ScrollableLabel> scrollableLabels = new ArrayList<>();
 
     private WorkerThreadsSlider workerThreadsSlider;
+    private Button enabledButton;
+    private Button worldgenOptimizationsButton;
+    private Button terrainFillOptimizationsButton;
+    private Button surfaceOptimizationsButton;
+    private Button noiseChunkOptimizationsButton;
+    private Button materialRuleOptimizationsButton;
     private Button parallelWorldgenButton;
     private Button parallelChunkSerializationButton;
     private Button chunkIoCacheButton;
     private Button fastLegacyRandomButton;
     private Button preloadProblematicClassesButton;
+    private Button debugLoggingButton;
+    private Button doneButton;
+    private int scrollOffset;
+    private int targetScrollOffset;
+    private int maxScroll;
+    private int contentBottom;
+    private double animatedScrollOffset;
 
     public AdrenalineConfigScreen(Screen parent) {
         super(Component.literal("Adrenaline"));
@@ -29,34 +53,79 @@ public class AdrenalineConfigScreen extends Screen {
 
     @Override
     protected void init() {
+        this.scrollableWidgets.clear();
+        this.scrollableLabels.clear();
+        this.scrollOffset = 0;
+        this.targetScrollOffset = 0;
+        this.animatedScrollOffset = 0.0D;
         int centerX = this.width / 2;
-        int y = 40;
+        int y = 54 + this.warningLines().size() * 10;
+        int leftX = centerX - 185;
+        int buttonX = centerX + 95;
+        int labelX = leftX;
+        int buttonWidth = 70;
 
-        this.parallelWorldgenButton = this.addRenderableWidget(this.createToggleButton(centerX - 100, y, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value));
-        y += 24;
-        this.parallelChunkSerializationButton = this.addRenderableWidget(this.createToggleButton(centerX - 100, y, Component.literal("Parallel chunk serialization"), this.config.parallelChunkSerialization, value -> this.config.parallelChunkSerialization = value));
-        y += 24;
-        this.chunkIoCacheButton = this.addRenderableWidget(this.createToggleButton(centerX - 100, y, Component.literal("Chunk IO cache"), this.config.chunkIoCache, value -> this.config.chunkIoCache = value));
-        y += 24;
-        this.fastLegacyRandomButton = this.addRenderableWidget(this.createToggleButton(centerX - 100, y, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value));
-        y += 24;
-        this.preloadProblematicClassesButton = this.addRenderableWidget(this.createToggleButton(centerX - 100, y, Component.literal("Preload problematic classes"), this.config.preloadProblematicClasses, value -> this.config.preloadProblematicClasses = value));
+        this.workerThreadsSlider = this.addScrollableWidget(new WorkerThreadsSlider(leftX, y, 370, 20), y);
         y += 30;
 
-        this.workerThreadsSlider = this.addRenderableWidget(new WorkerThreadsSlider(centerX - 100, y, 200, 20));
-        y += 32;
+        this.enabledButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Enabled"), this.config.enabled, value -> this.config.enabled = value);
+        y += 24;
+        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Worldgen optimizations"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value);
+        y += 24;
+        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Terrain fill optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value);
+        y += 24;
+        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Surface optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value);
+        y += 24;
+        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Noise chunk optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value);
+        y += 24;
+        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Material rule optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value);
+        y += 24;
+        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value);
+        y += 24;
+        this.parallelChunkSerializationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel chunk serialization"), this.config.parallelChunkSerialization, value -> this.config.parallelChunkSerialization = value);
+        y += 24;
+        this.chunkIoCacheButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Chunk IO cache"), this.config.chunkIoCache, value -> this.config.chunkIoCache = value);
+        y += 24;
+        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value);
+        y += 24;
+        this.preloadProblematicClassesButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Preload problematic classes"), this.config.preloadProblematicClasses, value -> this.config.preloadProblematicClasses = value);
+        y += 24;
+        this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value);
+        y += 24;
 
-        this.addRenderableWidget(Button.builder(Component.literal("Save"), button -> this.save()).bounds(centerX - 100, y, 98, 20).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Cancel"), button -> this.onClose()).bounds(centerX + 2, y, 98, 20).build());
+        this.doneButton = this.addRenderableWidget(Button.builder(Component.literal("Done"), button -> this.onClose()).bounds(centerX - 50, this.height - 26, 100, 20).build());
+        this.contentBottom = y;
+        this.maxScroll = Math.max(0, y - (this.doneButton.getY() - 20));
+        this.applyScroll();
+        this.updateButtonStates();
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.updateAnimatedScroll();
         this.renderBackground(guiGraphics);
+        int topPanelBottom = 32 + this.warningLines().size() * 10 + 18;
+        int contentBottom = this.doneButton.getY() - 6;
+        this.renderTiledPanel(guiGraphics, 0, 0, this.width, topPanelBottom);
+        this.renderTiledPanel(guiGraphics, 0, contentBottom, this.width, this.height - contentBottom);
+        this.renderContentShade(guiGraphics, topPanelBottom, contentBottom);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 15, 16777215);
-        guiGraphics.drawCenteredString(this.font, "Changes apply to new worldgen work. Restarting the world is safest.", this.width / 2, 28, 11184810);
-        guiGraphics.drawString(this.font, "Worker threads", this.width / 2 - 100, this.workerThreadsSlider.getY() - 12, 16777215, false);
+        int warningY = 30;
+        for (WarningLine warningLine : this.warningLines()) {
+            guiGraphics.drawCenteredString(this.font, warningLine.message(), this.width / 2, warningY, warningLine.color());
+            warningY += 10;
+        }
+        guiGraphics.enableScissor(0, topPanelBottom, this.width, contentBottom);
+        for (ScrollableLabel label : this.scrollableLabels) {
+            int y = label.baseY() - this.scrollOffset;
+            if (this.isPartiallyVisible(y, 20)) {
+                guiGraphics.drawString(this.font, label.message(), label.x(), y + 6, 16777215, false);
+            }
+        }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.disableScissor();
+        this.doneButton.render(guiGraphics, mouseX, mouseY, partialTick);
+        this.renderScrollBar(guiGraphics, topPanelBottom, contentBottom);
     }
 
     @Override
@@ -64,25 +133,146 @@ public class AdrenalineConfigScreen extends Screen {
         this.minecraft.setScreen(this.parent);
     }
 
-    private Button createToggleButton(int x, int y, Component label, boolean initialValue, BooleanConsumer consumer) {
-        return Button.builder(this.toggleLabel(label, initialValue), button -> {
-            boolean nextValue = !this.currentValue(button.getMessage());
-            consumer.accept(nextValue);
-            button.setMessage(this.toggleLabel(label, nextValue));
-        }).bounds(x, y, 200, 20).build();
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (this.maxScroll <= 0) {
+            return super.mouseScrolled(mouseX, mouseY, delta);
+        }
+
+        this.targetScrollOffset = Math.max(0, Math.min(this.maxScroll, this.targetScrollOffset - (int) Math.signum(delta) * 16));
+        return true;
     }
 
-    private Component toggleLabel(Component label, boolean value) {
-        return Component.literal(label.getString() + ": " + (value ? "ON" : "OFF"));
+    private Button createToggleButton(int x, int y, int width, boolean initialValue, BooleanConsumer consumer) {
+        return Button.builder(this.toggleLabel(initialValue), button -> {
+            boolean nextValue = !this.currentValue(button.getMessage());
+            consumer.accept(nextValue);
+            button.setMessage(this.toggleLabel(nextValue));
+            this.saveConfig();
+            this.updateButtonStates();
+        }).bounds(x, y, width, 20).build();
+    }
+
+    private Button addToggleRow(int labelX, int buttonX, int y, int buttonWidth, Component label, boolean initialValue, BooleanConsumer consumer) {
+        this.scrollableLabels.add(new ScrollableLabel(label, labelX, y));
+        return this.addScrollableWidget(this.createToggleButton(buttonX, y, buttonWidth, initialValue, consumer), y);
+    }
+
+    private Component toggleLabel(boolean value) {
+        return Component.literal(value ? "On" : "Off");
     }
 
     private boolean currentValue(Component message) {
-        return message.getString().endsWith("ON");
+        return message.getString().equalsIgnoreCase("On");
     }
 
-    private void save() {
+    private void saveConfig() {
         AdrenalineConfig.save(new AdrenalineConfig.Data(this.config));
-        this.onClose();
+    }
+
+    private <T extends AbstractWidget> T addScrollableWidget(T widget, int baseY) {
+        this.scrollableWidgets.add(new ScrollableWidget(widget, baseY));
+        return this.addRenderableWidget(widget);
+    }
+
+    private void applyScroll() {
+        for (ScrollableWidget scrollableWidget : this.scrollableWidgets) {
+            int y = scrollableWidget.baseY() - this.scrollOffset;
+            scrollableWidget.widget().setY(y);
+            scrollableWidget.widget().visible = this.isPartiallyVisible(y, scrollableWidget.widget().getHeight());
+        }
+    }
+
+    private void updateAnimatedScroll() {
+        if (this.scrollOffset == this.targetScrollOffset && this.animatedScrollOffset == this.targetScrollOffset) {
+            return;
+        }
+
+        this.animatedScrollOffset += (this.targetScrollOffset - this.animatedScrollOffset) * 0.35D;
+        if (Math.abs(this.targetScrollOffset - this.animatedScrollOffset) < 0.5D) {
+            this.animatedScrollOffset = this.targetScrollOffset;
+        }
+
+        this.scrollOffset = (int) Math.round(this.animatedScrollOffset);
+        this.applyScroll();
+    }
+
+    private boolean isPartiallyVisible(int y, int height) {
+        int top = 32;
+        int bottom = this.doneButton.getY() - 12;
+        return y + height >= top && y <= bottom;
+    }
+
+    private void renderScrollBar(GuiGraphics guiGraphics, int top, int bottom) {
+        if (this.maxScroll <= 0) {
+            return;
+        }
+
+        int trackHeight = bottom - top;
+        int barX = this.width - 10;
+        int totalContentHeight = Math.max(trackHeight, this.contentBottom - 32);
+        int thumbHeight = Math.max(24, trackHeight * trackHeight / totalContentHeight);
+        int travel = trackHeight - thumbHeight;
+        int thumbY = top + (travel * this.scrollOffset / this.maxScroll);
+
+        guiGraphics.fill(barX, top, barX + 4, bottom, 0xFF3A3A3A);
+        guiGraphics.fill(barX, thumbY, barX + 4, thumbY + thumbHeight, 0xFFA0A0A0);
+    }
+
+    private void renderTiledPanel(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+        guiGraphics.fill(x, y, x + width, y + height, 0xAA000000);
+        for (int drawY = 0; drawY < height; drawY += 32) {
+            for (int drawX = 0; drawX < width; drawX += 32) {
+                int tileWidth = Math.min(32, width - drawX);
+                int tileHeight = Math.min(32, height - drawY);
+                guiGraphics.blit(PANEL_TEXTURE, x + drawX, y + drawY, 0, 0, tileWidth, tileHeight, 32, 32);
+            }
+        }
+        guiGraphics.fill(x, y, x + width, y + height, 0x88000000);
+    }
+
+    private void renderContentShade(GuiGraphics guiGraphics, int top, int bottom) {
+        guiGraphics.fill(0, top, this.width, bottom, 0x55000000);
+    }
+
+    private void updateButtonStates() {
+        boolean enabled = this.config.enabled;
+        boolean worldgenOptimizations = enabled && this.config.worldgenOptimizations;
+        boolean parallelWorldgen = enabled && this.config.parallelWorldgen;
+
+        this.worldgenOptimizationsButton.active = enabled;
+        this.parallelWorldgenButton.active = enabled;
+        this.parallelChunkSerializationButton.active = enabled;
+        this.chunkIoCacheButton.active = enabled;
+        this.fastLegacyRandomButton.active = enabled;
+        this.preloadProblematicClassesButton.active = enabled;
+        this.debugLoggingButton.active = enabled;
+
+        this.terrainFillOptimizationsButton.active = worldgenOptimizations;
+        this.surfaceOptimizationsButton.active = worldgenOptimizations;
+        this.noiseChunkOptimizationsButton.active = worldgenOptimizations;
+        this.materialRuleOptimizationsButton.active = worldgenOptimizations;
+        this.workerThreadsSlider.active = parallelWorldgen;
+    }
+
+    private List<WarningLine> warningLines() {
+        List<WarningLine> warnings = new ArrayList<>();
+        Minecraft minecraft = this.minecraft;
+        if (minecraft == null || minecraft.level == null) {
+            return warnings;
+        }
+
+        if (!minecraft.hasSingleplayerServer()) {
+            warnings.add(new WarningLine(Component.literal("This is not local world, changes won't affect anything"), 16755200));
+            return warnings;
+        }
+
+        if (minecraft.getSingleplayerServer() != null && minecraft.getSingleplayerServer().isPublished()) {
+            warnings.add(new WarningLine(Component.literal("This world is open to LAN, changes may not affect current session"), 16755200));
+        }
+
+        warnings.add(new WarningLine(Component.literal("Restart or re-enter the world for safest results"), 11184810));
+        return warnings;
     }
 
     private final class WorkerThreadsSlider extends AbstractSliderButton {
@@ -95,7 +285,7 @@ public class AdrenalineConfigScreen extends Screen {
         @Override
         protected void updateMessage() {
             int value = AdrenalineConfigScreen.this.snapSliderValue(this.value);
-            this.setMessage(Component.literal(value == 0 ? "Auto" : Integer.toString(value)));
+            this.setMessage(Component.literal("Worker threads: " + (value == 0 ? "Auto" : Integer.toString(value))));
         }
 
         @Override
@@ -104,6 +294,8 @@ public class AdrenalineConfigScreen extends Screen {
             this.value = AdrenalineConfigScreen.this.toSliderValue(snappedValue);
             AdrenalineConfigScreen.this.config.workerThreads = snappedValue;
             this.updateMessage();
+            AdrenalineConfigScreen.this.saveConfig();
+            AdrenalineConfigScreen.this.updateButtonStates();
         }
     }
 
@@ -127,5 +319,14 @@ public class AdrenalineConfigScreen extends Screen {
     @FunctionalInterface
     private interface BooleanConsumer {
         void accept(boolean value);
+    }
+
+    private record WarningLine(Component message, int color) {
+    }
+
+    private record ScrollableWidget(AbstractWidget widget, int baseY) {
+    }
+
+    private record ScrollableLabel(Component message, int x, int baseY) {
     }
 }

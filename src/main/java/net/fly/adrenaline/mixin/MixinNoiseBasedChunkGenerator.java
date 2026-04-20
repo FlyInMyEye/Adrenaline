@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.FastHeightmap;
 import net.fly.adrenaline.worldgen.FastSectionAccess;
 import net.fly.adrenaline.worldgen.WorldgenHeightmapTracker;
@@ -56,7 +57,7 @@ public class MixinNoiseBasedChunkGenerator {
         )
     )
     private <T> CompletableFuture<T> inlineCreateBiomes(Supplier<T> supplier, Executor executor) {
-        if (executor == Util.backgroundExecutor()) {
+        if (AdrenalineConfig.terrainFillOptimizationsEnabled() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
         return CompletableFuture.supplyAsync(supplier, executor);
@@ -70,7 +71,7 @@ public class MixinNoiseBasedChunkGenerator {
         )
     )
     private <T> CompletableFuture<T> inlineFillFromNoise(Supplier<T> supplier, Executor executor) {
-        if (executor == Util.backgroundExecutor()) {
+        if (AdrenalineConfig.terrainFillOptimizationsEnabled() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
         return CompletableFuture.supplyAsync(supplier, executor);
@@ -82,6 +83,10 @@ public class MixinNoiseBasedChunkGenerator {
      */
     @Overwrite
     private ChunkAccess doFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY) {
+        if (!AdrenalineConfig.terrainFillOptimizationsEnabled()) {
+            return this.doFillFallback(blender, structureManager, randomState, chunk, minCellY, cellCountY);
+        }
+
         NoiseChunk noiseChunk = chunk.getOrCreateNoiseChunk(access -> this.createNoiseChunk(access, structureManager, blender, randomState));
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
         Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
@@ -182,6 +187,67 @@ public class MixinNoiseBasedChunkGenerator {
             }
         }
 
+        chunk.initializeLightSources();
+        return chunk;
+    }
+
+    private ChunkAccess doFillFallback(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY) {
+        NoiseChunk noiseChunk = chunk.getOrCreateNoiseChunk(access -> this.createNoiseChunk(access, structureManager, blender, randomState));
+        Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
+        Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
+        ChunkPos chunkPos = chunk.getPos();
+        int minBlockX = chunkPos.getMinBlockX();
+        int minBlockZ = chunkPos.getMinBlockZ();
+        BlockState defaultBlock = this.settings.value().defaultBlock();
+        int cellWidth = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$cellWidth();
+        int cellHeight = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$cellHeight();
+        int cellCountX = 16 / cellWidth;
+        int cellCountZ = 16 / cellWidth;
+        MutableBlockPos mutableBlockPos = new MutableBlockPos();
+
+        noiseChunk.initializeForFirstCellX();
+
+        for (int cellX = 0; cellX < cellCountX; cellX++) {
+            noiseChunk.advanceCellX(cellX);
+            for (int cellZ = 0; cellZ < cellCountZ; cellZ++) {
+                for (int cellY = cellCountY - 1; cellY >= 0; cellY--) {
+                    noiseChunk.selectCellYZ(cellY, cellZ);
+                    for (int yInCell = cellHeight - 1; yInCell >= 0; yInCell--) {
+                        int y = (minCellY + cellY) * cellHeight + yInCell;
+                        noiseChunk.updateForY(y, (double) yInCell / (double) cellHeight);
+                        for (int xInCell = 0; xInCell < cellWidth; xInCell++) {
+                            int x = minBlockX + cellX * cellWidth + xInCell;
+                            int localX = x & 15;
+                            noiseChunk.updateForX(x, (double) xInCell / (double) cellWidth);
+                            for (int zInCell = 0; zInCell < cellWidth; zInCell++) {
+                                int z = minBlockZ + cellZ * cellWidth + zInCell;
+                                int localZ = z & 15;
+                                noiseChunk.updateForZ(z, (double) zInCell / (double) cellWidth);
+                                BlockState state = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$getInterpolatedState();
+                                if (state == null) {
+                                    state = defaultBlock;
+                                }
+                                state = this.debugPreliminarySurfaceLevel(noiseChunk, x, y, z, state);
+                                if (state == AIR || SharedConstants.debugVoidTerrain(chunkPos)) {
+                                    continue;
+                                }
+                                chunk.setBlockState(mutableBlockPos.set(x, y, z), state, false);
+                                oceanFloor.update(localX, y, localZ, state);
+                                worldSurface.update(localX, y, localZ, state);
+                                if (!state.getFluidState().isEmpty()) {
+                                    chunk.markPosForPostprocessing(mutableBlockPos);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (cellX + 1 < cellCountX) {
+                noiseChunk.swapSlices();
+            }
+        }
+
+        noiseChunk.stopInterpolation();
         chunk.initializeLightSources();
         return chunk;
     }

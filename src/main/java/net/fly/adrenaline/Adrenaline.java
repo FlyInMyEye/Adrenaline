@@ -40,5 +40,8 @@ public class Adrenaline {
         }
         ChunkStore.init();
         LOGGER.info("Adrenaline initialized, worldgen parallelism: {}", ChunkJobScheduler.get().parallelism());
+        if (AdrenalineConfig.debugLoggingEnabled()) {
+            LOGGER.info("Config: enabled={}, worldgenOptimizations={}, terrainFill={}, surface={}, noiseChunk={}, materialRules={}, parallelWorldgen={}, parallelChunkSerialization={}, chunkIoCache={}, fastLegacyRandom={}, preloadProblematicClasses={}, workerThreads={}", AdrenalineConfig.get().enabled, AdrenalineConfig.get().worldgenOptimizations, AdrenalineConfig.get().terrainFillOptimizations, AdrenalineConfig.get().surfaceOptimizations, AdrenalineConfig.get().noiseChunkOptimizations, AdrenalineConfig.get().materialRuleOptimizations, AdrenalineConfig.get().parallelWorldgen, AdrenalineConfig.get().parallelChunkSerialization, AdrenalineConfig.get().chunkIoCache, AdrenalineConfig.get().fastLegacyRandom, AdrenalineConfig.get().preloadProblematicClasses, AdrenalineConfig.get().workerThreads);
+        }
     }
 }

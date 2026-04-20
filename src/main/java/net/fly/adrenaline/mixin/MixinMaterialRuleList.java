@@ -2,6 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import java.util.List;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseChunk;
@@ -22,6 +23,16 @@ public class MixinMaterialRuleList {
      */
     @Overwrite
     public BlockState calculate(DensityFunction.FunctionContext context) {
+        if (!AdrenalineConfig.materialRuleOptimizationsEnabled()) {
+            for (NoiseChunk.BlockStateFiller filler : this.materialRuleList) {
+                BlockState state = filler.calculate(context);
+                if (state != null) {
+                    return state;
+                }
+            }
+            return null;
+        }
+
         int size = this.materialRuleList.size();
         if (size == 0) {
             return null;

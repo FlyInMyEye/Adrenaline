@@ -75,6 +75,10 @@ public class AdrenalineConfig {
         return enabled() && get().preloadProblematicClasses;
     }
 
+    public static boolean debugLoggingEnabled() {
+        return enabled() && get().debugLogging;
+    }
+
     public static class Data {
         public boolean enabled = true;
         public boolean worldgenOptimizations = true;
@@ -88,6 +92,7 @@ public class AdrenalineConfig {
         public boolean chunkIoCache = true;
         public boolean fastLegacyRandom = true;
         public boolean preloadProblematicClasses = true;
+        public boolean debugLogging = false;
         public List<String> stageBlacklist = new ArrayList<>();
         public List<String> featureBlacklist = new ArrayList<>();
 
@@ -107,6 +112,7 @@ public class AdrenalineConfig {
             this.chunkIoCache = other.chunkIoCache;
             this.fastLegacyRandom = other.fastLegacyRandom;
             this.preloadProblematicClasses = other.preloadProblematicClasses;
+            this.debugLogging = other.debugLogging;
             this.stageBlacklist = new ArrayList<>(other.stageBlacklist);
             this.featureBlacklist = new ArrayList<>(other.featureBlacklist);
         }
