@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.SectionSerializationCache;
 import net.minecraft.core.Holder;
@@ -30,8 +31,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ForkJoinPool;
-
 @Mixin(ChunkSerializer.class)
 public class MixinChunkSerializer {
 
@@ -52,6 +51,10 @@ public class MixinChunkSerializer {
     private static void captureAndPreEncode(
             ServerLevel level, ChunkAccess chunk,
             CallbackInfoReturnable<CompoundTag> cir) {
+        if (!AdrenalineConfig.get().parallelChunkSerialization) {
+            return;
+        }
+
         SERIALIZING_CHUNK.set(chunk);
 
         LevelChunkSection[] sections = chunk.getSections();
@@ -74,7 +77,7 @@ public class MixinChunkSerializer {
                 sectionTags[idx][1] = biomeCodec
                         .encodeStart(NbtOps.INSTANCE, section.getBiomes())
                         .resultOrPartial(e -> {}).orElse(null);
-            }, ForkJoinPool.commonPool()));
+            }, ChunkJobScheduler.get().executor()));
         }
 
         try {
@@ -109,6 +112,12 @@ public class MixinChunkSerializer {
         remap = false
     )
     private static DataResult<?> useCachedEncoding(Codec<?> codec, DynamicOps<?> ops, Object value) {
+        if (!AdrenalineConfig.get().parallelChunkSerialization) {
+            @SuppressWarnings("unchecked")
+            DataResult<?> result = ((Codec<Object>) codec).encodeStart((DynamicOps<Object>) ops, value);
+            return result;
+        }
+
         ChunkAccess chunk = SERIALIZING_CHUNK.get();
         if (chunk instanceof SectionSerializationCache ssc) {
             Tag[][] cache = ssc.adrenaline$getSectionTags();

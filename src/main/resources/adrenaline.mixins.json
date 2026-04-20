@@ -28,6 +28,7 @@
     "MixinPalettedContainerDataAccessor",
     "MixinRegionFileStorage",
     "MixinRegionFileStorageAccessor",
+    "MixinRegionFileStorageInvoker",
     "MixinPalettedContainer"
   ],
   "client": [],

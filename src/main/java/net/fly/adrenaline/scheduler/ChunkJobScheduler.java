@@ -1,10 +1,12 @@
 package net.fly.adrenaline.scheduler;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 
 import net.minecraft.world.level.ChunkPos;
@@ -13,7 +15,7 @@ public final class ChunkJobScheduler {
 
     private static final ChunkJobScheduler INSTANCE = new ChunkJobScheduler();
 
-    private final ForkJoinPool pool = ForkJoinPool.commonPool();
+    private final ForkJoinPool pool = new ForkJoinPool(AdrenalineConfig.resolvedWorkerThreads());
     private final int maxActive = pool.getParallelism();
 
     private int activeCount = 0;
@@ -29,6 +31,14 @@ public final class ChunkJobScheduler {
 
     public static ChunkJobScheduler get() {
         return INSTANCE;
+    }
+
+    public int parallelism() {
+        return this.maxActive;
+    }
+
+    public Executor executor() {
+        return this.pool;
     }
 
     public synchronized void awaitNotActive(ChunkPos pos) throws InterruptedException {

@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.minecraft.server.level.ChunkHolder;
@@ -41,6 +42,11 @@ public class MixinChunkMap {
         )
     )
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
+        if (!AdrenalineConfig.get().parallelWorldgen) {
+            instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
+            return;
+        }
+
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());
         ChunkHolder holder = CURRENT_HOLDER.get();
