@@ -3,7 +3,6 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.util.NonAtomicLegacyRandomSource;
 import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.WorldgenRandom;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -15,7 +14,7 @@ public class MixinNoiseBasedChunkGeneratorRandom {
         method = {"applyCarvers", "spawnOriginalMobs"},
         at = @At(
             value = "NEW",
-            target = "net.minecraft.world.level.levelgen.LegacyRandomSource"
+            target = "Lnet/minecraft/world/level/levelgen/LegacyRandomSource;"
         )
     )
     private LegacyRandomSource redirectLegacyRandomSource(long seed) {

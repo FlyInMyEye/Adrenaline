@@ -1,5 +1,6 @@
 package net.fly.adrenaline.util;
 
+import net.fly.adrenaline.mixin.MixinLegacyRandomSourceAccessor;
 import net.minecraft.world.level.levelgen.LegacyRandomSource;
 
 public final class NonAtomicLegacyRandomSource extends LegacyRandomSource {
@@ -12,15 +13,7 @@ public final class NonAtomicLegacyRandomSource extends LegacyRandomSource {
     }
 
     private long getRawSeed() {
-        try {
-            var field = LegacyRandomSource.class.getDeclaredField("seed");
-            field.setAccessible(true);
-            java.util.concurrent.atomic.AtomicLong atomicSeed =
-                (java.util.concurrent.atomic.AtomicLong) field.get(this);
-            return atomicSeed.get();
-        } catch (Exception e) {
-            return 0L;
-        }
+        return ((MixinLegacyRandomSourceAccessor) (Object) this).adrenaline$getSeed().get();
     }
 
     @Override

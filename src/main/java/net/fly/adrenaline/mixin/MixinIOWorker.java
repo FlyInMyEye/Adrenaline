@@ -7,10 +7,10 @@ import net.minecraft.world.level.chunk.storage.IOWorker;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.lang.reflect.Field;
-import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -18,9 +18,7 @@ import java.util.concurrent.CompletableFuture;
 @Mixin(IOWorker.class)
 public class MixinIOWorker {
 
-    private static Field FOLDER_FIELD;
-    private static Field RESULT_FIELD;
-    private static final ThreadLocal<Map.Entry<?, ?>> CAPTURED_ENTRY = new ThreadLocal<>();
+    private static final ThreadLocal<Object> CAPTURED_PENDING_STORE = new ThreadLocal<>();
 
     @Redirect(
         method = "storePendingChunk",
@@ -32,9 +30,14 @@ public class MixinIOWorker {
     private <T> T captureEntry(Iterator<T> iterator) {
         T entry = iterator.next();
         if (entry instanceof Map.Entry) {
-            CAPTURED_ENTRY.set((Map.Entry<?, ?>) entry);
+            CAPTURED_PENDING_STORE.set(((Map.Entry<?, ?>) entry).getValue());
         }
         return entry;
+    }
+
+    @Inject(method = "runStore", at = @At("HEAD"))
+    private void clearPendingStoreBeforeRun(CallbackInfo ci) {
+        CAPTURED_PENDING_STORE.remove();
     }
 
     @Redirect(
@@ -46,33 +49,25 @@ public class MixinIOWorker {
     )
     private void redirectToDataFly(RegionFileStorage storage, ChunkPos pos, CompoundTag data) {
         if (data != null) {
-            try {
-                if (FOLDER_FIELD == null) {
-                    FOLDER_FIELD = RegionFileStorage.class.getDeclaredField("folder");
-                    FOLDER_FIELD.setAccessible(true);
-                }
-                Path folder = (Path) FOLDER_FIELD.get(storage);
-                CompletableFuture<?> dfFuture = ChunkStore.write(pos, data, folder).toFuture();
-
-                Map.Entry<?, ?> entry = CAPTURED_ENTRY.get();
-                if (entry != null) {
-                    if (RESULT_FIELD == null) {
-                        RESULT_FIELD = entry.getValue().getClass().getDeclaredField("result");
-                        RESULT_FIELD.setAccessible(true);
+            CompletableFuture<?> dataFlyFuture = ChunkStore.write(pos, data, ((MixinRegionFileStorageAccessor) (Object) storage).adrenaline$getFolder()).toFuture();
+            Object pendingStore = CAPTURED_PENDING_STORE.get();
+            if (pendingStore != null) {
+                CompletableFuture<Void> result = ((MixinIOWorkerPendingStoreAccessor) pendingStore).adrenaline$getResult();
+                dataFlyFuture.whenComplete((ignored, exception) -> {
+                    if (exception != null) {
+                        result.completeExceptionally(exception);
+                    } else {
+                        result.complete(null);
                     }
-                    CompletableFuture<Void> result = (CompletableFuture<Void>) RESULT_FIELD.get(entry.getValue());
-                    dfFuture.whenComplete((r, ex) -> {
-                        if (ex != null) {
-                            result.completeExceptionally(ex);
-                        } else {
-                            result.complete(null);
-                        }
-                    });
-                    CAPTURED_ENTRY.remove();
-                    return;
-                }
-            } catch (Exception e) {
+                });
+                CAPTURED_PENDING_STORE.remove();
+                return;
             }
         }
+    }
+
+    @Inject(method = "runStore", at = @At("RETURN"))
+    private void clearPendingStoreAfterRun(CallbackInfo ci) {
+        CAPTURED_PENDING_STORE.remove();
     }
 }

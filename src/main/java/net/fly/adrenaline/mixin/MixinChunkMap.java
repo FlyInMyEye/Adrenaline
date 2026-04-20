@@ -6,8 +6,8 @@ import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.util.Unit;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.util.thread.ProcessorHandle;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,7 +20,6 @@ import java.util.function.Function;
 
 @Mixin(ChunkMap.class)
 public class MixinChunkMap {
-
     private static final ThreadLocal<ChunkHolder> CURRENT_HOLDER = new ThreadLocal<>();
 
     @Inject(
@@ -41,25 +40,28 @@ public class MixinChunkMap {
             remap = false
         )
     )
-    private void redirectWorldgenDispatch(
-        ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance,
-        Object message
-    ) {
+    private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());
-
         ChunkHolder holder = CURRENT_HOLDER.get();
-
         int writeRadius = (holder != null && isFeatureStage(holder)) ? 1 : 0;
 
         ChunkJobScheduler.get().submit(new ChunkJob(pos, writeRadius, () -> {
             @SuppressWarnings("unchecked")
-            Function<ProcessorHandle<Unit>, Runnable> taskFunc =
-                (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
-            ProcessorHandle<Unit> dummy = ProcessorHandle.of("adrenaline-wrap", unit -> {});
-            Runnable task = taskFunc.apply(dummy);
-            task.run();
+            Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
+            ProcessorHandle<Unit> dummy = ProcessorHandle.of("adrenaline-wrap", unit -> {
+            });
+            taskFunction.apply(dummy).run();
         }));
+    }
+
+    @Inject(
+        method = "m_214956_",
+        remap = false,
+        at = @At("RETURN")
+    )
+    private void clearHolder(ChunkHolder holder, Runnable task, CallbackInfo ci) {
+        CURRENT_HOLDER.remove();
     }
 
     private static boolean isFeatureStage(ChunkHolder holder) {

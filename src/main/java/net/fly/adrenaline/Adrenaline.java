@@ -2,6 +2,7 @@ package net.fly.adrenaline;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.io.ChunkStore;
+import net.fly.adrenaline.util.ClassPreloader;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -24,6 +25,7 @@ public class Adrenaline {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
+        ClassPreloader.preloadKnownProblematicClasses();
         ChunkStore.init();
         LOGGER.info("Adrenaline initialized, worldgen parallelism: {}", ForkJoinPool.commonPool().getParallelism());
     }

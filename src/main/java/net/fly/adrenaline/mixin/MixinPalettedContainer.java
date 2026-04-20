@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,32 +17,37 @@ import java.util.Optional;
 public abstract class MixinPalettedContainer<T> {
 
     private static volatile Field DATA_FIELD;
-    private static volatile Method DATA_PALETTE_METHOD;
 
     @Inject(method = "pack", at = @At("HEAD"), cancellable = true)
     private void fastPackSingleValue(IdMap<T> idMap, PalettedContainer.Strategy strategy,
                                      CallbackInfoReturnable<PalettedContainerRO.PackedData<T>> cir) {
+        Object data = getData();
+        Palette<T> palette = ((MixinPalettedContainerDataAccessor<T>) data).adrenaline$getPalette();
+        if (palette.getSize() == 1) {
+            cir.setReturnValue(new PalettedContainerRO.PackedData<>(List.of(palette.valueFor(0)), Optional.empty()));
+        }
+    }
+
+    private Object getData() {
         try {
             Field dataField = DATA_FIELD;
             if (dataField == null) {
-                dataField = PalettedContainer.class.getDeclaredField("data");
+                dataField = findDataField();
                 dataField.setAccessible(true);
                 DATA_FIELD = dataField;
             }
-            Object data = dataField.get(this);
-
-            Method paletteMethod = DATA_PALETTE_METHOD;
-            if (paletteMethod == null) {
-                paletteMethod = data.getClass().getMethod("palette");
-                DATA_PALETTE_METHOD = paletteMethod;
-            }
-            @SuppressWarnings("unchecked")
-            Palette<T> palette = (Palette<T>) paletteMethod.invoke(data);
-
-            if (palette.getSize() == 1) {
-                cir.setReturnValue(new PalettedContainerRO.PackedData<>(List.of(palette.valueFor(0)), Optional.empty()));
-            }
-        } catch (Exception ignored) {
+            return dataField.get(this);
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException(exception);
         }
+    }
+
+    private static Field findDataField() throws NoSuchFieldException {
+        for (Field field : PalettedContainer.class.getDeclaredFields()) {
+            if (field.getType().getName().equals("net.minecraft.world.level.chunk.PalettedContainer$Data")) {
+                return field;
+            }
+        }
+        throw new NoSuchFieldException("PalettedContainer data field");
     }
 }

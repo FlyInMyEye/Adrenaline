@@ -103,8 +103,10 @@ public class MixinChunkSerializer {
         method = "write",
         at = @At(
             value = "INVOKE",
-            target = "Lcom/mojang/serialization/Codec;encodeStart(Lcom/mojang/serialization/DynamicOps;Ljava/lang/Object;)Lcom/mojang/serialization/DataResult;"
-        )
+            target = "Lcom/mojang/serialization/Codec;encodeStart(Lcom/mojang/serialization/DynamicOps;Ljava/lang/Object;)Lcom/mojang/serialization/DataResult;",
+            remap = false
+        ),
+        remap = false
     )
     private static DataResult<?> useCachedEncoding(Codec<?> codec, DynamicOps<?> ops, Object value) {
         ChunkAccess chunk = SERIALIZING_CHUNK.get();
