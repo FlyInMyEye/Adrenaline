@@ -18,7 +18,4 @@ public interface AdrenalineMixinNoiseChunkNoiseInterpolatorInvoker {
 
     @Invoker("updateForZ")
     void adrenaline$updateForZ(double zLerp);
-
-    @Invoker("swapSlices")
-    void adrenaline$swapSlices();
 }

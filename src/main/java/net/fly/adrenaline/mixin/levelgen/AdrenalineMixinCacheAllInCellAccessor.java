@@ -1,7 +1,6 @@
 package net.fly.adrenaline.mixin.levelgen;
 
 import net.minecraft.world.level.levelgen.DensityFunction;
-import net.minecraft.world.level.levelgen.NoiseChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
@@ -9,8 +8,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface AdrenalineMixinCacheAllInCellAccessor {
 
     @Accessor("noiseFiller")
-    DensityFunction getNoiseFiller();
+    DensityFunction adrenaline$getNoiseFiller();
 
     @Accessor("values")
-    double[] getValues();
+    double[] adrenaline$getValues();
 }
