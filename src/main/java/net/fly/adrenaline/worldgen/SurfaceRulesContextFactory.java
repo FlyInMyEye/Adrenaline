@@ -2,6 +2,8 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 import net.minecraft.core.BlockPos;
@@ -20,6 +22,7 @@ public final class SurfaceRulesContextFactory {
 
     private static final Constructor<?> CONSTRUCTOR;
     private static final Method TRY_APPLY_METHOD;
+    private static final ThreadLocal<Map<PipelineKey, SurfaceRulePipeline>> PIPELINE_CACHE = ThreadLocal.withInitial(HashMap::new);
 
     static {
         try {
@@ -50,9 +53,18 @@ public final class SurfaceRulesContextFactory {
     }
 
     public static SurfaceRulePipeline createPipeline(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
-        Object surfaceContext = create(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context);
-        Object surfaceRule = apply(ruleSource, surfaceContext);
-        return new SurfaceRulePipeline(surfaceRule, surfaceContext);
+        PipelineKey key = new PipelineKey(system, randomState, biomeRegistry, context, ruleSource);
+        Map<PipelineKey, SurfaceRulePipeline> cache = PIPELINE_CACHE.get();
+        SurfaceRulePipeline pipeline = cache.get(key);
+        if (pipeline == null) {
+            Object surfaceContext = create(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context);
+            Object surfaceRule = apply(ruleSource, surfaceContext);
+            pipeline = new SurfaceRulePipeline(surfaceRule, surfaceContext);
+            cache.put(key, pipeline);
+        } else {
+            pipeline.rebind(chunk, noiseChunk, biomeGetter);
+        }
+        return pipeline;
     }
 
     public static BlockState tryApply(Object surfaceRule, int x, int y, int z) {
@@ -86,5 +98,47 @@ public final class SurfaceRulesContextFactory {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static Object applyUnchecked(Function function, Object context) {
         return function.apply(context);
+    }
+
+    private static final class PipelineKey {
+
+        private final SurfaceSystem system;
+        private final RandomState randomState;
+        private final Registry<Biome> biomeRegistry;
+        private final WorldGenerationContext context;
+        private final SurfaceRules.RuleSource ruleSource;
+
+        private PipelineKey(SurfaceSystem system, RandomState randomState, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
+            this.system = system;
+            this.randomState = randomState;
+            this.biomeRegistry = biomeRegistry;
+            this.context = context;
+            this.ruleSource = ruleSource;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof PipelineKey key)) {
+                return false;
+            }
+            return this.system == key.system
+                && this.randomState == key.randomState
+                && this.biomeRegistry == key.biomeRegistry
+                && this.context == key.context
+                && this.ruleSource == key.ruleSource;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = System.identityHashCode(this.system);
+            result = 31 * result + System.identityHashCode(this.randomState);
+            result = 31 * result + System.identityHashCode(this.biomeRegistry);
+            result = 31 * result + System.identityHashCode(this.context);
+            result = 31 * result + System.identityHashCode(this.ruleSource);
+            return result;
+        }
     }
 }

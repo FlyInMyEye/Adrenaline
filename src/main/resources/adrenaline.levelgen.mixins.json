@@ -5,11 +5,13 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "adrenaline.refmap.json",
   "mixins": [
+    "AdrenalineMixinCacheAllInCellAccessor",
     "AdrenalineMixinNoiseChunkNoiseInterpolatorInvoker",
+    "AdrenalineMixinNoiseInterpolatorAccessor",
+    "AdrenalineMixinNoiseInterpolatorInvoker",
     "AdrenalineMixinSurfaceRulesContext",
     "AdrenalineMixinSurfaceRulesContextApi",
-    "AdrenalineMixinCacheAllInCell",
-    "AdrenalineMixinCacheAllInCellAccessor"
+    "AdrenalineMixinSurfaceRulesContextMutable"
   ],
   "client": [],
   "server": [],
