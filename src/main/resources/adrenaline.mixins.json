@@ -25,11 +25,9 @@
     "MixinIOWorker",
     "MixinIOWorkerPendingStoreAccessor",
     "MixinLegacyRandomSourceAccessor",
-    "MixinPalettedContainerDataAccessor",
     "MixinRegionFileStorage",
     "MixinRegionFileStorageAccessor",
-    "MixinRegionFileStorageInvoker",
-    "MixinPalettedContainer"
+    "MixinRegionFileStorageInvoker"
   ],
   "client": [],
   "server": [],

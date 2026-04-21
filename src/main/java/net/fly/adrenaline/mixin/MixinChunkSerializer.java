@@ -5,6 +5,7 @@ import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.util.ChunkSerializationSupport;
 import net.fly.adrenaline.util.SectionSerializationCache;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
+
 @Mixin(ChunkSerializer.class)
 public class MixinChunkSerializer {
 
@@ -42,17 +44,11 @@ public class MixinChunkSerializer {
         return null;
     }
 
-    private static volatile Codec<PalettedContainerRO<Holder<Biome>>> CACHED_BIOME_CODEC;
-    private static volatile Registry<Biome> CACHED_BIOME_REGISTRY;
-    private static final ForkJoinPool SERIALIZATION_POOL = new ForkJoinPool(AdrenalineConfig.resolvedWorkerThreads());
-
     private static final ThreadLocal<ChunkAccess> SERIALIZING_CHUNK = new ThreadLocal<>();
 
     @Inject(method = "write", at = @At("HEAD"))
-    private static void captureAndPreEncode(
-            ServerLevel level, ChunkAccess chunk,
-            CallbackInfoReturnable<CompoundTag> cir) {
-        if (!AdrenalineConfig.get().parallelChunkSerialization) {
+    private static void captureAndPreEncode(ServerLevel level, ChunkAccess chunk, CallbackInfoReturnable<CompoundTag> cir) {
+        if (!AdrenalineConfig.parallelChunkSerializationEnabled()) {
             return;
         }
 
@@ -60,14 +56,11 @@ public class MixinChunkSerializer {
 
         LevelChunkSection[] sections = chunk.getSections();
         Registry<Biome> biomeRegistry = level.registryAccess().registryOrThrow(Registries.BIOME);
-        if (CACHED_BIOME_REGISTRY != biomeRegistry) {
-            CACHED_BIOME_CODEC = makeBiomeCodec(biomeRegistry);
-            CACHED_BIOME_REGISTRY = biomeRegistry;
-        }
-        Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = CACHED_BIOME_CODEC;
+        Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec = ChunkSerializationSupport.biomeCodec(biomeRegistry, MixinChunkSerializer::makeBiomeCodec);
         Tag[][] sectionTags = new Tag[sections.length][2];
         List<CompletableFuture<Void>> futures = new ArrayList<>(sections.length);
 
+        ForkJoinPool serializationPool = ChunkSerializationSupport.serializationPool();
         for (int i = 0; i < sections.length; i++) {
             final int idx = i;
             final LevelChunkSection section = sections[i];
@@ -78,7 +71,7 @@ public class MixinChunkSerializer {
                 sectionTags[idx][1] = biomeCodec
                         .encodeStart(NbtOps.INSTANCE, section.getBiomes())
                         .resultOrPartial(e -> {}).orElse(null);
-            }, SERIALIZATION_POOL));
+            }, serializationPool));
         }
 
         try {
@@ -94,9 +87,7 @@ public class MixinChunkSerializer {
     }
 
     @Inject(method = "write", at = @At("RETURN"))
-    private static void clearCache(
-            ServerLevel level, ChunkAccess chunk,
-            CallbackInfoReturnable<CompoundTag> cir) {
+    private static void clearCache(ServerLevel level, ChunkAccess chunk, CallbackInfoReturnable<CompoundTag> cir) {
         if (chunk instanceof SectionSerializationCache ssc) {
             ssc.adrenaline$setSectionTags(null);
         }
@@ -113,29 +104,15 @@ public class MixinChunkSerializer {
         remap = false
     )
     private static DataResult<?> useCachedEncoding(Codec<?> codec, DynamicOps<?> ops, Object value) {
-        if (!AdrenalineConfig.get().parallelChunkSerialization) {
-            @SuppressWarnings("unchecked")
-            DataResult<?> result = ((Codec<Object>) codec).encodeStart((DynamicOps<Object>) ops, value);
-            return result;
+        if (!AdrenalineConfig.parallelChunkSerializationEnabled()) {
+            return ChunkSerializationSupport.encodeStart(codec, ops, value);
         }
 
         ChunkAccess chunk = SERIALIZING_CHUNK.get();
-        if (chunk instanceof SectionSerializationCache ssc) {
-            Tag[][] cache = ssc.adrenaline$getSectionTags();
-            if (cache != null) {
-                LevelChunkSection[] sections = chunk.getSections();
-                for (int i = 0; i < sections.length; i++) {
-                    if (value == sections[i].getStates() && cache[i][0] != null) {
-                        return DataResult.success(cache[i][0]);
-                    }
-                    if (value == sections[i].getBiomes() && cache[i][1] != null) {
-                        return DataResult.success(cache[i][1]);
-                    }
-                }
-            }
+        if (chunk == null) {
+            return ChunkSerializationSupport.encodeStart(codec, ops, value);
         }
-        @SuppressWarnings("unchecked")
-        DataResult<?> result = ((Codec<Object>) codec).encodeStart((DynamicOps<Object>) ops, value);
-        return result;
+
+        return ChunkSerializationSupport.cachedEncodeStart(chunk, codec, ops, value);
     }
 }

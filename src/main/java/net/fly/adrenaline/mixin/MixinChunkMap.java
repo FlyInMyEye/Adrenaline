@@ -1,5 +1,8 @@
 package net.fly.adrenaline.mixin;
 
+import java.util.List;
+import java.util.function.Function;
+
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -16,11 +19,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.List;
-import java.util.function.Function;
-
 @Mixin(ChunkMap.class)
 public class MixinChunkMap {
+
     private static final ThreadLocal<ChunkHolder> CURRENT_HOLDER = new ThreadLocal<>();
 
     @Inject(
@@ -42,7 +43,7 @@ public class MixinChunkMap {
         )
     )
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
-        if (!AdrenalineConfig.get().parallelWorldgen) {
+        if (!AdrenalineConfig.parallelWorldgenEnabled()) {
             instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
             return;
         }
@@ -50,7 +51,7 @@ public class MixinChunkMap {
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());
         ChunkHolder holder = CURRENT_HOLDER.get();
-        int writeRadius = (holder != null && isFeatureStage(holder)) ? 1 : 0;
+        int writeRadius = isFeatureStage(holder) ? 1 : 0;
 
         ChunkJobScheduler.get().submit(new ChunkJob(pos, writeRadius, () -> {
             @SuppressWarnings("unchecked")

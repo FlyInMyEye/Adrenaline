@@ -9,6 +9,7 @@ import net.fly.datafly.codec.Codecs;
 import net.fly.datafly.lifecycle.LifecycleManager;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +47,10 @@ public final class ChunkStore {
     }
 
     public static Path chunkPath(ChunkPos pos, Path regionFolder) {
-        Path base = regionFolder.resolveSibling("adrenaline_chunks");
+        Path normalizedFolder = regionFolder.toAbsolutePath().normalize();
+        String folderName = normalizedFolder.getFileName().toString();
+        String folderKey = Integer.toHexString(normalizedFolder.toString().hashCode());
+        Path base = FMLPaths.GAMEDIR.get().resolve(".adrenaline").resolve("chunk_cache").resolve(folderName + "-" + folderKey);
         return base.resolve("c." + pos.x + "." + pos.z + ".nbt");
     }
 }
