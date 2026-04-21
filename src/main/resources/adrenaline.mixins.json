@@ -25,6 +25,9 @@
     "MixinIOWorker",
     "MixinIOWorkerPendingStoreAccessor",
     "MixinLegacyRandomSourceAccessor",
+    "MixinBlender",
+    "MixinBeardifier",
+    "MixinNoiseChunkOreVeinifier",
     "MixinRegionFileStorage",
     "MixinRegionFileStorageAccessor",
     "MixinRegionFileStorageInvoker"
