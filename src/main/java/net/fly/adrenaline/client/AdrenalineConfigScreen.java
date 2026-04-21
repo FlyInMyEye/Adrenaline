@@ -122,7 +122,10 @@ public class AdrenalineConfigScreen extends Screen {
                 guiGraphics.drawString(this.font, label.message(), label.x(), y + 6, 16777215, false);
             }
         }
+        boolean doneButtonVisible = this.doneButton.visible;
+        this.doneButton.visible = false;
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        this.doneButton.visible = doneButtonVisible;
         guiGraphics.disableScissor();
         this.doneButton.render(guiGraphics, mouseX, mouseY, partialTick);
         this.renderScrollBar(guiGraphics, topPanelBottom, contentBottom);
