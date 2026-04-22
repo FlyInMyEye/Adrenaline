@@ -10,6 +10,8 @@
     "MixinChunkAccessAccessor",
     "MixinLevelChunk",
     "MixinLevelChunkSectionAccessor",
+    "MixinLevelLoadingScreen",
+    "MixinMinecraftServer",
     "MixinMessageAccessor",
     "MixinMaterialRuleList",
     "MixinNoiseBasedAquifer",

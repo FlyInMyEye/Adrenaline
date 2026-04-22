@@ -35,6 +35,11 @@ public class AdrenalineConfig {
         return v == 0 ? Runtime.getRuntime().availableProcessors() : Math.max(1, v);
     }
 
+    public static int resolvedSpawnZoneRadius() {
+        int v = get().spawnZoneRadius;
+        return v == 0 ? 11 : Math.max(12, Math.min(30, v));
+    }
+
     public static boolean enabled() {
         return get().enabled;
     }
@@ -87,6 +92,7 @@ public class AdrenalineConfig {
         public boolean noiseChunkOptimizations = true;
         public boolean materialRuleOptimizations = true;
         public int workerThreads = 0;
+        public int spawnZoneRadius = 0;
         public boolean parallelWorldgen = true;
         public boolean parallelChunkSerialization = true;
         public boolean chunkIoCache = true;
@@ -107,6 +113,7 @@ public class AdrenalineConfig {
             this.noiseChunkOptimizations = other.noiseChunkOptimizations;
             this.materialRuleOptimizations = other.materialRuleOptimizations;
             this.workerThreads = other.workerThreads;
+            this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
             this.parallelChunkSerialization = other.parallelChunkSerialization;
             this.chunkIoCache = other.chunkIoCache;

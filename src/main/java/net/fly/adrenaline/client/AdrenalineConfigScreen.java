@@ -25,6 +25,7 @@ public class AdrenalineConfigScreen extends Screen {
     private final List<ScrollableLabel> scrollableLabels = new ArrayList<>();
 
     private WorkerThreadsSlider workerThreadsSlider;
+    private SpawnZoneRadiusSlider spawnZoneRadiusSlider;
     private Button enabledButton;
     private Button worldgenOptimizationsButton;
     private Button terrainFillOptimizationsButton;
@@ -66,6 +67,8 @@ public class AdrenalineConfigScreen extends Screen {
         int buttonWidth = 70;
 
         this.workerThreadsSlider = this.addScrollableWidget(new WorkerThreadsSlider(leftX, y, 370, 20), y);
+        y += 30;
+        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20), y);
         y += 30;
 
         this.enabledButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Enabled"), this.config.enabled, value -> this.config.enabled = value);
@@ -256,6 +259,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.noiseChunkOptimizationsButton.active = worldgenOptimizations;
         this.materialRuleOptimizationsButton.active = worldgenOptimizations;
         this.workerThreadsSlider.active = parallelWorldgen;
+        this.spawnZoneRadiusSlider.active = enabled;
     }
 
     private List<WarningLine> warningLines() {
@@ -302,6 +306,30 @@ public class AdrenalineConfigScreen extends Screen {
         }
     }
 
+    private final class SpawnZoneRadiusSlider extends AbstractSliderButton {
+
+        private SpawnZoneRadiusSlider(int x, int y, int width, int height) {
+            super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toSpawnZoneRadiusSliderValue(AdrenalineConfigScreen.this.config.spawnZoneRadius));
+            this.updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            int value = AdrenalineConfigScreen.this.snapSpawnZoneRadiusSliderValue(this.value);
+            this.setMessage(Component.literal(value == 0 ? "Spawn zone radius: Default" : "Spawn zone radius: " + value));
+        }
+
+        @Override
+        protected void applyValue() {
+            int snappedValue = AdrenalineConfigScreen.this.snapSpawnZoneRadiusSliderValue(this.value);
+            this.value = AdrenalineConfigScreen.this.toSpawnZoneRadiusSliderValue(snappedValue);
+            AdrenalineConfigScreen.this.config.spawnZoneRadius = snappedValue;
+            this.updateMessage();
+            AdrenalineConfigScreen.this.saveConfig();
+            AdrenalineConfigScreen.this.updateButtonStates();
+        }
+    }
+
     private double toSliderValue(int workerThreads) {
         int clamped = Math.max(0, Math.min(workerThreads, this.availableProcessors));
         return this.availableProcessors <= 0 ? 0.0D : (double) clamped / (double) this.availableProcessors;
@@ -317,6 +345,26 @@ public class AdrenalineConfigScreen extends Screen {
 
     private int snapSliderValue(double value) {
         return this.fromSliderValue(value);
+    }
+
+    private double toSpawnZoneRadiusSliderValue(int spawnZoneRadius) {
+        if (spawnZoneRadius <= 0) {
+            return 0.0D;
+        }
+        int clamped = Math.max(12, Math.min(spawnZoneRadius, 30));
+        return (double) (clamped - 11) / 19.0D;
+    }
+
+    private int fromSpawnZoneRadiusSliderValue(double value) {
+        int resolved = 11 + (int) Math.round(value * 19.0D);
+        if (resolved <= 11) {
+            return 0;
+        }
+        return Math.min(resolved, 30);
+    }
+
+    private int snapSpawnZoneRadiusSliderValue(double value) {
+        return this.fromSpawnZoneRadiusSliderValue(value);
     }
 
     @FunctionalInterface
