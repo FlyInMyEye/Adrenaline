@@ -10,10 +10,12 @@ public final class ChunkJob implements Runnable {
 
     private final Set<Long> footprint;
     private final Runnable work;
+    private final ClassLoader contextClassLoader;
 
-    public ChunkJob(ChunkPos center, int writeRadius, Runnable work) {
+    public ChunkJob(ChunkPos center, int writeRadius, Runnable work, ClassLoader contextClassLoader) {
         this.footprint = buildFootprint(center, writeRadius);
         this.work = work;
+        this.contextClassLoader = contextClassLoader;
     }
 
     public Set<Long> footprint() {
@@ -22,10 +24,18 @@ public final class ChunkJob implements Runnable {
 
     @Override
     public void run() {
+        Thread currentThread = Thread.currentThread();
+        ClassLoader previousClassLoader = currentThread.getContextClassLoader();
         try {
+            if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
+                currentThread.setContextClassLoader(this.contextClassLoader);
+            }
             work.run();
             DeferredNotificationBuffer.flush();
         } finally {
+            if (currentThread.getContextClassLoader() != previousClassLoader) {
+                currentThread.setContextClassLoader(previousClassLoader);
+            }
             ChunkJobScheduler.get().onComplete(footprint);
         }
     }

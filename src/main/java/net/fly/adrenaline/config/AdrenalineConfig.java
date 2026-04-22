@@ -65,10 +65,6 @@ public class AdrenalineConfig {
         return get().fastLegacyRandom;
     }
 
-    public static boolean preloadProblematicClassesEnabled() {
-        return get().preloadProblematicClasses;
-    }
-
     public static boolean debugLoggingEnabled() {
         return get().debugLogging;
     }
@@ -83,7 +79,6 @@ public class AdrenalineConfig {
         public int spawnZoneRadius = 0;
         public boolean parallelWorldgen = true;
         public boolean fastLegacyRandom = true;
-        public boolean preloadProblematicClasses = true;
         public boolean debugLogging = false;
 
         public Data() {
@@ -99,7 +94,6 @@ public class AdrenalineConfig {
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
             this.fastLegacyRandom = other.fastLegacyRandom;
-            this.preloadProblematicClasses = other.preloadProblematicClasses;
             this.debugLogging = other.debugLogging;
         }
     }

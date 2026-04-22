@@ -52,6 +52,7 @@ public class MixinChunkMap {
         ChunkPos pos = new ChunkPos(accessor.getPos());
         ChunkHolder holder = CURRENT_HOLDER.get();
         int writeRadius = isFeatureStage(holder) ? 1 : 0;
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
 
         ChunkJobScheduler.get().submit(new ChunkJob(pos, writeRadius, () -> {
             @SuppressWarnings("unchecked")
@@ -59,7 +60,7 @@ public class MixinChunkMap {
             ProcessorHandle<Unit> dummy = ProcessorHandle.of("adrenaline-wrap", unit -> {
             });
             taskFunction.apply(dummy).run();
-        }));
+        }, contextClassLoader));
     }
 
     @Inject(

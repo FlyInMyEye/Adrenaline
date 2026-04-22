@@ -33,7 +33,6 @@ public class AdrenalineConfigScreen extends Screen {
     private Button materialRuleOptimizationsButton;
     private Button parallelWorldgenButton;
     private Button fastLegacyRandomButton;
-    private Button preloadProblematicClassesButton;
     private Button debugLoggingButton;
     private Button doneButton;
     private int scrollOffset;
@@ -85,8 +84,6 @@ public class AdrenalineConfigScreen extends Screen {
 
         y = this.addSectionHeader("Compatibility", y);
         this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value);
-        y += 24;
-        this.preloadProblematicClassesButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Preload problematic classes"), this.config.preloadProblematicClasses, value -> this.config.preloadProblematicClasses = value);
         y += 24;
 
         y = this.addSectionHeader("Diagnostics", y);
@@ -259,7 +256,6 @@ public class AdrenalineConfigScreen extends Screen {
         this.materialRuleOptimizationsButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
         this.fastLegacyRandomButton.active = true;
-        this.preloadProblematicClassesButton.active = true;
         this.debugLoggingButton.active = true;
         this.workerThreadsSlider.active = parallelWorldgen;
         this.spawnZoneRadiusSlider.active = true;

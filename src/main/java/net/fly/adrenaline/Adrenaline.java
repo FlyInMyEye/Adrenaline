@@ -3,7 +3,6 @@ package net.fly.adrenaline;
 import net.fly.adrenaline.client.AdrenalineConfigScreen;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
-import net.fly.adrenaline.util.ClassPreloader;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.common.MinecraftForge;
@@ -34,12 +33,9 @@ public class Adrenaline {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        if (AdrenalineConfig.get().preloadProblematicClasses) {
-            ClassPreloader.preloadKnownProblematicClasses();
-        }
         LOGGER.info("Adrenaline initialized, worldgen parallelism: {}", ChunkJobScheduler.get().parallelism());
         if (AdrenalineConfig.debugLoggingEnabled()) {
-            LOGGER.info("Config: worldgenOptimizations={}, terrainFill={}, surface={}, noiseChunk={}, materialRules={}, parallelWorldgen={}, fastLegacyRandom={}, preloadProblematicClasses={}, workerThreads={}, spawnZoneRadius={}", AdrenalineConfig.get().worldgenOptimizations, AdrenalineConfig.get().terrainFillOptimizations, AdrenalineConfig.get().surfaceOptimizations, AdrenalineConfig.get().noiseChunkOptimizations, AdrenalineConfig.get().materialRuleOptimizations, AdrenalineConfig.get().parallelWorldgen, AdrenalineConfig.get().fastLegacyRandom, AdrenalineConfig.get().preloadProblematicClasses, AdrenalineConfig.get().workerThreads, AdrenalineConfig.get().spawnZoneRadius);
+            LOGGER.info("Config: worldgenOptimizations={}, terrainFill={}, surface={}, noiseChunk={}, materialRules={}, parallelWorldgen={}, fastLegacyRandom={}, workerThreads={}, spawnZoneRadius={}", AdrenalineConfig.get().worldgenOptimizations, AdrenalineConfig.get().terrainFillOptimizations, AdrenalineConfig.get().surfaceOptimizations, AdrenalineConfig.get().noiseChunkOptimizations, AdrenalineConfig.get().materialRuleOptimizations, AdrenalineConfig.get().parallelWorldgen, AdrenalineConfig.get().fastLegacyRandom, AdrenalineConfig.get().workerThreads, AdrenalineConfig.get().spawnZoneRadius);
         }
     }
 }
