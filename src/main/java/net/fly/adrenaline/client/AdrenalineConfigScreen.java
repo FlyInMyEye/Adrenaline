@@ -26,15 +26,12 @@ public class AdrenalineConfigScreen extends Screen {
 
     private WorkerThreadsSlider workerThreadsSlider;
     private SpawnZoneRadiusSlider spawnZoneRadiusSlider;
-    private Button enabledButton;
     private Button worldgenOptimizationsButton;
     private Button terrainFillOptimizationsButton;
     private Button surfaceOptimizationsButton;
     private Button noiseChunkOptimizationsButton;
     private Button materialRuleOptimizationsButton;
     private Button parallelWorldgenButton;
-    private Button parallelChunkSerializationButton;
-    private Button chunkIoCacheButton;
     private Button fastLegacyRandomButton;
     private Button preloadProblematicClassesButton;
     private Button debugLoggingButton;
@@ -66,15 +63,17 @@ public class AdrenalineConfigScreen extends Screen {
         int labelX = leftX;
         int buttonWidth = 70;
 
+        y = this.addSectionHeader("General", y);
         this.workerThreadsSlider = this.addScrollableWidget(new WorkerThreadsSlider(leftX, y, 370, 20), y);
         y += 30;
         this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20), y);
         y += 30;
+        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Worldgen optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value);
+        y += 24;
+        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value);
+        y += 24;
 
-        this.enabledButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Enabled"), this.config.enabled, value -> this.config.enabled = value);
-        y += 24;
-        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Worldgen optimizations"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value);
-        y += 24;
+        y = this.addSectionHeader("Worldgen optimization", y);
         this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Terrain fill optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value);
         y += 24;
         this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Surface optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value);
@@ -83,16 +82,14 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
         this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Material rule optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value);
         y += 24;
-        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value);
-        y += 24;
-        this.parallelChunkSerializationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel chunk serialization"), this.config.parallelChunkSerialization, value -> this.config.parallelChunkSerialization = value);
-        y += 24;
-        this.chunkIoCacheButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Chunk IO cache"), this.config.chunkIoCache, value -> this.config.chunkIoCache = value);
-        y += 24;
+
+        y = this.addSectionHeader("Compatibility", y);
         this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value);
         y += 24;
         this.preloadProblematicClassesButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Preload problematic classes"), this.config.preloadProblematicClasses, value -> this.config.preloadProblematicClasses = value);
         y += 24;
+
+        y = this.addSectionHeader("Diagnostics", y);
         this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value);
         y += 24;
 
@@ -121,8 +118,13 @@ public class AdrenalineConfigScreen extends Screen {
         guiGraphics.enableScissor(0, topPanelBottom, this.width, contentBottom);
         for (ScrollableLabel label : this.scrollableLabels) {
             int y = label.baseY() - this.scrollOffset;
-            if (this.isPartiallyVisible(y, 20)) {
-                guiGraphics.drawString(this.font, label.message(), label.x(), y + 6, 16777215, false);
+            int height = label.centered() ? 16 : 20;
+            if (this.isPartiallyVisible(y, height)) {
+                if (label.centered()) {
+                    guiGraphics.drawCenteredString(this.font, label.message(), this.width / 2, y + 4, 0xFF59BD);
+                } else {
+                    guiGraphics.drawString(this.font, label.message(), label.x(), y + 6, 16777215, false);
+                }
             }
         }
         boolean doneButtonVisible = this.doneButton.visible;
@@ -160,8 +162,13 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private Button addToggleRow(int labelX, int buttonX, int y, int buttonWidth, Component label, boolean initialValue, BooleanConsumer consumer) {
-        this.scrollableLabels.add(new ScrollableLabel(label, labelX, y));
+        this.scrollableLabels.add(new ScrollableLabel(label, labelX, y, false));
         return this.addScrollableWidget(this.createToggleButton(buttonX, y, buttonWidth, initialValue, consumer), y);
+    }
+
+    private int addSectionHeader(String title, int y) {
+        this.scrollableLabels.add(new ScrollableLabel(Component.literal(title), 0, y, true));
+        return y + 16;
     }
 
     private Component toggleLabel(boolean value) {
@@ -242,24 +249,20 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private void updateButtonStates() {
-        boolean enabled = this.config.enabled;
-        boolean worldgenOptimizations = enabled && this.config.worldgenOptimizations;
-        boolean parallelWorldgen = enabled && this.config.parallelWorldgen;
+        boolean worldgenOptimizations = this.config.worldgenOptimizations;
+        boolean parallelWorldgen = this.config.parallelWorldgen;
 
-        this.worldgenOptimizationsButton.active = enabled;
-        this.parallelWorldgenButton.active = enabled;
-        this.parallelChunkSerializationButton.active = enabled;
-        this.chunkIoCacheButton.active = enabled;
-        this.fastLegacyRandomButton.active = enabled;
-        this.preloadProblematicClassesButton.active = enabled;
-        this.debugLoggingButton.active = enabled;
-
+        this.worldgenOptimizationsButton.active = true;
         this.terrainFillOptimizationsButton.active = worldgenOptimizations;
         this.surfaceOptimizationsButton.active = worldgenOptimizations;
         this.noiseChunkOptimizationsButton.active = worldgenOptimizations;
         this.materialRuleOptimizationsButton.active = worldgenOptimizations;
+        this.parallelWorldgenButton.active = true;
+        this.fastLegacyRandomButton.active = true;
+        this.preloadProblematicClassesButton.active = true;
+        this.debugLoggingButton.active = true;
         this.workerThreadsSlider.active = parallelWorldgen;
-        this.spawnZoneRadiusSlider.active = enabled;
+        this.spawnZoneRadiusSlider.active = true;
     }
 
     private List<WarningLine> warningLines() {
@@ -378,6 +381,6 @@ public class AdrenalineConfigScreen extends Screen {
     private record ScrollableWidget(AbstractWidget widget, int baseY) {
     }
 
-    private record ScrollableLabel(Component message, int x, int baseY) {
+    private record ScrollableLabel(Component message, int x, int baseY, boolean centered) {
     }
 }

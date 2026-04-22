@@ -2,9 +2,6 @@ package net.fly.adrenaline.config;
 
 import net.fly.configlib.JsonConfigManager;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class AdrenalineConfig {
 
     private static JsonConfigManager<Data> MANAGER;
@@ -40,52 +37,43 @@ public class AdrenalineConfig {
         return v == 0 ? 11 : Math.max(12, Math.min(30, v));
     }
 
-    public static boolean enabled() {
-        return get().enabled;
-    }
-
     public static boolean parallelWorldgenEnabled() {
-        return enabled() && get().parallelWorldgen;
+        return get().parallelWorldgen;
     }
 
     public static boolean terrainFillOptimizationsEnabled() {
-        return enabled() && get().worldgenOptimizations && get().terrainFillOptimizations;
+        return get().worldgenOptimizations && get().terrainFillOptimizations;
     }
 
     public static boolean surfaceOptimizationsEnabled() {
-        return enabled() && get().worldgenOptimizations && get().surfaceOptimizations;
+        return get().worldgenOptimizations && get().surfaceOptimizations;
     }
 
     public static boolean noiseChunkOptimizationsEnabled() {
-        return enabled() && get().worldgenOptimizations && get().noiseChunkOptimizations;
+        return get().worldgenOptimizations && get().noiseChunkOptimizations;
     }
 
     public static boolean materialRuleOptimizationsEnabled() {
-        return enabled() && get().worldgenOptimizations && get().materialRuleOptimizations;
+        return get().worldgenOptimizations && get().materialRuleOptimizations;
     }
 
     public static boolean parallelChunkSerializationEnabled() {
-        return enabled() && get().parallelChunkSerialization;
-    }
-
-    public static boolean chunkIoCacheEnabled() {
-        return enabled() && get().chunkIoCache;
+        return parallelWorldgenEnabled();
     }
 
     public static boolean fastLegacyRandomEnabled() {
-        return enabled() && get().fastLegacyRandom;
+        return get().fastLegacyRandom;
     }
 
     public static boolean preloadProblematicClassesEnabled() {
-        return enabled() && get().preloadProblematicClasses;
+        return get().preloadProblematicClasses;
     }
 
     public static boolean debugLoggingEnabled() {
-        return enabled() && get().debugLogging;
+        return get().debugLogging;
     }
 
     public static class Data {
-        public boolean enabled = true;
         public boolean worldgenOptimizations = true;
         public boolean terrainFillOptimizations = true;
         public boolean surfaceOptimizations = true;
@@ -94,19 +82,14 @@ public class AdrenalineConfig {
         public int workerThreads = 0;
         public int spawnZoneRadius = 0;
         public boolean parallelWorldgen = true;
-        public boolean parallelChunkSerialization = true;
-        public boolean chunkIoCache = true;
         public boolean fastLegacyRandom = true;
         public boolean preloadProblematicClasses = true;
         public boolean debugLogging = false;
-        public List<String> stageBlacklist = new ArrayList<>();
-        public List<String> featureBlacklist = new ArrayList<>();
 
         public Data() {
         }
 
         public Data(Data other) {
-            this.enabled = other.enabled;
             this.worldgenOptimizations = other.worldgenOptimizations;
             this.terrainFillOptimizations = other.terrainFillOptimizations;
             this.surfaceOptimizations = other.surfaceOptimizations;
@@ -115,13 +98,9 @@ public class AdrenalineConfig {
             this.workerThreads = other.workerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
-            this.parallelChunkSerialization = other.parallelChunkSerialization;
-            this.chunkIoCache = other.chunkIoCache;
             this.fastLegacyRandom = other.fastLegacyRandom;
             this.preloadProblematicClasses = other.preloadProblematicClasses;
             this.debugLogging = other.debugLogging;
-            this.stageBlacklist = new ArrayList<>(other.stageBlacklist);
-            this.featureBlacklist = new ArrayList<>(other.featureBlacklist);
         }
     }
 }

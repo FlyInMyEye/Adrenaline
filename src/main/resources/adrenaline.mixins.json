@@ -28,7 +28,9 @@
     "MixinBeardifier",
     "MixinNoiseChunkOreVeinifier"
   ],
-  "client": [],
+  "client": [
+    "MixinOptionsScreen"
+  ],
   "server": [],
   "injectors": {
     "defaultRequire": 1
