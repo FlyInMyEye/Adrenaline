@@ -1,7 +1,5 @@
 package net.fly.adrenaline.mixin;
 
-import net.fly.adrenaline.config.AdrenalineConfig;
-import net.fly.adrenaline.io.ChunkStore;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.IOWorker;
@@ -49,28 +47,6 @@ public class MixinIOWorker {
         )
     )
     private void redirectToDataFly(RegionFileStorage storage, ChunkPos pos, CompoundTag data) {
-        if (!AdrenalineConfig.get().chunkIoCache) {
-            ((MixinRegionFileStorageInvoker) (Object) storage).adrenaline$write(pos, data);
-            return;
-        }
-
-        if (data != null) {
-            CompletableFuture<?> dataFlyFuture = ChunkStore.write(pos, data, ((MixinRegionFileStorageAccessor) (Object) storage).adrenaline$getFolder()).toFuture();
-            Object pendingStore = CAPTURED_PENDING_STORE.get();
-            if (pendingStore != null) {
-                CompletableFuture<Void> result = ((MixinIOWorkerPendingStoreAccessor) pendingStore).adrenaline$getResult();
-                dataFlyFuture.whenComplete((ignored, exception) -> {
-                    if (exception != null) {
-                        result.completeExceptionally(exception);
-                    } else {
-                        result.complete(null);
-                    }
-                });
-                CAPTURED_PENDING_STORE.remove();
-                return;
-            }
-        }
-
         ((MixinRegionFileStorageInvoker) (Object) storage).adrenaline$write(pos, data);
     }
 
