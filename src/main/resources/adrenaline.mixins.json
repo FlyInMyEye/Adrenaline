@@ -8,7 +8,6 @@
     "MixinChunkMap",
     "MixinChunkSerializer",
     "MixinChunkAccessAccessor",
-    "MixinLevelChunk",
     "MixinLevelChunkSectionAccessor",
     "MixinLevelLoadingScreen",
     "MixinMinecraftServer",

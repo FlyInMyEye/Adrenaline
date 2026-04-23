@@ -9,10 +9,9 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.nbt.Tag;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.PalettedContainerRO;
+import net.minecraft.world.level.biome.Biome;
 
 public final class ChunkSerializationSupport {
 
@@ -69,18 +68,14 @@ public final class ChunkSerializationSupport {
         return result;
     }
 
-    public static DataResult<?> cachedEncodeStart(ChunkAccess chunk, Codec<?> codec, DynamicOps<?> ops, Object value) {
-        if (chunk instanceof SectionSerializationCache sectionSerializationCache) {
-            Tag[][] cache = sectionSerializationCache.adrenaline$getSectionTags();
-            if (cache != null) {
-                LevelChunkSection[] sections = chunk.getSections();
-                for (int i = 0; i < sections.length; i++) {
-                    if (value == sections[i].getStates() && cache[i][0] != null) {
-                        return DataResult.success(cache[i][0]);
-                    }
-                    if (value == sections[i].getBiomes() && cache[i][1] != null) {
-                        return DataResult.success(cache[i][1]);
-                    }
+    public static DataResult<?> cachedEncodeStart(LevelChunkSection[] sections, Tag[][] cache, Codec<?> codec, DynamicOps<?> ops, Object value) {
+        if (cache != null) {
+            for (int i = 0; i < sections.length; i++) {
+                if (value == sections[i].getStates() && cache[i][0] != null) {
+                    return DataResult.success(cache[i][0]);
+                }
+                if (value == sections[i].getBiomes() && cache[i][1] != null) {
+                    return DataResult.success(cache[i][1]);
                 }
             }
         }
