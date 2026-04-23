@@ -24,6 +24,7 @@ import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.Aquifer;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -198,7 +199,7 @@ public class MixinNoiseBasedChunkGenerator {
         ChunkPos chunkPos = chunk.getPos();
         int minBlockX = chunkPos.getMinBlockX();
         int minBlockZ = chunkPos.getMinBlockZ();
-        BlockState defaultBlock = this.settings.value().defaultBlock();
+        Aquifer aquifer = noiseChunk.aquifer();
         int cellWidth = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$cellWidth();
         int cellHeight = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$cellHeight();
         int cellCountX = 16 / cellWidth;
@@ -210,10 +211,20 @@ public class MixinNoiseBasedChunkGenerator {
         for (int cellX = 0; cellX < cellCountX; cellX++) {
             noiseChunk.advanceCellX(cellX);
             for (int cellZ = 0; cellZ < cellCountZ; cellZ++) {
+                int sectionIndex = chunk.getSectionsCount() - 1;
+                LevelChunkSection section = chunk.getSection(sectionIndex);
                 for (int cellY = cellCountY - 1; cellY >= 0; cellY--) {
                     noiseChunk.selectCellYZ(cellY, cellZ);
                     for (int yInCell = cellHeight - 1; yInCell >= 0; yInCell--) {
                         int y = (minCellY + cellY) * cellHeight + yInCell;
+                        int localY = y & 15;
+                        int targetSectionIndex = chunk.getSectionIndex(y);
+
+                        if (sectionIndex != targetSectionIndex) {
+                            sectionIndex = targetSectionIndex;
+                            section = chunk.getSection(sectionIndex);
+                        }
+
                         noiseChunk.updateForY(y, (double) yInCell / (double) cellHeight);
                         for (int xInCell = 0; xInCell < cellWidth; xInCell++) {
                             int x = minBlockX + cellX * cellWidth + xInCell;
@@ -225,16 +236,17 @@ public class MixinNoiseBasedChunkGenerator {
                                 noiseChunk.updateForZ(z, (double) zInCell / (double) cellWidth);
                                 BlockState state = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$getInterpolatedState();
                                 if (state == null) {
-                                    state = defaultBlock;
+                                    state = this.settings.value().defaultBlock();
                                 }
                                 state = this.debugPreliminarySurfaceLevel(noiseChunk, x, y, z, state);
                                 if (state == AIR || SharedConstants.debugVoidTerrain(chunkPos)) {
                                     continue;
                                 }
-                                chunk.setBlockState(mutableBlockPos.set(x, y, z), state, false);
+                                section.setBlockState(localX, localY, localZ, state, false);
                                 oceanFloor.update(localX, y, localZ, state);
                                 worldSurface.update(localX, y, localZ, state);
-                                if (!state.getFluidState().isEmpty()) {
+                                if (aquifer.shouldScheduleFluidUpdate() && !state.getFluidState().isEmpty()) {
+                                    mutableBlockPos.set(x, y, z);
                                     chunk.markPosForPostprocessing(mutableBlockPos);
                                 }
                             }
@@ -242,13 +254,10 @@ public class MixinNoiseBasedChunkGenerator {
                     }
                 }
             }
-            if (cellX + 1 < cellCountX) {
-                noiseChunk.swapSlices();
-            }
+            noiseChunk.swapSlices();
         }
 
         noiseChunk.stopInterpolation();
-        chunk.initializeLightSources();
         return chunk;
     }
 }
