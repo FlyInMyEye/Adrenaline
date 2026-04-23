@@ -1,8 +1,10 @@
 package net.fly.adrenaline.mixin.levelgen;
 
+import com.google.common.base.Suppliers;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
@@ -37,6 +39,16 @@ public abstract class AdrenalineMixinSurfaceRulesContext {
      */
     @Overwrite
     protected void updateY(int stoneDepthAbove, int stoneDepthBelow, int waterHeight, int blockX, int blockY, int blockZ) {
+        if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
+            this.lastUpdateY++;
+            this.biome = Suppliers.memoize(() -> this.biomeGetter.apply(this.pos.set(blockX, blockY, blockZ)));
+            this.blockY = blockY;
+            this.waterHeight = waterHeight;
+            this.stoneDepthBelow = stoneDepthBelow;
+            this.stoneDepthAbove = stoneDepthAbove;
+            return;
+        }
+
         this.lastUpdateY++;
         this.adrenaline$biomeX = blockX;
         this.adrenaline$biomeY = blockY;

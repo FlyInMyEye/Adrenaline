@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import org.spongepowered.asm.mixin.Mixin;
@@ -19,6 +20,10 @@ public class MixinBlender {
 
     @Inject(method = "of", at = @At("HEAD"), cancellable = true)
     private static void adrenaline$reuseBlender(WorldGenRegion region, CallbackInfoReturnable<Blender> cir) {
+        if (!AdrenalineConfig.get().worldgenOptimizations) {
+            return;
+        }
+
         if (region != null && region == ADRENALINE_LAST_REGION.get()) {
             Blender blender = ADRENALINE_LAST_BLENDER.get();
             if (blender != null) {
@@ -29,6 +34,12 @@ public class MixinBlender {
 
     @Inject(method = "of", at = @At("RETURN"))
     private static void adrenaline$cacheBlender(WorldGenRegion region, CallbackInfoReturnable<Blender> cir) {
+        if (!AdrenalineConfig.get().worldgenOptimizations) {
+            ADRENALINE_LAST_REGION.remove();
+            ADRENALINE_LAST_BLENDER.remove();
+            return;
+        }
+
         ADRENALINE_LAST_REGION.set(region);
         ADRENALINE_LAST_BLENDER.set(cir.getReturnValue());
     }
