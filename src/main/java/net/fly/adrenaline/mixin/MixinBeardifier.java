@@ -2,6 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectListIterator;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.world.level.levelgen.Beardifier;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
@@ -50,6 +51,10 @@ public abstract class MixinBeardifier {
 
     @Inject(method = "compute", at = @At("HEAD"), cancellable = true)
     private void adrenaline$compute(DensityFunction.FunctionContext context, CallbackInfoReturnable<Double> cir) {
+        if (!AdrenalineConfig.beardifierOptimizationsEnabled()) {
+            return;
+        }
+
         this.adrenaline$initCaches();
         int blockX = context.blockX();
         int blockY = context.blockY();

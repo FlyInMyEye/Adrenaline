@@ -57,6 +57,18 @@ public class AdrenalineConfig {
         return get().worldgenOptimizations && get().materialRuleOptimizations;
     }
 
+    public static boolean aquiferOptimizationsEnabled() {
+        return get().worldgenOptimizations && get().aquiferOptimizations;
+    }
+
+    public static boolean beardifierOptimizationsEnabled() {
+        return get().worldgenOptimizations && get().beardifierOptimizations;
+    }
+
+    public static boolean oreVeinOptimizationsEnabled() {
+        return get().worldgenOptimizations && get().oreVeinOptimizations;
+    }
+
     public static boolean parallelChunkSerializationEnabled() {
         return parallelWorldgenEnabled();
     }
@@ -75,6 +87,9 @@ public class AdrenalineConfig {
         public boolean surfaceOptimizations = true;
         public boolean noiseChunkOptimizations = true;
         public boolean materialRuleOptimizations = true;
+        public boolean aquiferOptimizations = true;
+        public boolean beardifierOptimizations = true;
+        public boolean oreVeinOptimizations = true;
         public int workerThreads = 0;
         public int spawnZoneRadius = 0;
         public boolean parallelWorldgen = true;
@@ -90,6 +105,9 @@ public class AdrenalineConfig {
             this.surfaceOptimizations = other.surfaceOptimizations;
             this.noiseChunkOptimizations = other.noiseChunkOptimizations;
             this.materialRuleOptimizations = other.materialRuleOptimizations;
+            this.aquiferOptimizations = other.aquiferOptimizations;
+            this.beardifierOptimizations = other.beardifierOptimizations;
+            this.oreVeinOptimizations = other.oreVeinOptimizations;
             this.workerThreads = other.workerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;

@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
@@ -29,6 +30,10 @@ public class MixinNoiseChunkOreVeinifier {
         )
     )
     private NoiseChunk.BlockStateFiller adrenaline$fastOreVeinifier(DensityFunction veinToggle, DensityFunction veinRidged, DensityFunction veinGap, PositionalRandomFactory randomFactory) {
+        if (!AdrenalineConfig.oreVeinOptimizationsEnabled()) {
+            return MixinOreVeinifierInvoker.adrenaline$create(veinToggle, veinRidged, veinGap, randomFactory);
+        }
+
         return context -> {
             double veininess = veinToggle.compute(context);
             int blockY = context.blockY();

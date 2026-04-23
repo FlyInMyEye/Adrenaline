@@ -31,6 +31,9 @@ public class AdrenalineConfigScreen extends Screen {
     private Button surfaceOptimizationsButton;
     private Button noiseChunkOptimizationsButton;
     private Button materialRuleOptimizationsButton;
+    private Button aquiferOptimizationsButton;
+    private Button beardifierOptimizationsButton;
+    private Button oreVeinOptimizationsButton;
     private Button parallelWorldgenButton;
     private Button fastLegacyRandomButton;
     private Button debugLoggingButton;
@@ -80,6 +83,12 @@ public class AdrenalineConfigScreen extends Screen {
         this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Noise chunk optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value);
         y += 24;
         this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Material rule optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value);
+        y += 24;
+        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Aquifer optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value);
+        y += 24;
+        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Beardifier optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value);
+        y += 24;
+        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Ore vein optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value);
         y += 24;
 
         y = this.addSectionHeader("Compatibility", y);
@@ -254,6 +263,9 @@ public class AdrenalineConfigScreen extends Screen {
         this.surfaceOptimizationsButton.active = worldgenOptimizations;
         this.noiseChunkOptimizationsButton.active = worldgenOptimizations;
         this.materialRuleOptimizationsButton.active = worldgenOptimizations;
+        this.aquiferOptimizationsButton.active = worldgenOptimizations;
+        this.beardifierOptimizationsButton.active = worldgenOptimizations;
+        this.oreVeinOptimizationsButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
         this.fastLegacyRandomButton.active = true;
         this.debugLoggingButton.active = true;

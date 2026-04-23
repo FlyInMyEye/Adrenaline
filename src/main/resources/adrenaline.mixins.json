@@ -24,6 +24,7 @@
     "MixinSurfaceSystem",
     "MixinStructureTemplatePalette",
     "MixinLegacyRandomSourceAccessor",
+    "MixinOreVeinifierInvoker",
     "MixinBlender",
     "MixinBeardifier",
     "MixinNoiseChunkOreVeinifier"

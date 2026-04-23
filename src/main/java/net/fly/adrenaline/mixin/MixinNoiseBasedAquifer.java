@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.OverworldBiomeBuilder;
@@ -18,6 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Aquifer.NoiseBasedAquifer.class)
 public abstract class MixinNoiseBasedAquifer {
 
+    @Shadow @Final private static int[][] SURFACE_SAMPLING_OFFSETS_IN_CHUNKS;
     @Shadow @Final private long[] aquiferLocationCache;
     @Shadow @Final private int minGridX;
     @Shadow @Final private int minGridY;
@@ -59,6 +61,10 @@ public abstract class MixinNoiseBasedAquifer {
         )
     )
     private int[][] adrenaline$useReducedSurfaceSampling() {
+        if (!AdrenalineConfig.aquiferOptimizationsEnabled()) {
+            return SURFACE_SAMPLING_OFFSETS_IN_CHUNKS;
+        }
+
         return adrenaline$surfaceOffsets;
     }
 
@@ -70,6 +76,10 @@ public abstract class MixinNoiseBasedAquifer {
         )
     )
     private boolean adrenaline$skipDeepDarkSpecialCase(DensityFunction erosion, DensityFunction depth, DensityFunction.FunctionContext context) {
+        if (!AdrenalineConfig.aquiferOptimizationsEnabled()) {
+            return OverworldBiomeBuilder.isDeepDarkRegion(erosion, depth, context);
+        }
+
         return false;
     }
 
@@ -81,6 +91,10 @@ public abstract class MixinNoiseBasedAquifer {
         )
     )
     private double adrenaline$skipBarrierNoise(DensityFunction barrierNoise, DensityFunction.FunctionContext context) {
+        if (!AdrenalineConfig.aquiferOptimizationsEnabled()) {
+            return barrierNoise.compute(context);
+        }
+
         return 0.0D;
     }
 }
