@@ -13,6 +13,8 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 
 public class AdrenalineConfigScreen extends Screen {
 
@@ -24,7 +26,8 @@ public class AdrenalineConfigScreen extends Screen {
     private final List<ScrollableWidget> scrollableWidgets = new ArrayList<>();
     private final List<ScrollableLabel> scrollableLabels = new ArrayList<>();
 
-    private WorkerThreadsSlider workerThreadsSlider;
+    private ThreadCountSlider generationThreadsSlider;
+    private ThreadCountSlider serializationThreadsSlider;
     private SpawnZoneRadiusSlider spawnZoneRadiusSlider;
     private Button worldgenOptimizationsButton;
     private Button terrainFillOptimizationsButton;
@@ -66,7 +69,9 @@ public class AdrenalineConfigScreen extends Screen {
         int buttonWidth = 70;
 
         y = this.addSectionHeader("General", y);
-        this.workerThreadsSlider = this.addScrollableWidget(new WorkerThreadsSlider(leftX, y, 370, 20), y);
+        this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Generation threads", () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value), y);
+        y += 30;
+        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Serialization threads", () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value), y);
         y += 30;
         this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20), y);
         y += 30;
@@ -269,7 +274,8 @@ public class AdrenalineConfigScreen extends Screen {
         this.parallelWorldgenButton.active = true;
         this.fastLegacyRandomButton.active = true;
         this.debugLoggingButton.active = true;
-        this.workerThreadsSlider.active = parallelWorldgen;
+        this.generationThreadsSlider.active = worldgenOptimizations;
+        this.serializationThreadsSlider.active = worldgenOptimizations;
         this.spawnZoneRadiusSlider.active = true;
     }
 
@@ -293,24 +299,29 @@ public class AdrenalineConfigScreen extends Screen {
         return warnings;
     }
 
-    private final class WorkerThreadsSlider extends AbstractSliderButton {
+    private final class ThreadCountSlider extends AbstractSliderButton {
 
-        private WorkerThreadsSlider(int x, int y, int width, int height) {
-            super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toSliderValue(AdrenalineConfigScreen.this.config.workerThreads));
+        private final String label;
+        private final IntConsumer setter;
+
+        private ThreadCountSlider(int x, int y, int width, int height, String label, IntSupplier getter, IntConsumer setter) {
+            super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toSliderValue(getter.getAsInt()));
+            this.label = label;
+            this.setter = setter;
             this.updateMessage();
         }
 
         @Override
         protected void updateMessage() {
             int value = AdrenalineConfigScreen.this.snapSliderValue(this.value);
-            this.setMessage(Component.literal("Worker threads: " + (value == 0 ? "Auto" : Integer.toString(value))));
+            this.setMessage(Component.literal(this.label + ": " + (value == 0 ? "Auto" : Integer.toString(value))));
         }
 
         @Override
         protected void applyValue() {
             int snappedValue = AdrenalineConfigScreen.this.snapSliderValue(this.value);
             this.value = AdrenalineConfigScreen.this.toSliderValue(snappedValue);
-            AdrenalineConfigScreen.this.config.workerThreads = snappedValue;
+            this.setter.accept(snappedValue);
             this.updateMessage();
             AdrenalineConfigScreen.this.saveConfig();
             AdrenalineConfigScreen.this.updateButtonStates();

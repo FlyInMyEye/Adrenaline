@@ -39,7 +39,7 @@ public final class ChunkSerializationSupport {
     }
 
     public static ForkJoinPool serializationPool() {
-        int threads = AdrenalineConfig.resolvedWorkerThreads();
+        int threads = AdrenalineConfig.resolvedSerializationWorkerThreads();
         ForkJoinPool pool = serializationPool;
         if (pool != null && serializationPoolThreads == threads) {
             return pool;

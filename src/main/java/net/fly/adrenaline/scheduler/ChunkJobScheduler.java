@@ -15,8 +15,8 @@ public final class ChunkJobScheduler {
 
     private static final ChunkJobScheduler INSTANCE = new ChunkJobScheduler();
 
-    private final ForkJoinPool pool = new ForkJoinPool(AdrenalineConfig.resolvedWorkerThreads());
-    private final int maxActive = pool.getParallelism();
+    private volatile ForkJoinPool pool = new ForkJoinPool(AdrenalineConfig.resolvedGenerationWorkerThreads());
+    private volatile int maxActive = pool.getParallelism();
 
     private int activeCount = 0;
     private final HashSet<Long> activeFootprint = new HashSet<>();
@@ -34,10 +34,12 @@ public final class ChunkJobScheduler {
     }
 
     public int parallelism() {
+        this.refreshPoolIfNeeded();
         return this.maxActive;
     }
 
     public Executor executor() {
+        this.refreshPoolIfNeeded();
         return this.pool;
     }
 
@@ -49,6 +51,7 @@ public final class ChunkJobScheduler {
     }
 
     public synchronized void submit(ChunkJob job) {
+        this.refreshPoolIfNeeded();
         if (conflicts(job.footprint())) {
             conflictPending.add(job);
             indexJob(job);
@@ -60,6 +63,7 @@ public final class ChunkJobScheduler {
     }
 
     synchronized void onComplete(Set<Long> footprint) {
+        this.refreshPoolIfNeeded();
         activeFootprint.removeAll(footprint);
         activeCount--;
 
@@ -130,5 +134,25 @@ public final class ChunkJobScheduler {
         activeFootprint.addAll(job.footprint());
         activeCount++;
         pool.execute(job);
+    }
+
+    private void refreshPoolIfNeeded() {
+        int threads = AdrenalineConfig.resolvedGenerationWorkerThreads();
+        ForkJoinPool current = this.pool;
+        if (current.getParallelism() == threads) {
+            return;
+        }
+
+        synchronized (this) {
+            current = this.pool;
+            if (current.getParallelism() == threads) {
+                return;
+            }
+
+            ForkJoinPool replacement = new ForkJoinPool(threads);
+            this.pool = replacement;
+            this.maxActive = replacement.getParallelism();
+            current.shutdown();
+        }
     }
 }

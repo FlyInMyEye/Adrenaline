@@ -27,8 +27,13 @@ public class AdrenalineConfig {
         MANAGER.reloadIfChanged();
     }
 
-    public static int resolvedWorkerThreads() {
-        int v = get().workerThreads;
+    public static int resolvedGenerationWorkerThreads() {
+        int v = get().generationWorkerThreads;
+        return v == 0 ? Runtime.getRuntime().availableProcessors() : Math.max(1, v);
+    }
+
+    public static int resolvedSerializationWorkerThreads() {
+        int v = get().serializationWorkerThreads;
         return v == 0 ? Runtime.getRuntime().availableProcessors() : Math.max(1, v);
     }
 
@@ -70,7 +75,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean parallelChunkSerializationEnabled() {
-        return parallelWorldgenEnabled();
+        return get().worldgenOptimizations;
     }
 
     public static boolean fastLegacyRandomEnabled() {
@@ -90,7 +95,8 @@ public class AdrenalineConfig {
         public boolean aquiferOptimizations = true;
         public boolean beardifierOptimizations = true;
         public boolean oreVeinOptimizations = true;
-        public int workerThreads = 0;
+        public int generationWorkerThreads = 0;
+        public int serializationWorkerThreads = 0;
         public int spawnZoneRadius = 0;
         public boolean parallelWorldgen = true;
         public boolean fastLegacyRandom = true;
@@ -108,7 +114,8 @@ public class AdrenalineConfig {
             this.aquiferOptimizations = other.aquiferOptimizations;
             this.beardifierOptimizations = other.beardifierOptimizations;
             this.oreVeinOptimizations = other.oreVeinOptimizations;
-            this.workerThreads = other.workerThreads;
+            this.generationWorkerThreads = other.generationWorkerThreads;
+            this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
             this.fastLegacyRandom = other.fastLegacyRandom;
