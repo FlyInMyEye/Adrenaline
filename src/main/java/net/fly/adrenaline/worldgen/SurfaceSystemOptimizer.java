@@ -50,13 +50,13 @@ public final class SurfaceSystemOptimizer {
                 int biomeY = useLegacyRandomSource ? 0 : topY;
                 Holder<Biome> biomeHolder = biomeManager.getBiome(biomePos.set(blockX, biomeY, blockZ));
 
-                column.resetColumn(localX, localZ, blockX, blockZ);
+                column.resetColumn(localX, localZ, blockX, blockZ, topY, heightTracker.oceanFloor(localX, localZ));
 
                 if (biomeHolder.is(Biomes.ERODED_BADLANDS)) {
                     badlandsExtension.apply(column, blockX, blockZ, topY, chunk);
                 }
 
-                int scanTopY = column.findWorldSurface(maxBuildHeight - 1);
+                int scanTopY = column.worldSurface();
                 surfaceRulePipeline.updateXZ(blockX, blockZ);
                 int stoneDepthAbove = 0;
                 int waterHeight = Integer.MIN_VALUE;
@@ -104,7 +104,7 @@ public final class SurfaceSystemOptimizer {
                     frozenOceanExtension.apply(surfaceRulePipeline.getMinSurfaceLevel(), biomeHolder.value(), column, extensionPos, blockX, blockZ, topY);
                 }
 
-                heightTracker.set(localX, localZ, column.findWorldSurface(maxBuildHeight - 1), column.findOceanFloor(maxBuildHeight - 1));
+                heightTracker.set(localX, localZ, column.worldSurface(), column.oceanFloor());
             }
         }
 
