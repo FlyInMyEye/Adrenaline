@@ -66,7 +66,7 @@ public final class SurfaceSystemOptimizer {
                     BlockState state = column.getBlock(y);
                     if (state.isAir()) {
                         stoneDepthAbove = 0;
-                        minStoneY = Integer.MIN_VALUE;
+                        waterHeight = Integer.MIN_VALUE;
                         continue;
                     }
 
