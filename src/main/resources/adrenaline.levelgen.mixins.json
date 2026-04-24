@@ -9,6 +9,7 @@
     "AdrenalineMixinNoiseChunkNoiseInterpolatorInvoker",
     "AdrenalineMixinNoiseInterpolatorAccessor",
     "AdrenalineMixinNoiseInterpolatorInvoker",
+    "AdrenalineMixinNoiseInterpolatorView",
     "AdrenalineMixinSurfaceRulesContext",
     "AdrenalineMixinSurfaceRulesContextApi",
     "AdrenalineMixinSurfaceRulesContextMutable"
