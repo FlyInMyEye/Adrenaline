@@ -1,5 +1,7 @@
 package net.fly.adrenaline.worldgen;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -21,17 +23,14 @@ import net.minecraft.world.level.levelgen.WorldGenerationContext;
 public final class SurfaceRulesContextFactory {
 
     private static final Constructor<?> CONSTRUCTOR;
-    private static final Method TRY_APPLY_METHOD;
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
     private static final ThreadLocal<Map<PipelineKey, SurfaceRulePipeline>> PIPELINE_CACHE = ThreadLocal.withInitial(HashMap::new);
 
     static {
         try {
             Class<?> contextType = Class.forName("net.minecraft.world.level.levelgen.SurfaceRules$Context");
-            Class<?> surfaceRuleType = Class.forName("net.minecraft.world.level.levelgen.SurfaceRules$SurfaceRule");
             CONSTRUCTOR = contextType.getDeclaredConstructor(SurfaceSystem.class, RandomState.class, ChunkAccess.class, NoiseChunk.class, Function.class, Registry.class, WorldGenerationContext.class);
             CONSTRUCTOR.setAccessible(true);
-            TRY_APPLY_METHOD = findTryApplyMethod(surfaceRuleType);
-            TRY_APPLY_METHOD.setAccessible(true);
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException(exception);
         }
@@ -67,9 +66,11 @@ public final class SurfaceRulesContextFactory {
         return pipeline;
     }
 
-    public static BlockState tryApply(Object surfaceRule, int x, int y, int z) {
+    public static MethodHandle createTryApplyHandle(Object surfaceRule) {
         try {
-            return (BlockState) TRY_APPLY_METHOD.invoke(surfaceRule, x, y, z);
+            Method method = findTryApplyMethod(surfaceRule.getClass());
+            method.setAccessible(true);
+            return LOOKUP.unreflect(method).bindTo(surfaceRule);
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException(exception);
         }

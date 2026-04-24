@@ -1,5 +1,6 @@
 package net.fly.adrenaline.worldgen;
 
+import java.lang.invoke.MethodHandle;
 import java.util.function.Function;
 
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextMutable;
@@ -15,14 +16,14 @@ public final class SurfaceRulePipeline {
 
     private static final long INITIAL_LAST_UPDATE = Long.MIN_VALUE + 1L;
 
-    private final Object surfaceRule;
     private final Object context;
+    private final MethodHandle tryApplyHandle;
     private final AdrenalineMixinSurfaceRulesContextApi contextApi;
     private final AdrenalineMixinSurfaceRulesContextMutable contextMutable;
 
     public SurfaceRulePipeline(Object surfaceRule, Object context) {
-        this.surfaceRule = surfaceRule;
         this.context = context;
+        this.tryApplyHandle = SurfaceRulesContextFactory.createTryApplyHandle(surfaceRule);
         this.contextApi = (AdrenalineMixinSurfaceRulesContextApi) context;
         this.contextMutable = (AdrenalineMixinSurfaceRulesContextMutable) context;
     }
@@ -52,6 +53,10 @@ public final class SurfaceRulePipeline {
     }
 
     public BlockState tryApply(int blockX, int blockY, int blockZ) {
-        return SurfaceRulesContextFactory.tryApply(this.surfaceRule, blockX, blockY, blockZ);
+        try {
+            return (BlockState) this.tryApplyHandle.invokeExact(blockX, blockY, blockZ);
+        } catch (Throwable throwable) {
+            throw new RuntimeException(throwable);
+        }
     }
 }
