@@ -6,13 +6,16 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 
@@ -25,6 +28,7 @@ public class AdrenalineConfigScreen extends Screen {
     private final int availableProcessors;
     private final List<ScrollableWidget> scrollableWidgets = new ArrayList<>();
     private final List<ScrollableLabel> scrollableLabels = new ArrayList<>();
+    private final Map<AbstractWidget, TooltipData> widgetTooltips = new HashMap<>();
 
     private ThreadCountSlider generationThreadsSlider;
     private ThreadCountSlider serializationThreadsSlider;
@@ -58,6 +62,7 @@ public class AdrenalineConfigScreen extends Screen {
     protected void init() {
         this.scrollableWidgets.clear();
         this.scrollableLabels.clear();
+        this.widgetTooltips.clear();
         this.scrollOffset = 0;
         this.targetScrollOffset = 0;
         this.animatedScrollOffset = 0.0D;
@@ -69,39 +74,39 @@ public class AdrenalineConfigScreen extends Screen {
         int buttonWidth = 70;
 
         y = this.addSectionHeader("General", y);
-        this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Generation threads", () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value), y);
+        this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Generation threads", () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value, tooltip("Controls parallel chunk generation workers.", PerformanceImpact.HIGH)), y, tooltip("Controls parallel chunk generation workers.", PerformanceImpact.HIGH));
         y += 30;
-        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Serialization threads", () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value), y);
+        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Serialization threads", () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value, tooltip("Controls parallel chunk save encoding workers.", PerformanceImpact.MEDIUM)), y, tooltip("Controls parallel chunk save encoding workers.", PerformanceImpact.MEDIUM));
         y += 30;
-        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20), y);
+        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, tooltip("Changes the chunk radius generated around spawn.", PerformanceImpact.LOW)), y, tooltip("Changes the chunk radius generated around spawn.", PerformanceImpact.LOW));
         y += 30;
-        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Worldgen optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value);
+        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Worldgen optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("Master switch for Adrenaline world generation changes.", PerformanceImpact.EXTREME));
         y += 24;
-        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value);
+        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("Runs chunk generation work on the generation pool.", PerformanceImpact.HIGH));
         y += 24;
 
         y = this.addSectionHeader("Worldgen optimization", y);
-        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Terrain fill optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value);
+        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Terrain fill optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value, tooltip("Speeds up block filling during noise terrain generation.", PerformanceImpact.EXTREME));
         y += 24;
-        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Surface optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value);
+        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Surface optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value, tooltip("Speeds up surface rule evaluation and block placement.", PerformanceImpact.HIGH));
         y += 24;
-        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Noise chunk optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value);
+        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Noise chunk optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value, tooltip("Optimizes hot paths inside noise chunk sampling.", PerformanceImpact.HIGH));
         y += 24;
-        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Material rule optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value);
+        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Material rule optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value, tooltip("Reduces overhead in material rule dispatch.", PerformanceImpact.MEDIUM));
         y += 24;
-        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Aquifer optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value);
+        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Aquifer optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value, tooltip("Reduces aquifer lookup and fluid decision cost.", PerformanceImpact.MEDIUM));
         y += 24;
-        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Beardifier optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value);
+        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Beardifier optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value, tooltip("Speeds up structure terrain blending calculations.", PerformanceImpact.LOW));
         y += 24;
-        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Ore vein optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value);
+        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Ore vein optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, tooltip("Speeds up ore vein sampling during generation.", PerformanceImpact.LOW));
         y += 24;
 
         y = this.addSectionHeader("Compatibility", y);
-        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value);
+        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("Replaces legacy random with a faster implementation.", PerformanceImpact.LOW));
         y += 24;
 
         y = this.addSectionHeader("Diagnostics", y);
-        this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value);
+        this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("Logs extra Adrenaline diagnostics to the console.", PerformanceImpact.NONE));
         y += 24;
 
         this.doneButton = this.addRenderableWidget(Button.builder(Component.literal("Done"), button -> this.onClose()).bounds(centerX - 50, this.height - 26, 100, 20).build());
@@ -145,6 +150,7 @@ public class AdrenalineConfigScreen extends Screen {
         guiGraphics.disableScissor();
         this.doneButton.render(guiGraphics, mouseX, mouseY, partialTick);
         this.renderScrollBar(guiGraphics, topPanelBottom, contentBottom);
+        this.renderTooltip(guiGraphics, mouseX, mouseY);
     }
 
     @Override
@@ -172,18 +178,19 @@ public class AdrenalineConfigScreen extends Screen {
         }).bounds(x, y, width, 20).build();
     }
 
-    private Button addToggleRow(int labelX, int buttonX, int y, int buttonWidth, Component label, boolean initialValue, BooleanConsumer consumer) {
-        this.scrollableLabels.add(new ScrollableLabel(label, labelX, y, false));
-        return this.addScrollableWidget(this.createToggleButton(buttonX, y, buttonWidth, initialValue, consumer), y);
+    private Button addToggleRow(int labelX, int buttonX, int y, int buttonWidth, Component label, boolean initialValue, BooleanConsumer consumer, TooltipData tooltip) {
+        this.scrollableLabels.add(new ScrollableLabel(label, labelX, y, false, tooltip));
+        return this.addScrollableWidget(this.createToggleButton(buttonX, y, buttonWidth, initialValue, consumer), y, tooltip);
     }
 
     private int addSectionHeader(String title, int y) {
-        this.scrollableLabels.add(new ScrollableLabel(Component.literal(title), 0, y, true));
+        this.scrollableLabels.add(new ScrollableLabel(Component.literal(title), 0, y, true, null));
         return y + 16;
     }
 
     private Component toggleLabel(boolean value) {
-        return Component.literal(value ? "On" : "Off");
+        int color = value ? 0x55FF55 : 0xFF5555;
+        return Component.literal(value ? "On" : "Off").withStyle(style -> style.withColor(color));
     }
 
     private boolean currentValue(Component message) {
@@ -194,9 +201,60 @@ public class AdrenalineConfigScreen extends Screen {
         AdrenalineConfig.save(new AdrenalineConfig.Data(this.config));
     }
 
-    private <T extends AbstractWidget> T addScrollableWidget(T widget, int baseY) {
+    private <T extends AbstractWidget> T addScrollableWidget(T widget, int baseY, TooltipData tooltip) {
         this.scrollableWidgets.add(new ScrollableWidget(widget, baseY));
+        this.widgetTooltips.put(widget, tooltip);
         return this.addRenderableWidget(widget);
+    }
+
+    private void renderTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        TooltipData tooltip = this.findTooltip(mouseX, mouseY);
+        if (tooltip != null) {
+            guiGraphics.renderComponentTooltip(this.font, tooltip.lines(), mouseX, mouseY);
+        }
+    }
+
+    private TooltipData findTooltip(int mouseX, int mouseY) {
+        for (ScrollableWidget scrollableWidget : this.scrollableWidgets) {
+            AbstractWidget widget = scrollableWidget.widget();
+            if (!widget.visible) {
+                continue;
+            }
+            TooltipData tooltip = this.widgetTooltips.get(widget);
+            if (tooltip != null && widget.isMouseOver(mouseX, mouseY)) {
+                return tooltip;
+            }
+        }
+
+        for (ScrollableLabel label : this.scrollableLabels) {
+            if (label.tooltip() == null) {
+                continue;
+            }
+            int y = label.baseY() - this.scrollOffset;
+            int height = label.centered() ? 16 : 20;
+            if (!this.isPartiallyVisible(y, height)) {
+                continue;
+            }
+
+            int x = label.centered() ? this.width / 2 - this.font.width(label.message()) / 2 : label.x();
+            int width = this.font.width(label.message());
+            if (mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height) {
+                return label.tooltip();
+            }
+        }
+
+        return null;
+    }
+
+    private static TooltipData tooltip(String description, PerformanceImpact impact) {
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.literal(description));
+        lines.add(CommonComponents.EMPTY);
+        lines.add(CommonComponents.EMPTY);
+        MutableComponent impactLine = Component.literal("Performance impact: ");
+        impactLine.append(Component.literal(impact.label).withStyle(style -> style.withColor(impact.color)));
+        lines.add(impactLine);
+        return new TooltipData(lines);
     }
 
     private void applyScroll() {
@@ -303,11 +361,13 @@ public class AdrenalineConfigScreen extends Screen {
 
         private final String label;
         private final IntConsumer setter;
+        private final TooltipData tooltip;
 
-        private ThreadCountSlider(int x, int y, int width, int height, String label, IntSupplier getter, IntConsumer setter) {
+        private ThreadCountSlider(int x, int y, int width, int height, String label, IntSupplier getter, IntConsumer setter, TooltipData tooltip) {
             super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toSliderValue(getter.getAsInt()));
             this.label = label;
             this.setter = setter;
+            this.tooltip = tooltip;
             this.updateMessage();
         }
 
@@ -330,8 +390,11 @@ public class AdrenalineConfigScreen extends Screen {
 
     private final class SpawnZoneRadiusSlider extends AbstractSliderButton {
 
-        private SpawnZoneRadiusSlider(int x, int y, int width, int height) {
+        private final TooltipData tooltip;
+
+        private SpawnZoneRadiusSlider(int x, int y, int width, int height, TooltipData tooltip) {
             super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toSpawnZoneRadiusSliderValue(AdrenalineConfigScreen.this.config.spawnZoneRadius));
+            this.tooltip = tooltip;
             this.updateMessage();
         }
 
@@ -397,9 +460,28 @@ public class AdrenalineConfigScreen extends Screen {
     private record WarningLine(Component message, int color) {
     }
 
+    private record TooltipData(List<Component> lines) {
+    }
+
     private record ScrollableWidget(AbstractWidget widget, int baseY) {
     }
 
-    private record ScrollableLabel(Component message, int x, int baseY, boolean centered) {
+    private record ScrollableLabel(Component message, int x, int baseY, boolean centered, TooltipData tooltip) {
+    }
+
+    private enum PerformanceImpact {
+        NONE("None", 0xAAAAAA),
+        LOW("Low", 0x55FF55),
+        MEDIUM("Medium", 0xFFFF55),
+        HIGH("High", 0xFF5555),
+        EXTREME("Extreme", 0xAA00AA);
+
+        private final String label;
+        private final int color;
+
+        PerformanceImpact(String label, int color) {
+            this.label = label;
+            this.color = color;
+        }
     }
 }
