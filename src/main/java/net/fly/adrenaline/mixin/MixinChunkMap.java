@@ -1,11 +1,10 @@
 package net.fly.adrenaline.mixin;
 
-import java.util.List;
 import java.util.function.Function;
-
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.util.WorldgenWarmup;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
@@ -48,6 +47,8 @@ public class MixinChunkMap {
             return;
         }
 
+        WorldgenWarmup.warmSharedCaches();
+
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());
         ChunkHolder holder = CURRENT_HOLDER.get();
@@ -77,11 +78,8 @@ public class MixinChunkMap {
         if (last == null) {
             return false;
         }
-        List<ChunkStatus> statuses = ChunkStatus.getStatusList();
-        int next = last.getIndex() + 1;
-        if (next >= statuses.size()) {
-            return false;
-        }
-        return statuses.get(next) == ChunkStatus.FEATURES;
+
+        int nextIndex = last.getIndex() + 1;
+        return nextIndex < ChunkStatus.getStatusList().size() && ChunkStatus.getStatusList().get(nextIndex) == ChunkStatus.FEATURES;
     }
 }
