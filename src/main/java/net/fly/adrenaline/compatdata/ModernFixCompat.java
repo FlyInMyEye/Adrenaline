@@ -1,15 +1,19 @@
 package net.fly.adrenaline.compatdata;
 
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 public final class ModernFixCompat {
 
@@ -27,6 +31,8 @@ public final class ModernFixCompat {
         RELEASE_PROTOCHUNKS
     };
 
+    private static final Map<String, OptionState> OPTION_STATE_CACHE = new HashMap<>();
+
     private ModernFixCompat() {
     }
 
@@ -39,22 +45,43 @@ public final class ModernFixCompat {
             return false;
         }
 
-        List<String> lines = readLines();
+        Properties properties = readProperties();
+        logDetectedState(properties);
         for (String option : REQUIRED_DISABLED_OPTIONS) {
-            if (!"false".equalsIgnoreCase(readValue(lines, option))) {
+            OptionState state = optionState(option);
+            if (!state.present()) {
+                continue;
+            }
+            if (state.enabled()) {
+                if (AdrenalineConfig.debugLoggingEnabled()) {
+                    Adrenaline.LOGGER.info("ModernFix compatibility fix required: {} is enabled", option);
+                }
                 return true;
             }
+        }
+        if (AdrenalineConfig.debugLoggingEnabled()) {
+            Adrenaline.LOGGER.info("ModernFix compatibility check passed");
         }
         return false;
     }
 
     public static boolean applyConfigFix() {
         Path configPath = configPath();
-        List<String> lines = readLines();
+        Properties properties = readProperties();
         boolean changed = false;
 
+        if (AdrenalineConfig.debugLoggingEnabled()) {
+            Adrenaline.LOGGER.info("Applying ModernFix compatibility fix at {}", configPath);
+            logDetectedState(properties);
+        }
+
         for (String option : REQUIRED_DISABLED_OPTIONS) {
-            if (setValue(lines, option, "false")) {
+            OptionState state = optionState(option);
+            if (!state.present()) {
+                continue;
+            }
+            if (state.enabled()) {
+                properties.setProperty(option, "false");
                 changed = true;
             }
         }
@@ -68,7 +95,14 @@ public final class ModernFixCompat {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.write(configPath, lines, StandardCharsets.UTF_8);
+            try (Writer writer = Files.newBufferedWriter(configPath, StandardCharsets.UTF_8)) {
+                properties.store(writer, "ModernFix overrides added by Adrenaline");
+            }
+            OPTION_STATE_CACHE.clear();
+            if (AdrenalineConfig.debugLoggingEnabled()) {
+                Adrenaline.LOGGER.info("Updated ModernFix mixin config at {}", configPath);
+                logDetectedState(properties);
+            }
             return true;
         } catch (IOException exception) {
             Adrenaline.LOGGER.warn("Failed to update ModernFix mixin config", exception);
@@ -80,49 +114,96 @@ public final class ModernFixCompat {
         return FMLPaths.CONFIGDIR.get().resolve("modernfix-mixins.properties");
     }
 
-    private static List<String> readLines() {
+    private static Properties readProperties() {
+        Properties properties = new Properties();
         Path configPath = configPath();
         if (!Files.exists(configPath)) {
-            return new ArrayList<>();
+            return properties;
         }
 
-        try {
-            return new ArrayList<>(Files.readAllLines(configPath, StandardCharsets.UTF_8));
+        try (Reader reader = Files.newBufferedReader(configPath, StandardCharsets.UTF_8)) {
+            properties.load(reader);
         } catch (IOException exception) {
             Adrenaline.LOGGER.warn("Failed to read ModernFix mixin config", exception);
-            return new ArrayList<>();
         }
+        return properties;
     }
 
-    private static String readValue(List<String> lines, String key) {
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.startsWith("#") || !trimmed.startsWith(key + "=")) {
-                continue;
-            }
-            return trimmed.substring(key.length() + 1).trim();
-        }
-        return null;
-    }
-
-    private static boolean setValue(List<String> lines, String key, String value) {
-        String target = key + "=" + value;
-        for (int i = 0; i < lines.size(); i++) {
-            String trimmed = lines.get(i).trim();
-            if (trimmed.startsWith("#") || !trimmed.startsWith(key + "=")) {
-                continue;
-            }
-            if (trimmed.equals(target)) {
-                return false;
-            }
-            lines.set(i, target);
+    public static boolean hasRequiredDisabledOptions() {
+        if (!isPresent()) {
             return true;
         }
 
-        if (!lines.isEmpty() && !lines.get(lines.size() - 1).isEmpty()) {
-            lines.add("");
+        Properties properties = readProperties();
+        for (String option : REQUIRED_DISABLED_OPTIONS) {
+            OptionState state = optionState(option);
+            if (!state.present()) {
+                continue;
+            }
+            if (state.enabled()) {
+                return false;
+            }
         }
-        lines.add(target);
         return true;
+    }
+
+    private static OptionState optionState(String option) {
+        OptionState cached = OPTION_STATE_CACHE.get(option);
+        if (cached != null) {
+            return cached;
+        }
+
+        OptionState state = loadOptionState(option);
+        OPTION_STATE_CACHE.put(option, state);
+        return state;
+    }
+
+    private static OptionState loadOptionState(String option) {
+        try {
+            Class<?> configClass = Class.forName("org.embeddedt.modernfix.core.config.ModernFixEarlyConfig");
+            Object earlyConfig = configClass.getMethod("load", java.io.File.class).invoke(null, configPath().toFile());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> optionMap = (Map<String, Object>) configClass.getMethod("getOptionMap").invoke(earlyConfig);
+            Object optionValue = optionMap.get(option);
+            if (optionValue == null) {
+                return OptionState.missing();
+            }
+            Class<?> optionClass = optionValue.getClass();
+            boolean enabled = (boolean) optionClass.getMethod("isEnabled").invoke(optionValue);
+            boolean userDefined = (boolean) optionClass.getMethod("isUserDefined").invoke(optionValue);
+            return new OptionState(true, enabled, userDefined);
+        } catch (ReflectiveOperationException exception) {
+            Adrenaline.LOGGER.warn("Failed to inspect ModernFix option state for {}", option, exception);
+            return OptionState.missing();
+        }
+    }
+
+    private static void logDetectedState(Properties properties) {
+        if (!AdrenalineConfig.debugLoggingEnabled()) {
+            return;
+        }
+
+        Adrenaline.LOGGER.info("ModernFix detected!");
+        Adrenaline.LOGGER.info("ModernFix config path: {}", configPath());
+        for (String option : REQUIRED_DISABLED_OPTIONS) {
+            OptionState state = optionState(option);
+            if (!state.present()) {
+                Adrenaline.LOGGER.info("{}: Not present in installed ModernFix", option);
+                continue;
+            }
+            if (!state.enabled() && !state.userDefined()) {
+                Adrenaline.LOGGER.info("{}: Disabled [DEFAULT]", option);
+            } else if (!state.enabled()) {
+                Adrenaline.LOGGER.info("{}: Disabled [OK]", option);
+            } else {
+                Adrenaline.LOGGER.info("{}: Enabled [RESTART BLOCKED]", option);
+            }
+        }
+    }
+
+    private record OptionState(boolean present, boolean enabled, boolean userDefined) {
+        private static OptionState missing() {
+            return new OptionState(false, false, false);
+        }
     }
 }
