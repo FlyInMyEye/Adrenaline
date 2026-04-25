@@ -83,7 +83,7 @@ public class MixinNoiseBasedChunkGenerator {
      * @reason Fast worldgen terrain writes
      */
     @Overwrite
-    private ChunkAccess doFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY) {
+    public ChunkAccess doFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY) {
         if (!AdrenalineConfig.terrainFillOptimizationsEnabled()) {
             return this.doFillFallback(blender, structureManager, randomState, chunk, minCellY, cellCountY);
         }
