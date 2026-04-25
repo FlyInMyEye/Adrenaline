@@ -41,6 +41,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button aquiferOptimizationsButton;
     private Button beardifierOptimizationsButton;
     private Button oreVeinOptimizationsButton;
+    private Button initialSpawnOptimizationButton;
     private Button parallelWorldgenButton;
     private Button fastLegacyRandomButton;
     private Button debugLoggingButton;
@@ -99,6 +100,8 @@ public class AdrenalineConfigScreen extends Screen {
         this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Beardifier optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value, tooltip("Speeds up structure terrain blending calculations.", PerformanceImpact.LOW));
         y += 24;
         this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Ore vein optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, tooltip("Speeds up ore vein sampling during generation.", PerformanceImpact.LOW));
+        y += 24;
+        this.initialSpawnOptimizationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Initial spawn optimization"), this.config.initialSpawnOptimization, value -> this.config.initialSpawnOptimization = value, tooltip("Skips vanilla's slow initial spawn refinement and jumps directly into normal start-region generation.", PerformanceImpact.HIGH));
         y += 24;
 
         y = this.addSectionHeader("Compatibility", y);
@@ -329,6 +332,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.aquiferOptimizationsButton.active = worldgenOptimizations;
         this.beardifierOptimizationsButton.active = worldgenOptimizations;
         this.oreVeinOptimizationsButton.active = worldgenOptimizations;
+        this.initialSpawnOptimizationButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
         this.fastLegacyRandomButton.active = true;
         this.debugLoggingButton.active = true;

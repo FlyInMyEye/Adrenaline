@@ -46,6 +46,10 @@ public class AdrenalineConfig {
         return get().parallelWorldgen;
     }
 
+    public static boolean initialSpawnOptimizationEnabled() {
+        return get().worldgenOptimizations && get().initialSpawnOptimization;
+    }
+
     public static boolean terrainFillOptimizationsEnabled() {
         return get().worldgenOptimizations && get().terrainFillOptimizations;
     }
@@ -95,6 +99,7 @@ public class AdrenalineConfig {
         public boolean aquiferOptimizations = true;
         public boolean beardifierOptimizations = true;
         public boolean oreVeinOptimizations = true;
+        public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
         public int serializationWorkerThreads = 0;
         public int spawnZoneRadius = 0;
@@ -114,6 +119,7 @@ public class AdrenalineConfig {
             this.aquiferOptimizations = other.aquiferOptimizations;
             this.beardifierOptimizations = other.beardifierOptimizations;
             this.oreVeinOptimizations = other.oreVeinOptimizations;
+            this.initialSpawnOptimization = other.initialSpawnOptimization;
             this.generationWorkerThreads = other.generationWorkerThreads;
             this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
