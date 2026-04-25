@@ -38,7 +38,7 @@ public abstract class AdrenalineMixinSurfaceRulesContext {
      * @reason Remove per-step biome supplier allocation
      */
     @Overwrite
-    protected void updateY(int stoneDepthAbove, int stoneDepthBelow, int waterHeight, int blockX, int blockY, int blockZ) {
+    public void updateY(int stoneDepthAbove, int stoneDepthBelow, int waterHeight, int blockX, int blockY, int blockZ) {
         if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
             this.lastUpdateY++;
             this.biome = Suppliers.memoize(() -> this.biomeGetter.apply(this.pos.set(blockX, blockY, blockZ)));
