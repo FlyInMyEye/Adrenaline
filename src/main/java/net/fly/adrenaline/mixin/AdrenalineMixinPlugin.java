@@ -22,16 +22,12 @@ public class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
         Set<String> mixins = new java.util.HashSet<>();
         for (IncompatibleData incompatibility : IncompatibilityRegistry.all()) {
-            if (LoadingModList.get().getModFileById(incompatibility.modId()) == null) {
+            if (!IncompatibilityRegistry.isLoaded(incompatibility.modId())) {
                 continue;
             }
 
             for (String mixin : incompatibility.incompatibleMixins()) {
                 mixins.add(mixin);
-            }
-
-            if (incompatibility.incompatibleMixins().length > 0) {
-                incompatibility.controller().setShouldShow(true);
             }
         }
         disabledMixins = Set.copyOf(mixins);

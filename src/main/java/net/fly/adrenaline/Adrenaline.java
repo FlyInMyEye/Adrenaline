@@ -1,6 +1,8 @@
 package net.fly.adrenaline;
 
 import net.fly.adrenaline.client.AdrenalineConfigScreen;
+import net.fly.adrenaline.client.FastloadCompatController;
+import net.fly.adrenaline.client.ModernFixCompatController;
 import net.fly.adrenaline.compatdata.IncompatibilityRegistry;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -28,7 +30,12 @@ public class Adrenaline {
                 ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory((minecraft, screen) -> new AdrenalineConfigScreen(screen))
             );
-            IncompatibilityRegistry.all().forEach(incompatibility -> MinecraftForge.EVENT_BUS.register(incompatibility.controller()));
+
+            MinecraftForge.EVENT_BUS.register(new ModernFixCompatController());
+
+            FastloadCompatController fastloadCompatController = new FastloadCompatController();
+            fastloadCompatController.setShouldShow(IncompatibilityRegistry.isLoaded("fastload"));
+            MinecraftForge.EVENT_BUS.register(fastloadCompatController);
         }
         MinecraftForge.EVENT_BUS.register(this);
     }
