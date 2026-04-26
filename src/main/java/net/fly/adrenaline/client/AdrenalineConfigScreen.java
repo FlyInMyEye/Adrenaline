@@ -405,7 +405,11 @@ public class AdrenalineConfigScreen extends Screen {
         @Override
         protected void updateMessage() {
             int value = AdrenalineConfigScreen.this.snapSpawnZoneRadiusSliderValue(this.value);
-            this.setMessage(Component.literal(value == 0 ? "Spawn zone radius: Default" : "Spawn zone radius: " + value));
+            if (value == AdrenalineConfig.DEFAULT_SPAWN_ZONE_RADIUS) {
+                this.setMessage(Component.literal("Spawn zone radius: Default"));
+                return;
+            }
+            this.setMessage(Component.literal(value == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? "Spawn zone radius: Instant" : "Spawn zone radius: " + value));
         }
 
         @Override
@@ -437,19 +441,14 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private double toSpawnZoneRadiusSliderValue(int spawnZoneRadius) {
-        if (spawnZoneRadius <= 0) {
-            return 0.0D;
-        }
-        int clamped = Math.max(12, Math.min(spawnZoneRadius, 30));
-        return (double) (clamped - 11) / 19.0D;
+        int clamped = Math.max(AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS, Math.min(spawnZoneRadius, AdrenalineConfig.MAX_SPAWN_ZONE_RADIUS));
+        int span = AdrenalineConfig.MAX_SPAWN_ZONE_RADIUS - AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS;
+        return span <= 0 ? 0.0D : (double) (clamped - AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) / (double) span;
     }
 
     private int fromSpawnZoneRadiusSliderValue(double value) {
-        int resolved = 11 + (int) Math.round(value * 19.0D);
-        if (resolved <= 11) {
-            return 0;
-        }
-        return Math.min(resolved, 30);
+        int span = AdrenalineConfig.MAX_SPAWN_ZONE_RADIUS - AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS;
+        return Math.min(AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS + (int) Math.round(value * span), AdrenalineConfig.MAX_SPAWN_ZONE_RADIUS);
     }
 
     private int snapSpawnZoneRadiusSliderValue(double value) {

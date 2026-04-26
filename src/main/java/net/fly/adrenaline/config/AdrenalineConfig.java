@@ -4,6 +4,10 @@ import net.fly.configlib.JsonConfigManager;
 
 public class AdrenalineConfig {
 
+    public static final int DEFAULT_SPAWN_ZONE_RADIUS = 11;
+    public static final int MIN_SPAWN_ZONE_RADIUS = 1;
+    public static final int MAX_SPAWN_ZONE_RADIUS = 30;
+
     private static JsonConfigManager<Data> MANAGER;
 
     public static void init() {
@@ -38,8 +42,7 @@ public class AdrenalineConfig {
     }
 
     public static int resolvedSpawnZoneRadius() {
-        int v = get().spawnZoneRadius;
-        return v == 0 ? 11 : Math.max(12, Math.min(30, v));
+        return Math.max(MIN_SPAWN_ZONE_RADIUS, Math.min(MAX_SPAWN_ZONE_RADIUS, get().spawnZoneRadius));
     }
 
     public static boolean parallelWorldgenEnabled() {
@@ -102,7 +105,7 @@ public class AdrenalineConfig {
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
         public int serializationWorkerThreads = 0;
-        public int spawnZoneRadius = 0;
+        public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
         public boolean fastLegacyRandom = true;
         public boolean debugLogging = false;

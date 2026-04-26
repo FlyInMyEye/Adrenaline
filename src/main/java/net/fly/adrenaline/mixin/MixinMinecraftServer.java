@@ -26,17 +26,22 @@ public class MixinMinecraftServer {
 
     @ModifyConstant(method = "loadLevel", constant = @Constant(intValue = 11))
     private int adrenaline$useConfiguredSpawnZoneRadiusForProgress(int radius) {
-        return AdrenalineConfig.resolvedSpawnZoneRadius();
+        int configuredRadius = AdrenalineConfig.resolvedSpawnZoneRadius();
+        return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
     }
 
     @ModifyConstant(method = "prepareLevels", constant = @Constant(intValue = 11))
     private int adrenaline$useConfiguredSpawnZoneRadiusForTickets(int radius) {
-        return AdrenalineConfig.resolvedSpawnZoneRadius();
+        int configuredRadius = AdrenalineConfig.resolvedSpawnZoneRadius();
+        return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
     }
 
     @ModifyConstant(method = "prepareLevels", constant = @Constant(intValue = 441))
     private int adrenaline$useConfiguredSpawnZoneChunkCount(int chunkCount) {
         int radius = AdrenalineConfig.resolvedSpawnZoneRadius();
+        if (radius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
+            return 0;
+        }
         int diameter = radius * 2 - 1;
         return diameter * diameter;
     }
