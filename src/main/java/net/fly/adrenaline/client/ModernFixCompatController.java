@@ -1,15 +1,17 @@
 package net.fly.adrenaline.client;
 
+import net.fly.adrenaline.compatdata.ICrashController;
 import net.fly.adrenaline.compatdata.ModernFixCompat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-public final class ModernFixCompatController {
+public final class ModernFixCompatController implements ICrashController {
+
+    private boolean shouldShow;
 
     private boolean checked;
-    private boolean needsFix;
     private boolean shown;
 
     @SubscribeEvent
@@ -25,14 +27,24 @@ public final class ModernFixCompatController {
 
         if (!this.checked) {
             this.checked = true;
-            this.needsFix = ModernFixCompat.needsConfigFix();
+            this.shouldShow = ModernFixCompat.needsConfigFix();
         }
 
-        if (!this.needsFix || this.shown || minecraft.screen == null || !(minecraft.screen instanceof TitleScreen)) {
+        if (!this.shouldShow || this.shown || minecraft.screen == null || !(minecraft.screen instanceof TitleScreen)) {
             return;
         }
 
         this.shown = true;
         minecraft.setScreen(new ModernFixCompatScreen());
+    }
+
+    @Override
+    public boolean shouldShow() {
+        return this.shouldShow;
+    }
+
+    @Override
+    public void setShouldShow(boolean shouldShow) {
+        this.shouldShow = shouldShow;
     }
 }
