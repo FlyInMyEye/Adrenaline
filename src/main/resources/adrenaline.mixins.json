@@ -13,6 +13,7 @@
     "MixinMinecraftServer",
     "MixinMessageAccessor",
     "MixinMaterialRuleList",
+    "MixinWorldGenRegion",
     "MixinNoiseBasedAquifer",
     "MixinNoiseBasedChunkGenerator",
     "MixinNoiseChunkAccessor",
