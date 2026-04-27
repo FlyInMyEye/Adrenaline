@@ -20,6 +20,7 @@ public final class ModernFixCompat {
     public static final String PAPER_CHUNK_PATCHES = "mixin.bugfix.paper_chunk_patches";
     public static final String CHUNK_DEADLOCK = "mixin.bugfix.chunk_deadlock";
     public static final String WORLDGEN_ALLOCATION = "mixin.perf.worldgen_allocation";
+    public static final String REMOVE_SPAWN_CHUNKS = "mixin.perf.remove_spawn_chunks";
     public static final String OPTIMIZE_SURFACE_RULES = "mixin.perf.optimize_surface_rules";
     public static final String RELEASE_PROTOCHUNKS = "mixin.perf.release_protochunks";
 
@@ -27,6 +28,7 @@ public final class ModernFixCompat {
         PAPER_CHUNK_PATCHES,
         CHUNK_DEADLOCK,
         WORLDGEN_ALLOCATION,
+        REMOVE_SPAWN_CHUNKS,
         OPTIMIZE_SURFACE_RULES,
         RELEASE_PROTOCHUNKS
     };
