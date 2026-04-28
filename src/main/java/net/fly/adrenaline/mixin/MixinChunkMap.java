@@ -42,7 +42,9 @@ public class MixinChunkMap {
         )
     )
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
-        if (!AdrenalineConfig.parallelWorldgenEnabled()) {
+        ChunkHolder holder = CURRENT_HOLDER.get();
+        ChunkStatus nextStatus = nextStatus(holder);
+        if (!AdrenalineConfig.parallelWorldgenEnabled() || !AdrenalineConfig.parallelChunkStatusEnabled(nextStatus)) {
             instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
             return;
         }
@@ -51,8 +53,7 @@ public class MixinChunkMap {
 
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());
-        ChunkHolder holder = CURRENT_HOLDER.get();
-        int writeRadius = isFeatureStage(holder) ? 1 : 0;
+        int writeRadius = nextStatus == ChunkStatus.FEATURES ? 1 : 0;
         ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
 
         ChunkJobScheduler.get().submit(new ChunkJob(pos, writeRadius, () -> {
@@ -73,13 +74,17 @@ public class MixinChunkMap {
         CURRENT_HOLDER.remove();
     }
 
-    private static boolean isFeatureStage(ChunkHolder holder) {
+    private static ChunkStatus nextStatus(ChunkHolder holder) {
+        if (holder == null) {
+            return null;
+        }
+
         ChunkStatus last = holder.getLastAvailableStatus();
         if (last == null) {
-            return false;
+            return ChunkStatus.STRUCTURE_STARTS;
         }
 
         int nextIndex = last.getIndex() + 1;
-        return nextIndex < ChunkStatus.getStatusList().size() && ChunkStatus.getStatusList().get(nextIndex) == ChunkStatus.FEATURES;
+        return nextIndex < ChunkStatus.getStatusList().size() ? ChunkStatus.getStatusList().get(nextIndex) : null;
     }
 }

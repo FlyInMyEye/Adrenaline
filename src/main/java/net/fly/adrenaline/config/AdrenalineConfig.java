@@ -1,6 +1,7 @@
 package net.fly.adrenaline.config;
 
 import net.fly.configlib.JsonConfigManager;
+import net.minecraft.world.level.chunk.ChunkStatus;
 
 public class AdrenalineConfig {
 
@@ -47,6 +48,48 @@ public class AdrenalineConfig {
 
     public static boolean parallelWorldgenEnabled() {
         return get().parallelWorldgen;
+    }
+
+    public static boolean parallelChunkStatusEnabled(ChunkStatus status) {
+        if (status == null) {
+            return true;
+        }
+
+        Data config = get();
+        if (status == ChunkStatus.STRUCTURE_STARTS) {
+            return config.parallelizeStructureStarts;
+        }
+        if (status == ChunkStatus.STRUCTURE_REFERENCES) {
+            return config.parallelizeStructureReferences;
+        }
+        if (status == ChunkStatus.BIOMES) {
+            return config.parallelizeBiomes;
+        }
+        if (status == ChunkStatus.NOISE) {
+            return config.parallelizeNoise;
+        }
+        if (status == ChunkStatus.SURFACE) {
+            return config.parallelizeSurface;
+        }
+        if (status == ChunkStatus.CARVERS) {
+            return config.parallelizeCarvers;
+        }
+        if (status == ChunkStatus.FEATURES) {
+            return config.parallelizeFeatures;
+        }
+        if (status == ChunkStatus.INITIALIZE_LIGHT) {
+            return config.parallelizeInitializeLight;
+        }
+        if (status == ChunkStatus.LIGHT) {
+            return config.parallelizeLight;
+        }
+        if (status == ChunkStatus.SPAWN) {
+            return config.parallelizeSpawn;
+        }
+        if (status == ChunkStatus.FULL) {
+            return config.parallelizeFull;
+        }
+        return true;
     }
 
     public static boolean initialSpawnOptimizationEnabled() {
@@ -107,6 +150,17 @@ public class AdrenalineConfig {
         public int serializationWorkerThreads = 0;
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
+        public boolean parallelizeStructureStarts = true;
+        public boolean parallelizeStructureReferences = true;
+        public boolean parallelizeBiomes = true;
+        public boolean parallelizeNoise = true;
+        public boolean parallelizeSurface = true;
+        public boolean parallelizeCarvers = true;
+        public boolean parallelizeFeatures = true;
+        public boolean parallelizeInitializeLight = true;
+        public boolean parallelizeLight = true;
+        public boolean parallelizeSpawn = true;
+        public boolean parallelizeFull = true;
         public boolean fastLegacyRandom = true;
         public boolean debugLogging = false;
 
@@ -127,6 +181,17 @@ public class AdrenalineConfig {
             this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
+            this.parallelizeStructureStarts = other.parallelizeStructureStarts;
+            this.parallelizeStructureReferences = other.parallelizeStructureReferences;
+            this.parallelizeBiomes = other.parallelizeBiomes;
+            this.parallelizeNoise = other.parallelizeNoise;
+            this.parallelizeSurface = other.parallelizeSurface;
+            this.parallelizeCarvers = other.parallelizeCarvers;
+            this.parallelizeFeatures = other.parallelizeFeatures;
+            this.parallelizeInitializeLight = other.parallelizeInitializeLight;
+            this.parallelizeLight = other.parallelizeLight;
+            this.parallelizeSpawn = other.parallelizeSpawn;
+            this.parallelizeFull = other.parallelizeFull;
             this.fastLegacyRandom = other.fastLegacyRandom;
             this.debugLogging = other.debugLogging;
         }

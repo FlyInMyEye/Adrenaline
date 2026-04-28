@@ -29,6 +29,7 @@ public class AdrenalineConfigScreen extends Screen {
     private final List<ScrollableWidget> scrollableWidgets = new ArrayList<>();
     private final List<ScrollableLabel> scrollableLabels = new ArrayList<>();
     private final Map<AbstractWidget, TooltipData> widgetTooltips = new HashMap<>();
+    private final List<Button> stageParallelButtons = new ArrayList<>();
 
     private ThreadCountSlider generationThreadsSlider;
     private ThreadCountSlider serializationThreadsSlider;
@@ -64,6 +65,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.scrollableWidgets.clear();
         this.scrollableLabels.clear();
         this.widgetTooltips.clear();
+        this.stageParallelButtons.clear();
         this.scrollOffset = 0;
         this.targetScrollOffset = 0;
         this.animatedScrollOffset = 0.0D;
@@ -105,6 +107,28 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
 
         y = this.addSectionHeader("Compatibility", y);
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_STARTS", 10066329), this.config.parallelizeStructureStarts, value -> this.config.parallelizeStructureStarts = value, tooltip("Controls whether the STRUCTURE_STARTS stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_REFERENCES", 6250897), this.config.parallelizeStructureReferences, value -> this.config.parallelizeStructureReferences = value, tooltip("Controls whether the STRUCTURE_REFERENCES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("BIOMES", 8434258), this.config.parallelizeBiomes, value -> this.config.parallelizeBiomes = value, tooltip("Controls whether the BIOMES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("NOISE", 13750737), this.config.parallelizeNoise, value -> this.config.parallelizeNoise = value, tooltip("Controls whether the NOISE stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("SURFACE", 7497737), this.config.parallelizeSurface, value -> this.config.parallelizeSurface = value, tooltip("Controls whether the SURFACE stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("CARVERS", 3159410), this.config.parallelizeCarvers, value -> this.config.parallelizeCarvers = value, tooltip("Controls whether the CARVERS stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FEATURES", 2213376), this.config.parallelizeFeatures, value -> this.config.parallelizeFeatures = value, tooltip("Controls whether the FEATURES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("INITIALIZE_LIGHT", 13421772), this.config.parallelizeInitializeLight, value -> this.config.parallelizeInitializeLight = value, tooltip("Controls whether the INITIALIZE_LIGHT stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("LIGHT", 16769184), this.config.parallelizeLight, value -> this.config.parallelizeLight = value, tooltip("Controls whether the LIGHT stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("SPAWN", 15884384), this.config.parallelizeSpawn, value -> this.config.parallelizeSpawn = value, tooltip("Controls whether the SPAWN stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FULL", 16777215), this.config.parallelizeFull, value -> this.config.parallelizeFull = value, tooltip("Controls whether the FULL stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        y += 24;
         this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("Replaces legacy random with a faster implementation.", PerformanceImpact.LOW));
         y += 24;
 
@@ -322,7 +346,6 @@ public class AdrenalineConfigScreen extends Screen {
 
     private void updateButtonStates() {
         boolean worldgenOptimizations = this.config.worldgenOptimizations;
-        boolean parallelWorldgen = this.config.parallelWorldgen;
 
         this.worldgenOptimizationsButton.active = true;
         this.terrainFillOptimizationsButton.active = worldgenOptimizations;
@@ -334,6 +357,9 @@ public class AdrenalineConfigScreen extends Screen {
         this.oreVeinOptimizationsButton.active = worldgenOptimizations;
         this.initialSpawnOptimizationButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
+        for (Button button : this.stageParallelButtons) {
+            button.active = this.config.parallelWorldgen;
+        }
         this.fastLegacyRandomButton.active = true;
         this.debugLoggingButton.active = true;
         this.generationThreadsSlider.active = worldgenOptimizations;
@@ -453,6 +479,10 @@ public class AdrenalineConfigScreen extends Screen {
 
     private int snapSpawnZoneRadiusSliderValue(double value) {
         return this.fromSpawnZoneRadiusSliderValue(value);
+    }
+
+    private Component stageLabel(String stage, int color) {
+        return Component.literal("Parallelize ").append(Component.literal(stage).withStyle(style -> style.withColor(color)));
     }
 
     @FunctionalInterface
