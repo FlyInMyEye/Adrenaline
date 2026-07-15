@@ -34,6 +34,7 @@ public class AdrenalineConfigScreen extends Screen {
     private ThreadCountSlider generationThreadsSlider;
     private ThreadCountSlider serializationThreadsSlider;
     private SpawnZoneRadiusSlider spawnZoneRadiusSlider;
+    private FeatureSafetyRadiusSlider featureSafetyRadiusSlider;
     private Button worldgenOptimizationsButton;
     private Button terrainFillOptimizationsButton;
     private Button surfaceOptimizationsButton;
@@ -107,6 +108,8 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
 
         y = this.addSectionHeader("Compatibility", y);
+        this.featureSafetyRadiusSlider = this.addScrollableWidget(new FeatureSafetyRadiusSlider(leftX, y, 370, 20, tooltip("Reserves nearby chunks during feature generation. Increase this for mods with features extending beyond adjacent chunks.", PerformanceImpact.HIGH)), y, tooltip("Reserves nearby chunks during feature generation. Increase this for mods with features extending beyond adjacent chunks.", PerformanceImpact.HIGH));
+        y += 30;
         this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_STARTS", 10066329), this.config.parallelizeStructureStarts, value -> this.config.parallelizeStructureStarts = value, tooltip("Controls whether the STRUCTURE_STARTS stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
         y += 24;
         this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_REFERENCES", 6250897), this.config.parallelizeStructureReferences, value -> this.config.parallelizeStructureReferences = value, tooltip("Controls whether the STRUCTURE_REFERENCES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
@@ -357,6 +360,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.oreVeinOptimizationsButton.active = worldgenOptimizations;
         this.initialSpawnOptimizationButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
+        this.featureSafetyRadiusSlider.active = this.config.parallelWorldgen;
         for (Button button : this.stageParallelButtons) {
             button.active = this.config.parallelWorldgen;
         }
@@ -449,6 +453,30 @@ public class AdrenalineConfigScreen extends Screen {
         }
     }
 
+    private final class FeatureSafetyRadiusSlider extends AbstractSliderButton {
+
+        private FeatureSafetyRadiusSlider(int x, int y, int width, int height, TooltipData tooltip) {
+            super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toFeatureSafetyRadiusSliderValue(AdrenalineConfigScreen.this.config.featureSafetyRadius));
+            this.updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            int radius = AdrenalineConfigScreen.this.snapFeatureSafetyRadiusSliderValue(this.value);
+            this.setMessage(Component.literal("Feature safety radius: " + radius + " chunks"));
+        }
+
+        @Override
+        protected void applyValue() {
+            int radius = AdrenalineConfigScreen.this.snapFeatureSafetyRadiusSliderValue(this.value);
+            this.value = AdrenalineConfigScreen.this.toFeatureSafetyRadiusSliderValue(radius);
+            AdrenalineConfigScreen.this.config.featureSafetyRadius = radius;
+            this.updateMessage();
+            AdrenalineConfigScreen.this.saveConfig();
+            AdrenalineConfigScreen.this.updateButtonStates();
+        }
+    }
+
     private double toSliderValue(int workerThreads) {
         int clamped = Math.max(0, Math.min(workerThreads, this.availableProcessors));
         return this.availableProcessors <= 0 ? 0.0D : (double) clamped / (double) this.availableProcessors;
@@ -479,6 +507,22 @@ public class AdrenalineConfigScreen extends Screen {
 
     private int snapSpawnZoneRadiusSliderValue(double value) {
         return this.fromSpawnZoneRadiusSliderValue(value);
+    }
+
+    private double toFeatureSafetyRadiusSliderValue(int featureSafetyRadius) {
+        int radius = featureSafetyRadius == 0 ? AdrenalineConfig.resolvedFeatureSafetyRadius() : featureSafetyRadius;
+        int clamped = Math.max(AdrenalineConfig.MIN_FEATURE_SAFETY_RADIUS, Math.min(radius, AdrenalineConfig.MAX_FEATURE_SAFETY_RADIUS));
+        int span = AdrenalineConfig.MAX_FEATURE_SAFETY_RADIUS - AdrenalineConfig.MIN_FEATURE_SAFETY_RADIUS;
+        return span <= 0 ? 0.0D : (double) (clamped - AdrenalineConfig.MIN_FEATURE_SAFETY_RADIUS) / (double) span;
+    }
+
+    private int fromFeatureSafetyRadiusSliderValue(double value) {
+        int span = AdrenalineConfig.MAX_FEATURE_SAFETY_RADIUS - AdrenalineConfig.MIN_FEATURE_SAFETY_RADIUS;
+        return Math.min(AdrenalineConfig.MIN_FEATURE_SAFETY_RADIUS + (int) Math.round(value * span), AdrenalineConfig.MAX_FEATURE_SAFETY_RADIUS);
+    }
+
+    private int snapFeatureSafetyRadiusSliderValue(double value) {
+        return this.fromFeatureSafetyRadiusSliderValue(value);
     }
 
     private Component stageLabel(String stage, int color) {

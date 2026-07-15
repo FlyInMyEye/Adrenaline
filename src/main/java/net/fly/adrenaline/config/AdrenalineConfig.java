@@ -8,6 +8,9 @@ public class AdrenalineConfig {
     public static final int DEFAULT_SPAWN_ZONE_RADIUS = 11;
     public static final int MIN_SPAWN_ZONE_RADIUS = 1;
     public static final int MAX_SPAWN_ZONE_RADIUS = 30;
+    public static final int DEFAULT_FEATURE_SAFETY_RADIUS = 1;
+    public static final int MIN_FEATURE_SAFETY_RADIUS = 1;
+    public static final int MAX_FEATURE_SAFETY_RADIUS = 16;
 
     private static JsonConfigManager<Data> MANAGER;
 
@@ -92,6 +95,22 @@ public class AdrenalineConfig {
         return true;
     }
 
+    public static int resolvedFeatureSafetyRadius() {
+        int radius = get().featureSafetyRadius;
+        if (radius != 0) {
+            return Math.max(MIN_FEATURE_SAFETY_RADIUS, Math.min(MAX_FEATURE_SAFETY_RADIUS, radius));
+        }
+        return switch (get().featureCompatibility) {
+            case "increased" -> 3;
+            case "max" -> 7;
+            default -> DEFAULT_FEATURE_SAFETY_RADIUS;
+        };
+    }
+
+    public static int internalSpawnPreparationRadius() {
+        return resolvedSpawnZoneRadius() + resolvedFeatureSafetyRadius() + 1;
+    }
+
     public static boolean initialSpawnOptimizationEnabled() {
         return get().worldgenOptimizations && get().initialSpawnOptimization;
     }
@@ -150,6 +169,8 @@ public class AdrenalineConfig {
         public int serializationWorkerThreads = 0;
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
+        public String featureCompatibility = "classic";
+        public int featureSafetyRadius;
         public boolean parallelizeStructureStarts = true;
         public boolean parallelizeStructureReferences = true;
         public boolean parallelizeBiomes = true;
@@ -181,6 +202,8 @@ public class AdrenalineConfig {
             this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
+            this.featureCompatibility = other.featureCompatibility;
+            this.featureSafetyRadius = other.featureSafetyRadius;
             this.parallelizeStructureStarts = other.parallelizeStructureStarts;
             this.parallelizeStructureReferences = other.parallelizeStructureReferences;
             this.parallelizeBiomes = other.parallelizeBiomes;
