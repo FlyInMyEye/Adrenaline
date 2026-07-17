@@ -10,7 +10,7 @@ public class AdrenalineConfig {
     public static final int MAX_SPAWN_ZONE_RADIUS = 30;
     public static final int DEFAULT_FEATURE_SAFETY_RADIUS = 1;
     public static final int MIN_FEATURE_SAFETY_RADIUS = 1;
-    public static final int MAX_FEATURE_SAFETY_RADIUS = 16;
+    public static final int MAX_FEATURE_SAFETY_RADIUS = 8;
 
     private static JsonConfigManager<Data> MANAGER;
 
@@ -108,7 +108,7 @@ public class AdrenalineConfig {
     }
 
     public static int internalSpawnPreparationRadius() {
-        return resolvedSpawnZoneRadius() + resolvedFeatureSafetyRadius() + 1;
+        return resolvedSpawnZoneRadius() + resolvedFeatureSafetyRadius() - 1;
     }
 
     public static boolean initialSpawnOptimizationEnabled() {

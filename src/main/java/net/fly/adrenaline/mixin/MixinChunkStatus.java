@@ -3,7 +3,6 @@ package net.fly.adrenaline.mixin;
 import com.mojang.datafixers.util.Either;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,10 +15,8 @@ import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
-import net.fly.adrenaline.scheduler.FeatureCompatibilityScheduler;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ThreadedLevelLightEngine;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -73,10 +70,10 @@ public class MixinChunkStatus {
             return invokeGenerationTask(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
 
-        return scheduleFeatureWhenCompatible(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
+        return scheduleFeature(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
     }
 
-    private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> scheduleFeatureWhenCompatible(
+    private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> scheduleFeature(
         Object generationTask,
         ChunkStatus status,
         Executor executor,
@@ -90,49 +87,10 @@ public class MixinChunkStatus {
     ) {
         int writeRadius = AdrenalineConfig.resolvedFeatureSafetyRadius();
         ChunkPos centerPos = centerChunk.getPos();
-        long centerKey = centerPos.toLong();
-        List<CompletableFuture<?>> blockers = compatibilityBlockers(level.getChunkSource(), chunks, centerPos, writeRadius, ChunkStatus.SURFACE);
-        if (!blockers.isEmpty()) {
-            CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> waiting = new CompletableFuture<>();
-
-            if (AdrenalineConfig.debugLoggingEnabled()) {
-                Adrenaline.LOGGER.info(
-                    "CARVERS compatibility waiting center={},{} featureSafetyRadius={} blockers={} chunkCount={}\n{}",
-                    centerPos.x,
-                    centerPos.z,
-                    writeRadius,
-                    blockers.size(),
-                    chunks.size(),
-                    chunkStageGrid(chunks)
-                );
-            }
-
-            return FeatureCompatibilityScheduler.register(
-                centerKey,
-                new FeatureCompatibilityScheduler.PendingFeature(
-                    waiting,
-                    blockers,
-                    () -> tryDispatchCompatibleFeature(
-                        generationTask,
-                        status,
-                        executor,
-                        level,
-                        generator,
-                        structureTemplateManager,
-                        lightEngine,
-                        fullChunkConverter,
-                        chunks,
-                        centerChunk,
-                        waiting,
-                        writeRadius
-                    )
-                )
-            );
-        }
 
         if (AdrenalineConfig.debugLoggingEnabled()) {
             Adrenaline.LOGGER.info(
-                "CARVERS compatibility scheduling center={},{} featureSafetyRadius={} chunkCount={}\n{}",
+                "Scheduling feature generation center={},{} featureSafetyRadius={} chunkCount={}\n{}",
                 centerPos.x,
                 centerPos.z,
                 writeRadius,
@@ -170,63 +128,6 @@ public class MixinChunkStatus {
         }, () -> result.complete(ChunkHolder.UNLOADED_CHUNK), contextClassLoader, debugLabel));
 
         return result;
-    }
-
-    private boolean tryDispatchCompatibleFeature(
-        Object generationTask,
-        ChunkStatus status,
-        Executor executor,
-        ServerLevel level,
-        ChunkGenerator generator,
-        StructureTemplateManager structureTemplateManager,
-        ThreadedLevelLightEngine lightEngine,
-        Function<ChunkAccess, CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> fullChunkConverter,
-        List<ChunkAccess> chunks,
-        ChunkAccess centerChunk,
-        CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> waiting,
-        int writeRadius
-    ) {
-        if (!compatibilityBlockers(level.getChunkSource(), chunks, centerChunk.getPos(), writeRadius, ChunkStatus.SURFACE).isEmpty()) {
-            return false;
-        }
-
-        scheduleFeatureWhenCompatible(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk)
-            .whenComplete((value, throwable) -> {
-                if (throwable != null) {
-                    waiting.completeExceptionally(throwable);
-                } else {
-                    waiting.complete(value);
-                }
-            });
-        return true;
-    }
-
-    private static List<CompletableFuture<?>> compatibilityBlockers(ServerChunkCache chunkSource, List<ChunkAccess> chunks, ChunkPos centerPos, int writeRadius, ChunkStatus requiredStatus) {
-        Map<Long, ChunkAccess> chunkByPos = new HashMap<>();
-        for (ChunkAccess chunk : chunks) {
-            chunkByPos.put(chunk.getPos().toLong(), chunk);
-        }
-
-        List<CompletableFuture<?>> blockers = new ArrayList<>();
-        MixinChunkMapAccessor accessor = (MixinChunkMapAccessor) (Object) chunkSource.chunkMap;
-        for (int dx = -writeRadius; dx <= writeRadius; dx++) {
-            for (int dz = -writeRadius; dz <= writeRadius; dz++) {
-                long key = new ChunkPos(centerPos.x + dx, centerPos.z + dz).toLong();
-                ChunkAccess chunk = chunkByPos.get(key);
-                if (chunk != null && chunk.getStatus() != null && chunk.getStatus().getIndex() >= requiredStatus.getIndex()) {
-                    continue;
-                }
-
-                ChunkHolder holder = accessor.adrenaline$getVisibleChunkIfPresent(key);
-                if (holder != null) {
-                    CompletableFuture<?> future = holder.getFutureIfPresentUnchecked(requiredStatus);
-                    if (future != null) {
-                        blockers.add(future);
-                    }
-                }
-            }
-        }
-        return blockers;
     }
 
     @SuppressWarnings("unchecked")

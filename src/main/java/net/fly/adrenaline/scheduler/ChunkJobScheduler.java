@@ -155,7 +155,6 @@ public final class ChunkJobScheduler {
         for (ChunkJob job : jobsToCancel) {
             cancellationExecutor.execute(job::cancel);
         }
-        cancellationExecutor.execute(FeatureCompatibilityScheduler::cancelAll);
         Adrenaline.LOGGER.info("Cancelled {} pending worldgen jobs; {} active jobs will drain", pendingCount, activeJobCount);
     }
 

@@ -33,6 +33,14 @@ public class MixinChunkMap {
 
     private static final ThreadLocal<ChunkHolder> CURRENT_HOLDER = new ThreadLocal<>();
     private static final Map<ChunkHolder, Deque<ChunkStatus>> PENDING_STATUS = new ConcurrentHashMap<>();
+
+    @Inject(method = "getDependencyStatus", at = @At("HEAD"), cancellable = true)
+    private void useConfiguredFeatureDependencyStatus(ChunkStatus status, int distance, CallbackInfoReturnable<ChunkStatus> cir) {
+        if (status == ChunkStatus.FEATURES && distance > 0 && distance <= AdrenalineConfig.resolvedFeatureSafetyRadius()) {
+            cir.setReturnValue(ChunkStatus.CARVERS);
+        }
+    }
+
     @Inject(
         method = "scheduleChunkGeneration",
         at = @At("HEAD")
