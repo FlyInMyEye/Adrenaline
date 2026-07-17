@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import com.mojang.datafixers.util.Either;
+import it.unimi.dsi.fastutil.ints.IntList;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -23,14 +24,55 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChunkStatus.class)
 public class MixinChunkStatus {
+
+    @Shadow
+    @Final
+    private static List<ChunkStatus> STATUS_BY_RANGE;
+
+    @Shadow
+    @Final
+    private static IntList RANGE_BY_STATUS;
+
+    @Inject(method = "getStatusAroundFullChunk", at = @At("HEAD"), cancellable = true)
+    private static void adrenaline$useConfiguredStatusByRange(int distance, CallbackInfoReturnable<ChunkStatus> cir) {
+        int extraRadius = AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
+        if (extraRadius <= 0 || distance < 3) {
+            return;
+        }
+        if (distance <= 2 + extraRadius) {
+            cir.setReturnValue(ChunkStatus.CARVERS);
+            return;
+        }
+
+        int vanillaDistance = distance - extraRadius;
+        cir.setReturnValue(vanillaDistance >= STATUS_BY_RANGE.size() ? ChunkStatus.EMPTY : STATUS_BY_RANGE.get(vanillaDistance));
+    }
+
+    @Inject(method = "maxDistance", at = @At("HEAD"), cancellable = true)
+    private static void adrenaline$useConfiguredMaxDistance(CallbackInfoReturnable<Integer> cir) {
+        cir.setReturnValue(STATUS_BY_RANGE.size() + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1);
+    }
+
+    @Inject(method = "getDistance", at = @At("HEAD"), cancellable = true)
+    private static void adrenaline$useConfiguredStatusDistance(ChunkStatus status, CallbackInfoReturnable<Integer> cir) {
+        int distance = RANGE_BY_STATUS.getInt(status.getIndex());
+        if (status.getIndex() <= ChunkStatus.CARVERS.getIndex()) {
+            distance += AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
+        }
+        cir.setReturnValue(distance);
+    }
 
     @ModifyArg(
         method = "m_279978_",
@@ -66,7 +108,7 @@ public class MixinChunkStatus {
         List<ChunkAccess> chunks,
         ChunkAccess centerChunk
     ) {
-        if ((Object) this != ChunkStatus.CARVERS || !AdrenalineConfig.parallelWorldgenEnabled() || !AdrenalineConfig.parallelChunkStatusEnabled(status)) {
+        if ((Object) this != ChunkStatus.FEATURES || !AdrenalineConfig.parallelWorldgenEnabled() || !AdrenalineConfig.parallelChunkStatusEnabled(status)) {
             return invokeGenerationTask(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
 

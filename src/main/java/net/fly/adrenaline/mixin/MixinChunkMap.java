@@ -1,5 +1,11 @@
 package net.fly.adrenaline.mixin;
 
+import com.mojang.datafixers.util.Either;
+import java.util.Deque;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Function;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -12,6 +18,7 @@ import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.util.Unit;
 import net.minecraft.util.thread.ProcessorHandle;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,26 +27,11 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.Deque;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ConcurrentHashMap;
-import com.mojang.datafixers.util.Either;
-import net.minecraft.world.level.chunk.ChunkAccess;
-
 @Mixin(ChunkMap.class)
 public class MixinChunkMap {
 
     private static final ThreadLocal<ChunkHolder> CURRENT_HOLDER = new ThreadLocal<>();
     private static final Map<ChunkHolder, Deque<ChunkStatus>> PENDING_STATUS = new ConcurrentHashMap<>();
-
-    @Inject(method = "getDependencyStatus", at = @At("HEAD"), cancellable = true)
-    private void useConfiguredFeatureDependencyStatus(ChunkStatus status, int distance, CallbackInfoReturnable<ChunkStatus> cir) {
-        if (status == ChunkStatus.FEATURES && distance > 0 && distance <= AdrenalineConfig.resolvedFeatureSafetyRadius()) {
-            cir.setReturnValue(ChunkStatus.CARVERS);
-        }
-    }
 
     @Inject(
         method = "scheduleChunkGeneration",
@@ -79,13 +71,10 @@ public class MixinChunkMap {
                 }
             }
         }
-        if (nextStatus == null) {
-            nextStatus = nextStatus(holder);
-        }
         if (
             !AdrenalineConfig.parallelWorldgenEnabled()
                 || nextStatus == null
-                || nextStatus.getIndex() >= ChunkStatus.FEATURES.getIndex()
+                || nextStatus.getIndex() >= ChunkStatus.CARVERS.getIndex()
                 || !AdrenalineConfig.parallelChunkStatusEnabled(nextStatus)
         ) {
             instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
@@ -102,21 +91,22 @@ public class MixinChunkMap {
             Adrenaline.LOGGER.info("ChunkMap redirect scheduling pos={},{} inferredStatus={}", pos.x, pos.z, nextStatus);
         }
 
-        int writeRadius = nextStatus == ChunkStatus.CARVERS ? AdrenalineConfig.resolvedFeatureSafetyRadius() : 0;
         ChunkStatus scheduledStatus = nextStatus;
-
-        ChunkJobScheduler.get().submit(new ChunkJob(pos, writeRadius, () -> {
-            @SuppressWarnings("unchecked")
-            Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
-            ProcessorHandle<Unit> dummy = ProcessorHandle.of("adrenaline-wrap", unit -> {
+        @SuppressWarnings("unchecked")
+        Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
+        Function<ProcessorHandle<Unit>, Runnable> wrappedTask = completionHandle -> () -> {
+            ProcessorHandle<Unit> discardedCompletionHandle = ProcessorHandle.of("adrenaline-wrap", unit -> {
             });
-            taskFunction.apply(dummy).run();
-        }, () -> {
-            CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
-            if (future != null) {
-                future.complete(ChunkHolder.UNLOADED_CHUNK);
-            }
-        }, contextClassLoader));
+            ChunkJobScheduler.get().submit(new ChunkJob(pos, 0, () -> taskFunction.apply(discardedCompletionHandle).run(), () -> {
+                CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
+                if (future != null) {
+                    future.complete(ChunkHolder.UNLOADED_CHUNK);
+                }
+            }, contextClassLoader));
+            completionHandle.tell(Unit.INSTANCE);
+        };
+        accessor.setTask(wrappedTask);
+        instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
     }
 
     @Inject(
@@ -126,20 +116,6 @@ public class MixinChunkMap {
     )
     private void clearHolder(ChunkHolder holder, Runnable task, CallbackInfo ci) {
         CURRENT_HOLDER.remove();
-    }
-
-    private static ChunkStatus nextStatus(ChunkHolder holder) {
-        if (holder == null) {
-            return null;
-        }
-
-        ChunkStatus last = holder.getLastAvailableStatus();
-        if (last == null) {
-            return ChunkStatus.STRUCTURE_STARTS;
-        }
-
-        int nextIndex = last.getIndex() + 1;
-        return nextIndex < ChunkStatus.getStatusList().size() ? ChunkStatus.getStatusList().get(nextIndex) : null;
     }
 
 }
