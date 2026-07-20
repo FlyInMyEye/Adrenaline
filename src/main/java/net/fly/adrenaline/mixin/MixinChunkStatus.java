@@ -16,6 +16,7 @@ import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.util.WorldgenStageStats;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ThreadedLevelLightEngine;
@@ -108,11 +109,14 @@ public class MixinChunkStatus {
         List<ChunkAccess> chunks,
         ChunkAccess centerChunk
     ) {
+        long startedNanos = WorldgenStageStats.isEnabled() ? System.nanoTime() : 0L;
+        CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future;
         if ((Object) this != ChunkStatus.FEATURES || !AdrenalineConfig.parallelWorldgenEnabled() || !AdrenalineConfig.parallelChunkStatusEnabled(status)) {
-            return invokeGenerationTask(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
+            future = invokeGenerationTask(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
+        } else {
+            future = scheduleFeature(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
-
-        return scheduleFeature(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
+        return WorldgenStageStats.track(status, centerChunk.getPos(), startedNanos, future);
     }
 
     private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> scheduleFeature(

@@ -1,0 +1,86 @@
+package net.fly.adrenaline.client;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.WorldgenStageStats.StageTiming;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import net.minecraftforge.client.event.CustomizeGuiOverlayEvent;
+import net.minecraftforge.client.event.RegisterClientCommandsEvent;
+import net.minecraftforge.client.event.RenderGuiEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+
+public final class WorldgenStatsOverlay {
+
+    private static final int BACKGROUND_COLOR = -1873784752;
+    private static final int TEXT_COLOR = 14737632;
+    private static final int MAX_BARS = 50;
+
+    @SubscribeEvent
+    public void onRegisterCommands(RegisterClientCommandsEvent event) {
+        event.getDispatcher().register(
+            Commands.literal("adrenaline")
+                .then(Commands.literal("stats")
+                    .then(Commands.literal("on").executes(context -> setEnabled(context.getSource(), true)))
+                    .then(Commands.literal("off").executes(context -> setEnabled(context.getSource(), false))))
+        );
+    }
+
+    @SubscribeEvent
+    public void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
+        if (!WorldgenStageStats.isEnabled()) {
+            return;
+        }
+        event.getLeft().addAll(lines());
+    }
+
+    @SubscribeEvent
+    public void onRenderGui(RenderGuiEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (!WorldgenStageStats.isEnabled() || minecraft.options.renderDebug) {
+            return;
+        }
+
+        GuiGraphics graphics = event.getGuiGraphics();
+        Font font = minecraft.font;
+        List<String> lines = lines();
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            int x = 2;
+            int y = 2 + font.lineHeight * i;
+            int width = font.width(line);
+            graphics.fill(x - 1, y - 1, x + width + 1, y + font.lineHeight - 1, BACKGROUND_COLOR);
+            graphics.drawString(font, line, x, y, TEXT_COLOR, false);
+        }
+    }
+
+    private static int setEnabled(CommandSourceStack source, boolean enabled) {
+        WorldgenStageStats.setEnabled(enabled);
+        source.sendSuccess(() -> Component.literal("Adrenaline stats " + (enabled ? "enabled" : "disabled")), false);
+        return 1;
+    }
+
+    private static List<String> lines() {
+        List<StageTiming> timings = WorldgenStageStats.snapshot();
+        long maxNanos = 0L;
+        for (StageTiming timing : timings) {
+            maxNanos = Math.max(maxNanos, timing.averageNanos());
+        }
+
+        List<String> lines = new ArrayList<>(timings.size());
+        for (StageTiming timing : timings) {
+            int bars = timing.averageNanos() == 0L || maxNanos == 0L
+                ? 0
+                : Math.max(1, (int) Math.round((double) timing.averageNanos() * MAX_BARS / maxNanos));
+            long milliseconds = Math.round(timing.averageNanos() / 1_000_000.0D);
+            lines.add(String.format(Locale.ROOT, "%-20s %s %dms", timing.name(), "|".repeat(bars), milliseconds));
+        }
+        return lines;
+    }
+}
