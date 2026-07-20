@@ -1,7 +1,5 @@
 package net.fly.adrenaline.mixin;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
@@ -9,7 +7,7 @@ import java.util.function.Supplier;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.FastHeightmap;
-import net.fly.adrenaline.worldgen.FastSectionAccess;
+import net.fly.adrenaline.worldgen.NoiseSectionWriter;
 import net.fly.adrenaline.worldgen.WorldgenHeightmapTracker;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
@@ -113,7 +111,7 @@ public class MixinNoiseBasedChunkGenerator {
         BlockState defaultBlock = noiseGeneratorSettings.defaultBlock();
         Aquifer aquifer = noiseChunk.aquifer();
         WorldgenHeightmapTracker heightmapTracker = new WorldgenHeightmapTracker(chunk.getMinBuildHeight());
-        Set<LevelChunkSection> dirtySections = new HashSet<>();
+        NoiseSectionWriter[] sectionWriters = new NoiseSectionWriter[chunk.getSectionsCount()];
         MutableBlockPos mutableBlockPos = new MutableBlockPos();
         MixinNoiseChunkAccessor noiseChunkAccessor = (MixinNoiseChunkAccessor) noiseChunk;
         int cellWidth = noiseChunkAccessor.adrenaline$cellWidth();
@@ -137,6 +135,11 @@ public class MixinNoiseBasedChunkGenerator {
             for (int cellZ = 0; cellZ < cellCountZ; cellZ++) {
                 int sectionIndex = chunk.getSectionsCount() - 1;
                 LevelChunkSection section = chunk.getSection(sectionIndex);
+                NoiseSectionWriter sectionWriter = sectionWriters[sectionIndex];
+                if (sectionWriter == null) {
+                    sectionWriter = new NoiseSectionWriter(section);
+                    sectionWriters[sectionIndex] = sectionWriter;
+                }
 
                 for (int cellY = cellCountY - 1; cellY >= 0; cellY--) {
                     noiseChunk.selectCellYZ(cellY, cellZ);
@@ -149,6 +152,11 @@ public class MixinNoiseBasedChunkGenerator {
                         if (sectionIndex != targetSectionIndex) {
                             sectionIndex = targetSectionIndex;
                             section = chunk.getSection(sectionIndex);
+                            sectionWriter = sectionWriters[sectionIndex];
+                            if (sectionWriter == null) {
+                                sectionWriter = new NoiseSectionWriter(section);
+                                sectionWriters[sectionIndex] = sectionWriter;
+                            }
                         }
 
                         noiseChunk.updateForY(y, (double) yInCell / (double) cellHeight);
@@ -172,8 +180,7 @@ public class MixinNoiseBasedChunkGenerator {
                                     continue;
                                 }
 
-                                FastSectionAccess.writeUnchecked(section, localX, localY, localZ, state);
-                                dirtySections.add(section);
+                                sectionWriter.set(localX, localY, localZ, state);
                                 heightmapTracker.record(localX, y, localZ, state);
 
                                 if (aquifer.shouldScheduleFluidUpdate() && !state.getFluidState().isEmpty()) {
@@ -193,8 +200,10 @@ public class MixinNoiseBasedChunkGenerator {
 
         noiseChunk.stopInterpolation();
 
-        for (LevelChunkSection dirtySection : dirtySections) {
-            dirtySection.recalcBlockCounts();
+        for (NoiseSectionWriter sectionWriter : sectionWriters) {
+            if (sectionWriter != null) {
+                sectionWriter.finish();
+            }
         }
 
         for (int localX = 0; localX < 16; localX++) {
