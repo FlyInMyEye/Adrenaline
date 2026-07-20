@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -76,6 +77,20 @@ public class MixinNoiseBasedChunkGenerator {
             return CompletableFuture.completedFuture(supplier.get());
         }
         return CompletableFuture.supplyAsync(supplier, executor);
+    }
+
+    @Redirect(
+        method = "fillFromNoise",
+        at = @At(
+            value = "INVOKE",
+            target = "Ljava/util/concurrent/CompletableFuture;whenCompleteAsync(Ljava/util/function/BiConsumer;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"
+        )
+    )
+    private <T> CompletableFuture<T> inlineFillFromNoiseCompletion(CompletableFuture<T> future, BiConsumer<? super T, ? super Throwable> action, Executor executor) {
+        if (AdrenalineConfig.terrainFillOptimizationsEnabled()) {
+            return future.whenComplete(action);
+        }
+        return future.whenCompleteAsync(action, executor);
     }
 
     /**
