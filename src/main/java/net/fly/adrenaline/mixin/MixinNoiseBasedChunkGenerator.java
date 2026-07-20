@@ -6,6 +6,9 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.WorldgenStageStats.NoiseProfile;
+import net.fly.adrenaline.util.WorldgenStageStats.NoiseSubstage;
 import net.fly.adrenaline.worldgen.FastHeightmap;
 import net.fly.adrenaline.worldgen.NoiseSectionWriter;
 import net.fly.adrenaline.worldgen.WorldgenHeightmapTracker;
@@ -101,6 +104,8 @@ public class MixinNoiseBasedChunkGenerator {
             return this.doFillFallback(blender, structureManager, randomState, chunk, minCellY, cellCountY);
         }
 
+        NoiseProfile profile = WorldgenStageStats.beginNoiseProfile();
+        long phaseStart = profile == null ? 0L : System.nanoTime();
         NoiseChunk noiseChunk = chunk.getOrCreateNoiseChunk(access -> this.createNoiseChunk(access, structureManager, blender, randomState));
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
         Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
@@ -126,11 +131,24 @@ public class MixinNoiseBasedChunkGenerator {
             xLerp[i] = lerp;
             zLerp[i] = lerp;
         }
+        if (profile != null) {
+            profile.add(NoiseSubstage.SETUP, System.nanoTime() - phaseStart);
+            phaseStart = System.nanoTime();
+        }
 
         noiseChunk.initializeForFirstCellX();
+        if (profile != null) {
+            profile.add(NoiseSubstage.SLICE_SAMPLING, System.nanoTime() - phaseStart);
+        }
 
         for (int cellX = 0; cellX < cellCountX; cellX++) {
+            if (profile != null) {
+                phaseStart = System.nanoTime();
+            }
             noiseChunk.advanceCellX(cellX);
+            if (profile != null) {
+                profile.add(NoiseSubstage.SLICE_SAMPLING, System.nanoTime() - phaseStart);
+            }
 
             for (int cellZ = 0; cellZ < cellCountZ; cellZ++) {
                 int sectionIndex = chunk.getSectionsCount() - 1;
@@ -142,7 +160,13 @@ public class MixinNoiseBasedChunkGenerator {
                 }
 
                 for (int cellY = cellCountY - 1; cellY >= 0; cellY--) {
+                    if (profile != null) {
+                        phaseStart = System.nanoTime();
+                    }
                     noiseChunk.selectCellYZ(cellY, cellZ);
+                    if (profile != null) {
+                        profile.add(NoiseSubstage.CELL_CACHE, System.nanoTime() - phaseStart);
+                    }
 
                     for (int yInCell = cellHeight - 1; yInCell >= 0; yInCell--) {
                         int y = (minCellY + cellY) * cellHeight + yInCell;
@@ -159,24 +183,50 @@ public class MixinNoiseBasedChunkGenerator {
                             }
                         }
 
+                        if (profile != null) {
+                            phaseStart = System.nanoTime();
+                        }
                         noiseChunk.updateForY(y, (double) yInCell / (double) cellHeight);
+                        if (profile != null) {
+                            profile.add(NoiseSubstage.INTERPOLATION, System.nanoTime() - phaseStart);
+                        }
 
                         for (int xInCell = 0; xInCell < cellWidth; xInCell++) {
                             int x = minBlockX + cellX * cellWidth + xInCell;
                             int localX = x & 15;
+                            if (profile != null) {
+                                phaseStart = System.nanoTime();
+                            }
                             noiseChunk.updateForX(x, xLerp[xInCell]);
+                            if (profile != null) {
+                                profile.add(NoiseSubstage.INTERPOLATION, System.nanoTime() - phaseStart);
+                            }
 
                             for (int zInCell = 0; zInCell < cellWidth; zInCell++) {
                                 int z = minBlockZ + cellZ * cellWidth + zInCell;
                                 int localZ = z & 15;
+                                if (profile != null) {
+                                    phaseStart = System.nanoTime();
+                                }
                                 noiseChunk.updateForZ(z, zLerp[zInCell]);
+                                if (profile != null) {
+                                    profile.add(NoiseSubstage.INTERPOLATION, System.nanoTime() - phaseStart);
+                                    phaseStart = System.nanoTime();
+                                }
                                 BlockState state = noiseChunkAccessor.adrenaline$getInterpolatedState();
                                 if (state == null) {
                                     state = defaultBlock;
                                 }
 
                                 state = this.debugPreliminarySurfaceLevel(noiseChunk, x, y, z, state);
+                                if (profile != null) {
+                                    profile.add(NoiseSubstage.BLOCK_STATE, System.nanoTime() - phaseStart);
+                                    phaseStart = System.nanoTime();
+                                }
                                 if (state == AIR || SharedConstants.debugVoidTerrain(chunkPos)) {
+                                    if (profile != null) {
+                                        profile.add(NoiseSubstage.BLOCK_WRITE, System.nanoTime() - phaseStart);
+                                    }
                                     continue;
                                 }
 
@@ -187,6 +237,9 @@ public class MixinNoiseBasedChunkGenerator {
                                     mutableBlockPos.set(x, y, z);
                                     chunk.markPosForPostprocessing(mutableBlockPos);
                                 }
+                                if (profile != null) {
+                                    profile.add(NoiseSubstage.BLOCK_WRITE, System.nanoTime() - phaseStart);
+                                }
                             }
                         }
                     }
@@ -194,10 +247,19 @@ public class MixinNoiseBasedChunkGenerator {
             }
 
             if (cellX + 1 < cellCountX) {
+                if (profile != null) {
+                    phaseStart = System.nanoTime();
+                }
                 noiseChunk.swapSlices();
+                if (profile != null) {
+                    profile.add(NoiseSubstage.SLICE_SAMPLING, System.nanoTime() - phaseStart);
+                }
             }
         }
 
+        if (profile != null) {
+            phaseStart = System.nanoTime();
+        }
         noiseChunk.stopInterpolation();
 
         for (NoiseSectionWriter sectionWriter : sectionWriters) {
@@ -214,6 +276,10 @@ public class MixinNoiseBasedChunkGenerator {
         }
 
         chunk.initializeLightSources();
+        if (profile != null) {
+            profile.add(NoiseSubstage.FINALIZE, System.nanoTime() - phaseStart);
+            WorldgenStageStats.finishNoiseProfile(profile);
+        }
         return chunk;
     }
 
