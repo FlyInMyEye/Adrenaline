@@ -5,6 +5,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLPaths;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -163,7 +164,7 @@ public final class ModernFixCompat {
     private static OptionState loadOptionState(String option) {
         try {
             Class<?> configClass = Class.forName("org.embeddedt.modernfix.core.config.ModernFixEarlyConfig");
-            Object earlyConfig = configClass.getMethod("load", java.io.File.class).invoke(null, configPath().toFile());
+            Object earlyConfig = configClass.getMethod("load", File.class).invoke(null, configPath().toFile());
             @SuppressWarnings("unchecked")
             Map<String, Object> optionMap = (Map<String, Object>) configClass.getMethod("getOptionMap").invoke(earlyConfig);
             Object optionValue = optionMap.get(option);
@@ -171,12 +172,20 @@ public final class ModernFixCompat {
                 return OptionState.missing();
             }
             Class<?> optionClass = optionValue.getClass();
-            boolean enabled = (boolean) optionClass.getMethod("isEnabled").invoke(optionValue);
+            boolean enabled = enabledValue(optionClass, optionValue);
             boolean userDefined = (boolean) optionClass.getMethod("isUserDefined").invoke(optionValue);
             return new OptionState(true, enabled, userDefined);
         } catch (ReflectiveOperationException exception) {
             Adrenaline.LOGGER.warn("Failed to inspect ModernFix option state for {}", option, exception);
             return OptionState.missing();
+        }
+    }
+
+    private static boolean enabledValue(Class<?> optionClass, Object optionValue) throws ReflectiveOperationException {
+        try {
+            return (boolean) optionClass.getMethod("isEnabled").invoke(optionValue);
+        } catch (NoSuchMethodException exception) {
+            return (boolean) optionClass.getMethod("getValue").invoke(optionValue);
         }
     }
 
