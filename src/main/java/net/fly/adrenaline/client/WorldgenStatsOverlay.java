@@ -70,15 +70,21 @@ public final class WorldgenStatsOverlay {
         List<StageTiming> timings = WorldgenStageStats.snapshot();
         long maxNanos = 0L;
         for (StageTiming timing : timings) {
-            maxNanos = Math.max(maxNanos, timing.averageNanos());
+            if (!"WAITING".equals(timing.name())) {
+                maxNanos = Math.max(maxNanos, timing.averageNanos());
+            }
         }
 
         List<String> lines = new ArrayList<>(timings.size());
         for (StageTiming timing : timings) {
+            long milliseconds = Math.round(timing.averageNanos() / 1_000_000.0D);
+            if ("WAITING".equals(timing.name())) {
+                lines.add(String.format(Locale.ROOT, "%-20s %dms", timing.name(), milliseconds));
+                continue;
+            }
             int bars = timing.averageNanos() == 0L || maxNanos == 0L
                 ? 0
                 : Math.max(1, (int) Math.round((double) timing.averageNanos() * MAX_BARS / maxNanos));
-            long milliseconds = Math.round(timing.averageNanos() / 1_000_000.0D);
             lines.add(String.format(Locale.ROOT, "%-20s %s %dms", timing.name(), "|".repeat(bars), milliseconds));
         }
         return lines;

@@ -140,7 +140,6 @@ public final class WorldgenStageStats {
     public static List<StageTiming> snapshot() {
         List<StageTiming> timings = new ArrayList<>(STATUSES.size() + NOISE_SUBSTAGES.length + 2);
         timings.add(new StageTiming("SCHEDULING", SCHEDULING_AVERAGE_NANOS.get()));
-        timings.add(new StageTiming("WAITING", WAITING_AVERAGE_NANOS.get()));
         for (ChunkStatus status : STATUSES) {
             int index = status.getIndex();
             String name = status.toString();
@@ -149,8 +148,6 @@ public final class WorldgenStageStats {
         }
         Collections.reverse(timings);
         StageTiming scheduling = timings.remove(timings.size() - 1);
-        StageTiming waiting = timings.remove(timings.size() - 1);
-        timings.add(0, waiting);
         timings.add(0, scheduling);
         int noiseIndex = -1;
         for (int i = 0; i < timings.size(); i++) {
@@ -167,6 +164,7 @@ public final class WorldgenStageStats {
             }
             timings.addAll(noiseIndex + 1, noiseTimings);
         }
+        timings.add(new StageTiming("WAITING", WAITING_AVERAGE_NANOS.get()));
         return timings;
     }
 
