@@ -14,17 +14,14 @@ import net.minecraft.world.level.chunk.ChunkStatus;
 public final class WorldgenStageStats {
 
     private static final List<ChunkStatus> STATUSES = ChunkStatus.getStatusList();
-    private static final AtomicLongArray TOTAL_NANOS = new AtomicLongArray(STATUSES.size());
-    private static final AtomicLongArray SAMPLE_COUNTS = new AtomicLongArray(STATUSES.size());
+    private static final AtomicLongArray AVERAGE_NANOS = new AtomicLongArray(STATUSES.size());
     private static final NoiseSubstage[] NOISE_SUBSTAGES = NoiseSubstage.values();
-    private static final AtomicLongArray NOISE_TOTAL_NANOS = new AtomicLongArray(NOISE_SUBSTAGES.length);
-    private static final AtomicLongArray NOISE_SAMPLE_COUNTS = new AtomicLongArray(NOISE_SUBSTAGES.length);
+    private static final AtomicLongArray NOISE_AVERAGE_NANOS = new AtomicLongArray(NOISE_SUBSTAGES.length);
     private static final ConcurrentHashMap<StageKey, SchedulingState> STAGE_SCHEDULING = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Long, ChunkScheduling> CHUNK_SCHEDULING = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Long, AtomicLong> LAST_STAGE_FINISH_NANOS = new ConcurrentHashMap<>();
-    private static final AtomicLong SCHEDULING_TOTAL_NANOS = new AtomicLong();
-    private static final AtomicLong WAITING_TOTAL_NANOS = new AtomicLong();
-    private static final AtomicLong SCHEDULING_SAMPLE_COUNTS = new AtomicLong();
+    private static final AtomicLong SCHEDULING_AVERAGE_NANOS = new AtomicLong();
+    private static final AtomicLong WAITING_AVERAGE_NANOS = new AtomicLong();
     private static final AtomicLong EPOCH = new AtomicLong();
     private static volatile boolean enabled;
 
@@ -40,19 +37,16 @@ public final class WorldgenStageStats {
         WorldgenStageStats.enabled = enabled;
         if (enabled) {
             for (int i = 0; i < STATUSES.size(); i++) {
-                TOTAL_NANOS.set(i, 0L);
-                SAMPLE_COUNTS.set(i, 0L);
+                AVERAGE_NANOS.set(i, 0L);
             }
             for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
-                NOISE_TOTAL_NANOS.set(i, 0L);
-                NOISE_SAMPLE_COUNTS.set(i, 0L);
+                NOISE_AVERAGE_NANOS.set(i, 0L);
             }
             STAGE_SCHEDULING.clear();
             CHUNK_SCHEDULING.clear();
             LAST_STAGE_FINISH_NANOS.clear();
-            SCHEDULING_TOTAL_NANOS.set(0L);
-            WAITING_TOTAL_NANOS.set(0L);
-            SCHEDULING_SAMPLE_COUNTS.set(0L);
+            SCHEDULING_AVERAGE_NANOS.set(0L);
+            WAITING_AVERAGE_NANOS.set(0L);
         }
     }
 
@@ -114,8 +108,7 @@ public final class WorldgenStageStats {
             return;
         }
         for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
-            NOISE_TOTAL_NANOS.addAndGet(i, profile.elapsedNanos[i]);
-            NOISE_SAMPLE_COUNTS.incrementAndGet(i);
+            updateAverage(NOISE_AVERAGE_NANOS, i, profile.elapsedNanos[i]);
         }
     }
 
@@ -129,15 +122,13 @@ public final class WorldgenStageStats {
         future.whenComplete((value, throwable) -> {
             if (enabled && EPOCH.get() == epoch) {
                 long finishedNanos = System.nanoTime();
-                TOTAL_NANOS.addAndGet(index, finishedNanos - startedNanos);
-                SAMPLE_COUNTS.incrementAndGet(index);
+                updateAverage(AVERAGE_NANOS, index, finishedNanos - startedNanos);
                 LAST_STAGE_FINISH_NANOS.computeIfAbsent(pos.toLong(), ignored -> new AtomicLong()).accumulateAndGet(finishedNanos, Math::max);
                 if (status == ChunkStatus.FULL) {
                     ChunkScheduling chunkScheduling = CHUNK_SCHEDULING.remove(pos.toLong());
                     if (chunkScheduling != null) {
-                        SCHEDULING_TOTAL_NANOS.addAndGet(chunkScheduling.schedulingNanos.get());
-                        WAITING_TOTAL_NANOS.addAndGet(chunkScheduling.waitingNanos.get());
-                        SCHEDULING_SAMPLE_COUNTS.incrementAndGet();
+                        updateAverage(SCHEDULING_AVERAGE_NANOS, chunkScheduling.schedulingNanos.get());
+                        updateAverage(WAITING_AVERAGE_NANOS, chunkScheduling.waitingNanos.get());
                     }
                     LAST_STAGE_FINISH_NANOS.remove(pos.toLong());
                 }
@@ -148,18 +139,13 @@ public final class WorldgenStageStats {
 
     public static List<StageTiming> snapshot() {
         List<StageTiming> timings = new ArrayList<>(STATUSES.size() + NOISE_SUBSTAGES.length + 2);
-        long schedulingSamples = SCHEDULING_SAMPLE_COUNTS.get();
-        long schedulingAverageNanos = schedulingSamples == 0L ? 0L : SCHEDULING_TOTAL_NANOS.get() / schedulingSamples;
-        long waitingAverageNanos = schedulingSamples == 0L ? 0L : WAITING_TOTAL_NANOS.get() / schedulingSamples;
-        timings.add(new StageTiming("SCHEDULING", schedulingAverageNanos));
-        timings.add(new StageTiming("WAITING", waitingAverageNanos));
+        timings.add(new StageTiming("SCHEDULING", SCHEDULING_AVERAGE_NANOS.get()));
+        timings.add(new StageTiming("WAITING", WAITING_AVERAGE_NANOS.get()));
         for (ChunkStatus status : STATUSES) {
             int index = status.getIndex();
-            long samples = SAMPLE_COUNTS.get(index);
-            long averageNanos = samples == 0L ? 0L : TOTAL_NANOS.get(index) / samples;
             String name = status.toString();
             int separator = name.indexOf(':');
-            timings.add(new StageTiming(name.substring(separator + 1).toUpperCase(Locale.ROOT), averageNanos));
+            timings.add(new StageTiming(name.substring(separator + 1).toUpperCase(Locale.ROOT), AVERAGE_NANOS.get(index)));
         }
         Collections.reverse(timings);
         StageTiming scheduling = timings.remove(timings.size() - 1);
@@ -177,13 +163,29 @@ public final class WorldgenStageStats {
             List<StageTiming> noiseTimings = new ArrayList<>(NOISE_SUBSTAGES.length);
             for (NoiseSubstage substage : NOISE_SUBSTAGES) {
                 int index = substage.ordinal();
-                long samples = NOISE_SAMPLE_COUNTS.get(index);
-                long averageNanos = samples == 0L ? 0L : NOISE_TOTAL_NANOS.get(index) / samples;
-                noiseTimings.add(new StageTiming("  " + substage.displayName, averageNanos));
+                noiseTimings.add(new StageTiming("  " + substage.displayName, NOISE_AVERAGE_NANOS.get(index)));
             }
             timings.addAll(noiseIndex + 1, noiseTimings);
         }
         return timings;
+    }
+
+    private static void updateAverage(AtomicLong average, long sample) {
+        long current;
+        long updated;
+        do {
+            current = average.get();
+            updated = current == 0L ? sample : current + (sample - current) / 100L;
+        } while (!average.compareAndSet(current, updated));
+    }
+
+    private static void updateAverage(AtomicLongArray averages, int index, long sample) {
+        long current;
+        long updated;
+        do {
+            current = averages.get(index);
+            updated = current == 0L ? sample : current + (sample - current) / 100L;
+        } while (!averages.compareAndSet(index, current, updated));
     }
 
     public enum NoiseSubstage {
