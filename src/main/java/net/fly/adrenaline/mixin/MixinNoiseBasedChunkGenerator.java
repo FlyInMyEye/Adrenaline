@@ -111,6 +111,7 @@ public class MixinNoiseBasedChunkGenerator {
         int minBlockZ = chunkPos.getMinBlockZ();
         NoiseGeneratorSettings noiseGeneratorSettings = this.settings.value();
         BlockState defaultBlock = noiseGeneratorSettings.defaultBlock();
+        Aquifer aquifer = noiseChunk.aquifer();
         WorldgenHeightmapTracker heightmapTracker = new WorldgenHeightmapTracker(chunk.getMinBuildHeight());
         Set<LevelChunkSection> dirtySections = new HashSet<>();
         MutableBlockPos mutableBlockPos = new MutableBlockPos();
@@ -175,7 +176,7 @@ public class MixinNoiseBasedChunkGenerator {
                                 dirtySections.add(section);
                                 heightmapTracker.record(localX, y, localZ, state);
 
-                                if (!state.getFluidState().isEmpty()) {
+                                if (aquifer.shouldScheduleFluidUpdate() && !state.getFluidState().isEmpty()) {
                                     mutableBlockPos.set(x, y, z);
                                     chunk.markPosForPostprocessing(mutableBlockPos);
                                 }
