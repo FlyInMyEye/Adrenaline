@@ -1,8 +1,6 @@
 package net.fly.adrenaline.scheduler;
 
 import net.fly.adrenaline.util.DeferredNotificationBuffer;
-import net.fly.adrenaline.util.WorldgenStageStats;
-import net.fly.adrenaline.util.WorldgenStageStats.SchedulingSample;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.HashSet;
@@ -16,42 +14,35 @@ public final class ChunkJob implements Runnable {
     private final Runnable cancelWork;
     private final ClassLoader contextClassLoader;
     private final String debugLabel;
-    private final ChunkPos statsPos;
     private final AtomicBoolean cancellationHandled = new AtomicBoolean();
     private long schedulerEpoch = Long.MIN_VALUE;
     private volatile boolean started;
-    private SchedulingSample schedulingSample;
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, ClassLoader contextClassLoader) {
-        this(center, buildFootprint(center, writeRadius), work, () -> {
+        this(buildFootprint(center, writeRadius), work, () -> {
         }, contextClassLoader, center.x + "," + center.z);
     }
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, Runnable cancelWork, ClassLoader contextClassLoader) {
-        this(center, buildFootprint(center, writeRadius), work, cancelWork, contextClassLoader, center.x + "," + center.z);
+        this(buildFootprint(center, writeRadius), work, cancelWork, contextClassLoader, center.x + "," + center.z);
     }
 
     public ChunkJob(Set<Long> footprint, Runnable work, ClassLoader contextClassLoader) {
-        this(null, footprint, work, () -> {
+        this(footprint, work, () -> {
         }, contextClassLoader, "custom");
     }
 
     public ChunkJob(Set<Long> footprint, Runnable work, ClassLoader contextClassLoader, String debugLabel) {
-        this(null, footprint, work, () -> {
+        this(footprint, work, () -> {
         }, contextClassLoader, debugLabel);
     }
 
     public ChunkJob(Set<Long> footprint, Runnable work, Runnable cancelWork, ClassLoader contextClassLoader, String debugLabel) {
-        this(null, footprint, work, cancelWork, contextClassLoader, debugLabel);
-    }
-
-    public ChunkJob(ChunkPos statsPos, Set<Long> footprint, Runnable work, Runnable cancelWork, ClassLoader contextClassLoader, String debugLabel) {
         this.footprint = new HashSet<>(footprint);
         this.work = work;
         this.cancelWork = cancelWork;
         this.contextClassLoader = contextClassLoader;
         this.debugLabel = debugLabel;
-        this.statsPos = statsPos;
     }
 
     public Set<Long> footprint() {
@@ -72,15 +63,6 @@ public final class ChunkJob implements Runnable {
 
     void markStarted() {
         this.started = true;
-    }
-
-    void markSubmitted() {
-        this.schedulingSample = this.statsPos == null ? null : WorldgenStageStats.beginScheduling(this.statsPos);
-    }
-
-    void finishScheduling() {
-        WorldgenStageStats.finishScheduling(this.schedulingSample);
-        this.schedulingSample = null;
     }
 
     void cancel() {
