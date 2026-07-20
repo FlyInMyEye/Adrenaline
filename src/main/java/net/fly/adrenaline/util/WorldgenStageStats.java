@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import net.minecraft.world.level.ChunkPos;
@@ -18,6 +19,9 @@ public final class WorldgenStageStats {
     private static final NoiseSubstage[] NOISE_SUBSTAGES = NoiseSubstage.values();
     private static final AtomicLongArray NOISE_TOTAL_NANOS = new AtomicLongArray(NOISE_SUBSTAGES.length);
     private static final AtomicLongArray NOISE_SAMPLE_COUNTS = new AtomicLongArray(NOISE_SUBSTAGES.length);
+    private static final ConcurrentHashMap<Long, AtomicLong> CHUNK_SCHEDULING_NANOS = new ConcurrentHashMap<>();
+    private static final AtomicLong SCHEDULING_TOTAL_NANOS = new AtomicLong();
+    private static final AtomicLong SCHEDULING_SAMPLE_COUNTS = new AtomicLong();
     private static final AtomicLong EPOCH = new AtomicLong();
     private static volatile boolean enabled;
 
@@ -40,7 +44,22 @@ public final class WorldgenStageStats {
                 NOISE_TOTAL_NANOS.set(i, 0L);
                 NOISE_SAMPLE_COUNTS.set(i, 0L);
             }
+            CHUNK_SCHEDULING_NANOS.clear();
+            SCHEDULING_TOTAL_NANOS.set(0L);
+            SCHEDULING_SAMPLE_COUNTS.set(0L);
         }
+    }
+
+    public static SchedulingSample beginScheduling(ChunkPos pos) {
+        return enabled ? new SchedulingSample(pos.toLong(), EPOCH.get(), System.nanoTime()) : null;
+    }
+
+    public static void finishScheduling(SchedulingSample sample) {
+        if (sample == null || !enabled || EPOCH.get() != sample.epoch) {
+            return;
+        }
+        long elapsedNanos = System.nanoTime() - sample.startedNanos;
+        CHUNK_SCHEDULING_NANOS.computeIfAbsent(sample.chunkPos, ignored -> new AtomicLong()).addAndGet(elapsedNanos);
     }
 
     public static NoiseProfile beginNoiseProfile() {
@@ -68,13 +87,23 @@ public final class WorldgenStageStats {
             if (enabled && EPOCH.get() == epoch) {
                 TOTAL_NANOS.addAndGet(index, System.nanoTime() - startedNanos);
                 SAMPLE_COUNTS.incrementAndGet(index);
+                if (status == ChunkStatus.FULL) {
+                    AtomicLong schedulingNanos = CHUNK_SCHEDULING_NANOS.remove(pos.toLong());
+                    if (schedulingNanos != null) {
+                        SCHEDULING_TOTAL_NANOS.addAndGet(schedulingNanos.get());
+                        SCHEDULING_SAMPLE_COUNTS.incrementAndGet();
+                    }
+                }
             }
         });
         return future;
     }
 
     public static List<StageTiming> snapshot() {
-        List<StageTiming> timings = new ArrayList<>(STATUSES.size() + NOISE_SUBSTAGES.length);
+        List<StageTiming> timings = new ArrayList<>(STATUSES.size() + NOISE_SUBSTAGES.length + 1);
+        long schedulingSamples = SCHEDULING_SAMPLE_COUNTS.get();
+        long schedulingAverageNanos = schedulingSamples == 0L ? 0L : SCHEDULING_TOTAL_NANOS.get() / schedulingSamples;
+        timings.add(new StageTiming("SCHEDULING", schedulingAverageNanos));
         for (ChunkStatus status : STATUSES) {
             int index = status.getIndex();
             long samples = SAMPLE_COUNTS.get(index);
@@ -84,6 +113,8 @@ public final class WorldgenStageStats {
             timings.add(new StageTiming(name.substring(separator + 1).toUpperCase(Locale.ROOT), averageNanos));
         }
         Collections.reverse(timings);
+        StageTiming scheduling = timings.remove(timings.size() - 1);
+        timings.add(0, scheduling);
         int noiseIndex = -1;
         for (int i = 0; i < timings.size(); i++) {
             if ("NOISE".equals(timings.get(i).name())) {
@@ -130,6 +161,18 @@ public final class WorldgenStageStats {
 
         public void add(NoiseSubstage substage, long elapsedNanos) {
             this.elapsedNanos[substage.ordinal()] += elapsedNanos;
+        }
+    }
+
+    public static final class SchedulingSample {
+        private final long chunkPos;
+        private final long epoch;
+        private final long startedNanos;
+
+        private SchedulingSample(long chunkPos, long epoch, long startedNanos) {
+            this.chunkPos = chunkPos;
+            this.epoch = epoch;
+            this.startedNanos = startedNanos;
         }
     }
 

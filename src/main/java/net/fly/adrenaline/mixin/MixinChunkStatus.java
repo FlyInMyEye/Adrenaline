@@ -150,7 +150,7 @@ public class MixinChunkStatus {
         CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> result = new CompletableFuture<>();
         String debugLabel = centerPos.x + "," + centerPos.z + " status=" + status + " footprint=" + summarizeFootprint(footprint);
 
-        ChunkJobScheduler.get().submit(new ChunkJob(footprint, () -> {
+        ChunkJobScheduler.get().submit(new ChunkJob(centerPos, footprint, () -> {
             CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = invokeGenerationTask(
                 generationTask,
                 status,

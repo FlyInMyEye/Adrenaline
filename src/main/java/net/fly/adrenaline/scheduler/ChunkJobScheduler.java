@@ -62,6 +62,7 @@ public final class ChunkJobScheduler {
             return;
         }
         this.refreshPoolIfNeeded();
+        job.markSubmitted();
         job.setSchedulerEpoch(this.epoch);
         if (conflicts(job.footprint())) {
             if (AdrenalineConfig.debugLoggingEnabled()) {
@@ -84,6 +85,7 @@ public final class ChunkJobScheduler {
             return false;
         }
         job.markStarted();
+        job.finishScheduling();
         return true;
     }
 

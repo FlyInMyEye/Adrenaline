@@ -12,6 +12,8 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.WorldgenWarmup;
+import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.WorldgenStageStats.SchedulingSample;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
@@ -71,20 +73,31 @@ public class MixinChunkMap {
                 }
             }
         }
+
+        MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
+        ChunkPos pos = new ChunkPos(accessor.getPos());
+        SchedulingSample mailboxSample = nextStatus == null ? null : WorldgenStageStats.beginScheduling(pos);
         if (
             !AdrenalineConfig.parallelWorldgenEnabled()
                 || nextStatus == null
                 || nextStatus.getIndex() >= ChunkStatus.CARVERS.getIndex()
                 || !AdrenalineConfig.parallelChunkStatusEnabled(nextStatus)
         ) {
+            if (mailboxSample != null) {
+                @SuppressWarnings("unchecked")
+                Function<ProcessorHandle<Unit>, Runnable> originalTask = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
+                Function<ProcessorHandle<Unit>, Runnable> measuredTask = completionHandle -> () -> {
+                    WorldgenStageStats.finishScheduling(mailboxSample);
+                    originalTask.apply(completionHandle).run();
+                };
+                accessor.setTask(measuredTask);
+            }
             instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
             return;
         }
 
         WorldgenWarmup.warmSharedCaches();
 
-        MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
-        ChunkPos pos = new ChunkPos(accessor.getPos());
         ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
 
         if (AdrenalineConfig.debugLoggingEnabled()) {
@@ -95,6 +108,7 @@ public class MixinChunkMap {
         @SuppressWarnings("unchecked")
         Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
         Function<ProcessorHandle<Unit>, Runnable> wrappedTask = completionHandle -> () -> {
+            WorldgenStageStats.finishScheduling(mailboxSample);
             ProcessorHandle<Unit> discardedCompletionHandle = ProcessorHandle.of("adrenaline-wrap", unit -> {
             });
             ChunkJobScheduler.get().submit(new ChunkJob(pos, 0, () -> taskFunction.apply(discardedCompletionHandle).run(), () -> {
