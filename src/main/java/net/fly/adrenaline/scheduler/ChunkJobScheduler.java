@@ -1,6 +1,7 @@
 package net.fly.adrenaline.scheduler;
 
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -64,13 +65,13 @@ public final class ChunkJobScheduler {
         this.refreshPoolIfNeeded();
         job.setSchedulerEpoch(this.epoch);
         if (conflicts(job.footprint())) {
-            if (AdrenalineConfig.debugLoggingEnabled()) {
+            if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 Adrenaline.LOGGER.info("Queued conflicting job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
             conflictPending.add(job);
             indexJob(job);
         } else if (activeCount >= maxActive) {
-            if (AdrenalineConfig.debugLoggingEnabled()) {
+            if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 Adrenaline.LOGGER.info("Queued capacity job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
             capacityQueue.addLast(job);
@@ -190,7 +191,7 @@ public final class ChunkJobScheduler {
     }
 
     private void dispatch(ChunkJob job) {
-        if (AdrenalineConfig.debugLoggingEnabled()) {
+        if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             Adrenaline.LOGGER.info("Dispatching job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
         }
         activeFootprint.addAll(job.footprint());

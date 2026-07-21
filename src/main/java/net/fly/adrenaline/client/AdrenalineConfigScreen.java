@@ -1,5 +1,6 @@
 package net.fly.adrenaline.client;
 
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -135,9 +136,11 @@ public class AdrenalineConfigScreen extends Screen {
         this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("Replaces legacy random with a faster implementation.", PerformanceImpact.LOW));
         y += 24;
 
-        y = this.addSectionHeader("Diagnostics", y);
-        this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("Logs extra Adrenaline diagnostics to the console.", PerformanceImpact.NONE));
-        y += 24;
+        if (BuildConfig.DEBUG) {
+            y = this.addSectionHeader("Diagnostics", y);
+            this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("Logs extra Adrenaline diagnostics to the console.", PerformanceImpact.NONE));
+            y += 24;
+        }
 
         this.doneButton = this.addRenderableWidget(Button.builder(Component.literal("Done"), button -> this.onClose()).bounds(centerX - 50, this.height - 26, 100, 20).build());
         this.contentBottom = y;
@@ -365,7 +368,9 @@ public class AdrenalineConfigScreen extends Screen {
             button.active = this.config.parallelWorldgen;
         }
         this.fastLegacyRandomButton.active = true;
-        this.debugLoggingButton.active = true;
+        if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
+            this.debugLoggingButton.active = true;
+        }
         this.generationThreadsSlider.active = worldgenOptimizations;
         this.serializationThreadsSlider.active = worldgenOptimizations;
         this.spawnZoneRadiusSlider.active = true;

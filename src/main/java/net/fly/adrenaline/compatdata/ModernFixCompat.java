@@ -1,6 +1,7 @@
 package net.fly.adrenaline.compatdata;
 
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.loading.FMLPaths;
@@ -56,13 +57,13 @@ public final class ModernFixCompat {
                 continue;
             }
             if (state.enabled()) {
-                if (AdrenalineConfig.debugLoggingEnabled()) {
+                if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                     Adrenaline.LOGGER.info("ModernFix compatibility fix required: {} is enabled", option);
                 }
                 return true;
             }
         }
-        if (AdrenalineConfig.debugLoggingEnabled()) {
+        if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             Adrenaline.LOGGER.info("ModernFix compatibility check passed");
         }
         return false;
@@ -73,7 +74,7 @@ public final class ModernFixCompat {
         Properties properties = readProperties();
         boolean changed = false;
 
-        if (AdrenalineConfig.debugLoggingEnabled()) {
+        if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             Adrenaline.LOGGER.info("Applying ModernFix compatibility fix at {}", configPath);
             logDetectedState(properties);
         }
@@ -102,7 +103,7 @@ public final class ModernFixCompat {
                 properties.store(writer, "ModernFix overrides added by Adrenaline");
             }
             OPTION_STATE_CACHE.clear();
-            if (AdrenalineConfig.debugLoggingEnabled()) {
+            if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 Adrenaline.LOGGER.info("Updated ModernFix mixin config at {}", configPath);
                 logDetectedState(properties);
             }
@@ -190,7 +191,7 @@ public final class ModernFixCompat {
     }
 
     private static void logDetectedState(Properties properties) {
-        if (!AdrenalineConfig.debugLoggingEnabled()) {
+        if (!BuildConfig.DEBUG || !AdrenalineConfig.debugLoggingEnabled()) {
             return;
         }
 

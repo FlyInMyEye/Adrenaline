@@ -8,6 +8,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
+import net.fly.adrenaline.BuildConfig;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
 
@@ -29,10 +30,16 @@ public final class WorldgenStageStats {
     }
 
     public static boolean isEnabled() {
+        if (!BuildConfig.DEBUG) {
+            return false;
+        }
         return enabled;
     }
 
     public static void setEnabled(boolean enabled) {
+        if (!BuildConfig.DEBUG) {
+            return;
+        }
         EPOCH.incrementAndGet();
         WorldgenStageStats.enabled = enabled;
         if (enabled) {
@@ -51,7 +58,7 @@ public final class WorldgenStageStats {
     }
 
     public static void beginScheduling(ChunkPos pos, ChunkStatus status) {
-        if (!enabled) {
+        if (!BuildConfig.DEBUG || !enabled) {
             return;
         }
         long now = System.nanoTime();
@@ -59,6 +66,9 @@ public final class WorldgenStageStats {
     }
 
     public static void finishInitialScheduling(ChunkPos pos, ChunkStatus status) {
+        if (!BuildConfig.DEBUG) {
+            return;
+        }
         SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
         if (state == null || !enabled || EPOCH.get() != state.epoch) {
             return;
@@ -67,7 +77,7 @@ public final class WorldgenStageStats {
     }
 
     public static SchedulingWork beginSchedulingWork(ChunkPos pos, ChunkStatus status) {
-        if (!enabled) {
+        if (!BuildConfig.DEBUG || !enabled) {
             return null;
         }
         SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
@@ -75,14 +85,14 @@ public final class WorldgenStageStats {
     }
 
     public static void finishSchedulingWork(SchedulingWork work) {
-        if (work == null || !enabled || EPOCH.get() != work.state.epoch) {
+        if (!BuildConfig.DEBUG || work == null || !enabled || EPOCH.get() != work.state.epoch) {
             return;
         }
         work.state.schedulingNanos.addAndGet(System.nanoTime() - work.startedNanos);
     }
 
     public static long beginStage(ChunkPos pos, ChunkStatus status) {
-        if (!enabled) {
+        if (!BuildConfig.DEBUG || !enabled) {
             return 0L;
         }
         long now = System.nanoTime();
@@ -100,11 +110,11 @@ public final class WorldgenStageStats {
     }
 
     public static NoiseProfile beginNoiseProfile() {
-        return enabled ? new NoiseProfile(EPOCH.get()) : null;
+        return BuildConfig.DEBUG && enabled ? new NoiseProfile(EPOCH.get()) : null;
     }
 
     public static void finishNoiseProfile(NoiseProfile profile) {
-        if (profile == null || !enabled || EPOCH.get() != profile.epoch) {
+        if (!BuildConfig.DEBUG || profile == null || !enabled || EPOCH.get() != profile.epoch) {
             return;
         }
         for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
@@ -113,7 +123,7 @@ public final class WorldgenStageStats {
     }
 
     public static <T> CompletableFuture<T> track(ChunkStatus status, ChunkPos pos, long startedNanos, CompletableFuture<T> future) {
-        if (startedNanos == 0L) {
+        if (!BuildConfig.DEBUG || startedNanos == 0L) {
             return future;
         }
 
@@ -138,6 +148,9 @@ public final class WorldgenStageStats {
     }
 
     public static List<StageTiming> snapshot() {
+        if (!BuildConfig.DEBUG) {
+            return List.of();
+        }
         List<StageTiming> timings = new ArrayList<>(STATUSES.size() + NOISE_SUBSTAGES.length + 2);
         timings.add(new StageTiming("SCHEDULING", SCHEDULING_AVERAGE_NANOS.get()));
         for (ChunkStatus status : STATUSES) {

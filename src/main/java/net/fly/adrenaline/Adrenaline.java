@@ -33,7 +33,9 @@ public class Adrenaline {
             );
 
             MinecraftForge.EVENT_BUS.register(new ModernFixCompatController());
-            MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());
+            if (BuildConfig.DEBUG) {
+                MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());
+            }
 
             FastloadCompatController fastloadCompatController = new FastloadCompatController();
             fastloadCompatController.setShouldShow(IncompatibilityRegistry.isLoaded("fastload"));
@@ -45,7 +47,7 @@ public class Adrenaline {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         LOGGER.info("Adrenaline initialized, worldgen parallelism: {}", ChunkJobScheduler.get().parallelism());
-        if (AdrenalineConfig.debugLoggingEnabled()) {
+        if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             LOGGER.info("Config: worldgenOptimizations={}, terrainFill={}, surface={}, noiseChunk={}, materialRules={}, aquifer={}, beardifier={}, oreVeins={}, parallelWorldgen={}, featureSafetyRadius={}, fastLegacyRandom={}, generationWorkerThreads={}, serializationWorkerThreads={}, spawnZoneRadius={}", AdrenalineConfig.get().worldgenOptimizations, AdrenalineConfig.get().terrainFillOptimizations, AdrenalineConfig.get().surfaceOptimizations, AdrenalineConfig.get().noiseChunkOptimizations, AdrenalineConfig.get().materialRuleOptimizations, AdrenalineConfig.get().aquiferOptimizations, AdrenalineConfig.get().beardifierOptimizations, AdrenalineConfig.get().oreVeinOptimizations, AdrenalineConfig.get().parallelWorldgen, AdrenalineConfig.resolvedFeatureSafetyRadius(), AdrenalineConfig.get().fastLegacyRandom, AdrenalineConfig.get().generationWorkerThreads, AdrenalineConfig.get().serializationWorkerThreads, AdrenalineConfig.get().spawnZoneRadius);
         }
     }

@@ -1,5 +1,6 @@
 package net.fly.adrenaline.config;
 
+import net.fly.adrenaline.BuildConfig;
 import net.fly.configlib.JsonConfigManager;
 import net.minecraft.world.level.chunk.ChunkStatus;
 
@@ -152,7 +153,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean debugLoggingEnabled() {
-        return get().debugLogging;
+        return BuildConfig.DEBUG && get().debugLogging;
     }
 
     public static class Data {

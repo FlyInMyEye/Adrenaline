@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -113,9 +114,12 @@ public class MixinChunkStatus {
         if ((Object) this == ChunkStatus.FEATURES && AdrenalineConfig.parallelWorldgenEnabled() && AdrenalineConfig.parallelChunkStatusEnabled(status)) {
             return scheduleFeature(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
-        long startedNanos = WorldgenStageStats.beginStage(centerChunk.getPos(), status);
+        long startedNanos = BuildConfig.DEBUG ? WorldgenStageStats.beginStage(centerChunk.getPos(), status) : 0L;
         CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = invokeGenerationTask(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
-        return WorldgenStageStats.track(status, centerChunk.getPos(), startedNanos, future);
+        if (BuildConfig.DEBUG) {
+            return WorldgenStageStats.track(status, centerChunk.getPos(), startedNanos, future);
+        }
+        return future;
     }
 
     private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> scheduleFeature(
@@ -132,9 +136,9 @@ public class MixinChunkStatus {
     ) {
         int writeRadius = AdrenalineConfig.resolvedFeatureSafetyRadius();
         ChunkPos centerPos = centerChunk.getPos();
-        SchedulingWork schedulingWork = WorldgenStageStats.beginSchedulingWork(centerPos, status);
+        SchedulingWork schedulingWork = BuildConfig.DEBUG ? WorldgenStageStats.beginSchedulingWork(centerPos, status) : null;
 
-        if (AdrenalineConfig.debugLoggingEnabled()) {
+        if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             Adrenaline.LOGGER.info(
                 "Scheduling feature generation center={},{} featureSafetyRadius={} chunkCount={}\n{}",
                 centerPos.x,
@@ -151,7 +155,7 @@ public class MixinChunkStatus {
         String debugLabel = centerPos.x + "," + centerPos.z + " status=" + status + " footprint=" + summarizeFootprint(footprint);
 
         ChunkJob job = new ChunkJob(footprint, () -> {
-            long startedNanos = WorldgenStageStats.beginStage(centerPos, status);
+            long startedNanos = BuildConfig.DEBUG ? WorldgenStageStats.beginStage(centerPos, status) : 0L;
             CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = invokeGenerationTask(
                 generationTask,
                 status,
@@ -164,7 +168,9 @@ public class MixinChunkStatus {
                 chunks,
                 centerChunk
             );
-            WorldgenStageStats.track(status, centerPos, startedNanos, future);
+            if (BuildConfig.DEBUG) {
+                WorldgenStageStats.track(status, centerPos, startedNanos, future);
+            }
             future.whenComplete((value, throwable) -> {
                 if (throwable != null) {
                     result.completeExceptionally(throwable);
@@ -174,7 +180,9 @@ public class MixinChunkStatus {
             });
             future.join();
         }, () -> result.complete(ChunkHolder.UNLOADED_CHUNK), contextClassLoader, debugLabel);
-        WorldgenStageStats.finishSchedulingWork(schedulingWork);
+        if (BuildConfig.DEBUG) {
+            WorldgenStageStats.finishSchedulingWork(schedulingWork);
+        }
         ChunkJobScheduler.get().submit(job);
 
         return result;

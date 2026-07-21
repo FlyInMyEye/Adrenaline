@@ -16,6 +16,9 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+def prodBuild = providers.gradleProperty('prodBuild').map { it.toBoolean() }.orElse(false)
+def generatedBuildConfigDir = layout.buildDirectory.dir('generated/sources/buildConfig/java')
+
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 minecraft {
 
@@ -75,6 +78,25 @@ minecraft {
 
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
+sourceSets.main.java.srcDir generatedBuildConfigDir
+
+tasks.register('generateBuildConfig') {
+    inputs.property('prodBuild', prodBuild)
+    outputs.dir(generatedBuildConfigDir)
+    doLast {
+        File outputFile = generatedBuildConfigDir.get().file('net/fly/adrenaline/BuildConfig.java').asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.text = """package net.fly.adrenaline;
+
+public final class BuildConfig {
+    public static final boolean DEBUG = ${!prodBuild.get()};
+
+    private BuildConfig() {
+    }
+}
+"""
+    }
+}
 
 repositories {
     maven {
@@ -107,8 +129,17 @@ tasks.named('processResources', ProcessResources).configure {
     }
 }
 
+tasks.named('compileJava', JavaCompile).configure {
+    dependsOn tasks.named('generateBuildConfig')
+}
+
 
 tasks.named('jar', Jar).configure {
+    if (prodBuild.get()) {
+        archiveClassifier.set('prod')
+        exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
+    }
+
     manifest {
         attributes([
                 'Specification-Title'     : mod_id,
@@ -149,4 +180,9 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.register('buildProd', GradleBuild) {
+    tasks = ['build']
+    startParameter.projectProperties.put('prodBuild', 'true')
 }

@@ -3,6 +3,7 @@ package net.fly.adrenaline.client;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.StageTiming;
 import net.minecraft.client.Minecraft;
@@ -24,6 +25,9 @@ public final class WorldgenStatsOverlay {
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterClientCommandsEvent event) {
+        if (!BuildConfig.DEBUG) {
+            return;
+        }
         event.getDispatcher().register(
             Commands.literal("adrenaline")
                 .then(Commands.literal("stats")
@@ -34,7 +38,7 @@ public final class WorldgenStatsOverlay {
 
     @SubscribeEvent
     public void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
-        if (!WorldgenStageStats.isEnabled()) {
+        if (!BuildConfig.DEBUG || !WorldgenStageStats.isEnabled()) {
             return;
         }
         event.getLeft().addAll(lines());
@@ -43,7 +47,7 @@ public final class WorldgenStatsOverlay {
     @SubscribeEvent
     public void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!WorldgenStageStats.isEnabled() || minecraft.options.renderDebug) {
+        if (!BuildConfig.DEBUG || !WorldgenStageStats.isEnabled() || minecraft.options.renderDebug) {
             return;
         }
 

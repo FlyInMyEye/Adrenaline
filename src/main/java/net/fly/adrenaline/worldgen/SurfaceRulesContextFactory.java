@@ -47,6 +47,16 @@ public final class SurfaceRulesContextFactory {
         }
     }
 
+    public static MethodHandle createTryApplyHandle(Object surfaceRule) {
+        try {
+            Method method = findTryApplyMethod(surfaceRule.getClass());
+            method.setAccessible(true);
+            return LOOKUP.unreflect(method).bindTo(surfaceRule);
+        } catch (ReflectiveOperationException exception) {
+            throw new RuntimeException(exception);
+        }
+    }
+
     public static Object apply(SurfaceRules.RuleSource ruleSource, Object context) {
         return applyUnchecked(ruleSource, context);
     }
@@ -64,16 +74,6 @@ public final class SurfaceRulesContextFactory {
             pipeline.rebind(chunk, noiseChunk, biomeGetter);
         }
         return pipeline;
-    }
-
-    public static MethodHandle createTryApplyHandle(Object surfaceRule) {
-        try {
-            Method method = findTryApplyMethod(surfaceRule.getClass());
-            method.setAccessible(true);
-            return LOOKUP.unreflect(method).bindTo(surfaceRule);
-        } catch (ReflectiveOperationException exception) {
-            throw new RuntimeException(exception);
-        }
     }
 
     private static Method findTryApplyMethod(Class<?> surfaceRuleType) throws NoSuchMethodException {
