@@ -1,6 +1,7 @@
 package net.fly.adrenaline;
 
 import net.fly.adrenaline.client.AdrenalineConfigScreen;
+import net.fly.adrenaline.client.BuildWarningOverlay;
 import net.fly.adrenaline.client.FastloadCompatController;
 import net.fly.adrenaline.client.ModernFixCompatController;
 import net.fly.adrenaline.client.WorldgenStatsOverlay;
@@ -34,6 +35,7 @@ public class Adrenaline {
 
             MinecraftForge.EVENT_BUS.register(new ModernFixCompatController());
             if (BuildConfig.DEBUG) {
+                MinecraftForge.EVENT_BUS.register(new BuildWarningOverlay());
                 MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());
             }
 
