@@ -41,7 +41,7 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Override
     protected void init() {
-        this.adrenaline$cancelButton = this.addRenderableWidget(Button.builder(Component.literal("Cancel"), this::adrenaline$cancelWorldCreation).bounds((this.width - 100) / 2, this.height - 28, 100, 20).build());
+        this.adrenaline$cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.cancel"), this::adrenaline$cancelWorldCreation).bounds((this.width - 100) / 2, this.height - 28, 100, 20).build());
     }
 
     @Inject(method = "render", at = @At("TAIL"))
@@ -80,7 +80,7 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;getFormattedProgress()Ljava/lang/String;"))
     private String adrenaline$replaceInstantProgressText(LevelLoadingScreen screen) {
-        return AdrenalineConfig.resolvedSpawnZoneRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? "Searching for spawnpoint" : this.getFormattedProgress();
+        return AdrenalineConfig.resolvedSpawnZoneRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? Component.translatable("gui.adrenaline.loading.searching_spawnpoint").getString() : this.getFormattedProgress();
     }
 
     @Unique
@@ -94,7 +94,7 @@ public abstract class MixinLevelLoadingScreen extends Screen {
         WorldLoadCancellation.request();
         ChunkJobScheduler.get().cancel(server);
         button.active = false;
-        button.setMessage(Component.literal("Cancelling world creation..."));
+        button.setMessage(Component.translatable("gui.adrenaline.loading.cancelling_world_creation"));
         server.halt(false);
     }
 

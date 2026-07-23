@@ -10,13 +10,13 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 
@@ -56,7 +56,7 @@ public class AdrenalineConfigScreen extends Screen {
     private double animatedScrollOffset;
 
     public AdrenalineConfigScreen(Screen parent) {
-        super(Component.literal("Adrenaline"));
+        super(Component.translatable("gui.adrenaline.config.title"));
         this.parent = parent;
         this.config = AdrenalineConfig.copy();
         this.availableProcessors = Runtime.getRuntime().availableProcessors();
@@ -78,71 +78,71 @@ public class AdrenalineConfigScreen extends Screen {
         int labelX = leftX;
         int buttonWidth = 70;
 
-        y = this.addSectionHeader("General", y);
-        this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Generation threads", () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value, tooltip("Controls parallel chunk generation workers.", PerformanceImpact.HIGH)), y, tooltip("Controls parallel chunk generation workers.", PerformanceImpact.HIGH));
+        y = this.addSectionHeader("gui.adrenaline.config.section.general", y);
+        this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.generation_threads"), () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH)), y, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH));
         y += 30;
-        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, "Serialization threads", () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value, tooltip("Controls parallel chunk save encoding workers.", PerformanceImpact.MEDIUM)), y, tooltip("Controls parallel chunk save encoding workers.", PerformanceImpact.MEDIUM));
+        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.serialization_threads"), () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value, tooltip("tooltip.adrenaline.config.serialization_threads", PerformanceImpact.MEDIUM)), y, tooltip("tooltip.adrenaline.config.serialization_threads", PerformanceImpact.MEDIUM));
         y += 30;
-        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, tooltip("Changes the chunk radius generated around spawn.", PerformanceImpact.LOW)), y, tooltip("Changes the chunk radius generated around spawn.", PerformanceImpact.LOW));
+        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, tooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW)), y, tooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW));
         y += 30;
-        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Worldgen optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("Master switch for Adrenaline world generation changes.", PerformanceImpact.EXTREME));
+        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.worldgen_optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("tooltip.adrenaline.config.worldgen_optimization", PerformanceImpact.EXTREME));
         y += 24;
-        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Parallel worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("Runs chunk generation work on the generation pool.", PerformanceImpact.HIGH));
+        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH));
         y += 24;
 
-        y = this.addSectionHeader("Worldgen optimization", y);
-        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Terrain fill optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value, tooltip("Speeds up block filling during noise terrain generation.", PerformanceImpact.EXTREME));
+        y = this.addSectionHeader("gui.adrenaline.config.section.worldgen", y);
+        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.terrain_fill_optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value, tooltip("tooltip.adrenaline.config.terrain_fill_optimizations", PerformanceImpact.EXTREME));
         y += 24;
-        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Surface optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value, tooltip("Speeds up surface rule evaluation and block placement.", PerformanceImpact.HIGH));
+        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.surface_optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value, tooltip("tooltip.adrenaline.config.surface_optimizations", PerformanceImpact.HIGH));
         y += 24;
-        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Noise chunk optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value, tooltip("Optimizes hot paths inside noise chunk sampling.", PerformanceImpact.HIGH));
+        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.noise_chunk_optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value, tooltip("tooltip.adrenaline.config.noise_chunk_optimizations", PerformanceImpact.HIGH));
         y += 24;
-        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Material rule optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value, tooltip("Reduces overhead in material rule dispatch.", PerformanceImpact.MEDIUM));
+        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.material_rule_optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value, tooltip("tooltip.adrenaline.config.material_rule_optimizations", PerformanceImpact.MEDIUM));
         y += 24;
-        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Aquifer optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value, tooltip("Reduces aquifer lookup and fluid decision cost.", PerformanceImpact.MEDIUM));
+        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.aquifer_optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value, tooltip("tooltip.adrenaline.config.aquifer_optimizations", PerformanceImpact.MEDIUM));
         y += 24;
-        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Beardifier optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value, tooltip("Speeds up structure terrain blending calculations.", PerformanceImpact.LOW));
+        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.beardifier_optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value, tooltip("tooltip.adrenaline.config.beardifier_optimizations", PerformanceImpact.LOW));
         y += 24;
-        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Ore vein optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, tooltip("Speeds up ore vein sampling during generation.", PerformanceImpact.LOW));
+        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.ore_vein_optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, tooltip("tooltip.adrenaline.config.ore_vein_optimizations", PerformanceImpact.LOW));
         y += 24;
-        this.initialSpawnOptimizationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Initial spawn optimization"), this.config.initialSpawnOptimization, value -> this.config.initialSpawnOptimization = value, tooltip("Skips vanilla's slow initial spawn refinement and jumps directly into normal start-region generation.", PerformanceImpact.HIGH));
+        this.initialSpawnOptimizationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.initial_spawn_optimization"), this.config.initialSpawnOptimization, value -> this.config.initialSpawnOptimization = value, tooltip("tooltip.adrenaline.config.initial_spawn_optimization", PerformanceImpact.HIGH));
         y += 24;
 
-        y = this.addSectionHeader("Compatibility", y);
-        this.featureSafetyRadiusSlider = this.addScrollableWidget(new FeatureSafetyRadiusSlider(leftX, y, 370, 20, tooltip("Reserves nearby chunks during feature generation. Increase this for mods with features extending beyond adjacent chunks.", PerformanceImpact.HIGH)), y, tooltip("Reserves nearby chunks during feature generation. Increase this for mods with features extending beyond adjacent chunks.", PerformanceImpact.HIGH));
+        y = this.addSectionHeader("gui.adrenaline.config.section.compatibility", y);
+        this.featureSafetyRadiusSlider = this.addScrollableWidget(new FeatureSafetyRadiusSlider(leftX, y, 370, 20, tooltip("tooltip.adrenaline.config.feature_safety_radius", PerformanceImpact.HIGH)), y, tooltip("tooltip.adrenaline.config.feature_safety_radius", PerformanceImpact.HIGH));
         y += 30;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_STARTS", 10066329), this.config.parallelizeStructureStarts, value -> this.config.parallelizeStructureStarts = value, tooltip("Controls whether the STRUCTURE_STARTS stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_STARTS", 10066329), this.config.parallelizeStructureStarts, value -> this.config.parallelizeStructureStarts = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.structure_starts"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_REFERENCES", 6250897), this.config.parallelizeStructureReferences, value -> this.config.parallelizeStructureReferences = value, tooltip("Controls whether the STRUCTURE_REFERENCES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("STRUCTURE_REFERENCES", 6250897), this.config.parallelizeStructureReferences, value -> this.config.parallelizeStructureReferences = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.structure_references"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("BIOMES", 8434258), this.config.parallelizeBiomes, value -> this.config.parallelizeBiomes = value, tooltip("Controls whether the BIOMES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("BIOMES", 8434258), this.config.parallelizeBiomes, value -> this.config.parallelizeBiomes = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.biomes"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("NOISE", 13750737), this.config.parallelizeNoise, value -> this.config.parallelizeNoise = value, tooltip("Controls whether the NOISE stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("NOISE", 13750737), this.config.parallelizeNoise, value -> this.config.parallelizeNoise = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.noise"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("SURFACE", 7497737), this.config.parallelizeSurface, value -> this.config.parallelizeSurface = value, tooltip("Controls whether the SURFACE stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("SURFACE", 7497737), this.config.parallelizeSurface, value -> this.config.parallelizeSurface = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.surface"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("CARVERS", 3159410), this.config.parallelizeCarvers, value -> this.config.parallelizeCarvers = value, tooltip("Controls whether the CARVERS stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("CARVERS", 3159410), this.config.parallelizeCarvers, value -> this.config.parallelizeCarvers = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.carvers"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FEATURES", 2213376), this.config.parallelizeFeatures, value -> this.config.parallelizeFeatures = value, tooltip("Controls whether the FEATURES stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FEATURES", 2213376), this.config.parallelizeFeatures, value -> this.config.parallelizeFeatures = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.features"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("INITIALIZE_LIGHT", 13421772), this.config.parallelizeInitializeLight, value -> this.config.parallelizeInitializeLight = value, tooltip("Controls whether the INITIALIZE_LIGHT stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("INITIALIZE_LIGHT", 13421772), this.config.parallelizeInitializeLight, value -> this.config.parallelizeInitializeLight = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.initialize_light"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("LIGHT", 16769184), this.config.parallelizeLight, value -> this.config.parallelizeLight = value, tooltip("Controls whether the LIGHT stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("LIGHT", 16769184), this.config.parallelizeLight, value -> this.config.parallelizeLight = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.light"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("SPAWN", 15884384), this.config.parallelizeSpawn, value -> this.config.parallelizeSpawn = value, tooltip("Controls whether the SPAWN stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("SPAWN", 15884384), this.config.parallelizeSpawn, value -> this.config.parallelizeSpawn = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.spawn"))));
         y += 24;
-        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FULL", 16777215), this.config.parallelizeFull, value -> this.config.parallelizeFull = value, tooltip("Controls whether the FULL stage is redirected to Adrenaline's parallel scheduler.", PerformanceImpact.LOW)));
+        this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FULL", 16777215), this.config.parallelizeFull, value -> this.config.parallelizeFull = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.full"))));
         y += 24;
-        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Fast legacy random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("Replaces legacy random with a faster implementation.", PerformanceImpact.LOW));
+        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_legacy_random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("tooltip.adrenaline.config.fast_legacy_random", PerformanceImpact.LOW));
         y += 24;
 
         if (BuildConfig.DEBUG) {
-            y = this.addSectionHeader("Diagnostics", y);
-            this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.literal("Debug logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("Logs extra Adrenaline diagnostics to the console.", PerformanceImpact.NONE));
+            y = this.addSectionHeader("gui.adrenaline.config.section.diagnostics", y);
+            this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.debug_logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("tooltip.adrenaline.config.debug_logging", PerformanceImpact.NONE));
             y += 24;
         }
 
-        this.doneButton = this.addRenderableWidget(Button.builder(Component.literal("Done"), button -> this.onClose()).bounds(centerX - 50, this.height - 26, 100, 20).build());
+        this.doneButton = this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).bounds(centerX - 50, this.height - 26, 100, 20).build());
         this.contentBottom = y;
         this.maxScroll = Math.max(0, y - (this.doneButton.getY() - 20));
         this.applyScroll();
@@ -202,10 +202,11 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private Button createToggleButton(int x, int y, int width, boolean initialValue, BooleanConsumer consumer) {
-        return Button.builder(this.toggleLabel(initialValue), button -> {
-            boolean nextValue = !this.currentValue(button.getMessage());
-            consumer.accept(nextValue);
-            button.setMessage(this.toggleLabel(nextValue));
+        MutableBoolean state = new MutableBoolean(initialValue);
+        return Button.builder(this.toggleLabel(state.value), button -> {
+            state.value = !state.value;
+            consumer.accept(state.value);
+            button.setMessage(this.toggleLabel(state.value));
             this.saveConfig();
             this.updateButtonStates();
         }).bounds(x, y, width, 20).build();
@@ -217,17 +218,13 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private int addSectionHeader(String title, int y) {
-        this.scrollableLabels.add(new ScrollableLabel(Component.literal(title), 0, y, true, null));
+        this.scrollableLabels.add(new ScrollableLabel(Component.translatable(title), 0, y, true, null));
         return y + 16;
     }
 
     private Component toggleLabel(boolean value) {
         int color = value ? 0x55FF55 : 0xFF5555;
-        return Component.literal(value ? "On" : "Off").withStyle(style -> style.withColor(color));
-    }
-
-    private boolean currentValue(Component message) {
-        return message.getString().equalsIgnoreCase("On");
+        return Component.translatable(value ? "gui.adrenaline.toggle.on" : "gui.adrenaline.toggle.off").withStyle(style -> style.withColor(color));
     }
 
     private void saveConfig() {
@@ -279,14 +276,12 @@ public class AdrenalineConfigScreen extends Screen {
         return null;
     }
 
-    private static TooltipData tooltip(String description, PerformanceImpact impact) {
+    private static TooltipData tooltip(String description, PerformanceImpact impact, Object... args) {
         List<Component> lines = new ArrayList<>();
-        lines.add(Component.literal(description));
+        lines.add(Component.translatable(description, args));
         lines.add(CommonComponents.EMPTY);
         lines.add(CommonComponents.EMPTY);
-        MutableComponent impactLine = Component.literal("Performance impact: ");
-        impactLine.append(Component.literal(impact.label).withStyle(style -> style.withColor(impact.color)));
-        lines.add(impactLine);
+        lines.add(Component.translatable("tooltip.adrenaline.performance_impact", Component.translatable(impact.key()).withStyle(style -> style.withColor(impact.color))));
         return new TooltipData(lines);
     }
 
@@ -384,25 +379,25 @@ public class AdrenalineConfigScreen extends Screen {
         }
 
         if (!minecraft.hasSingleplayerServer()) {
-            warnings.add(new WarningLine(Component.literal("This is not local world, changes won't affect anything"), 16755200));
+            warnings.add(new WarningLine(Component.translatable("gui.adrenaline.warning.not_local_world"), 16755200));
             return warnings;
         }
 
         if (minecraft.getSingleplayerServer() != null && minecraft.getSingleplayerServer().isPublished()) {
-            warnings.add(new WarningLine(Component.literal("This world is open to LAN, changes may not affect current session"), 16755200));
+            warnings.add(new WarningLine(Component.translatable("gui.adrenaline.warning.lan_world"), 16755200));
         }
 
-        warnings.add(new WarningLine(Component.literal("Restart or re-enter the world for safest results"), 11184810));
+        warnings.add(new WarningLine(Component.translatable("gui.adrenaline.warning.restart"), 11184810));
         return warnings;
     }
 
     private final class ThreadCountSlider extends AbstractSliderButton {
 
-        private final String label;
+        private final Component label;
         private final IntConsumer setter;
         private final TooltipData tooltip;
 
-        private ThreadCountSlider(int x, int y, int width, int height, String label, IntSupplier getter, IntConsumer setter, TooltipData tooltip) {
+        private ThreadCountSlider(int x, int y, int width, int height, Component label, IntSupplier getter, IntConsumer setter, TooltipData tooltip) {
             super(x, y, width, height, Component.empty(), AdrenalineConfigScreen.this.toSliderValue(getter.getAsInt()));
             this.label = label;
             this.setter = setter;
@@ -413,7 +408,7 @@ public class AdrenalineConfigScreen extends Screen {
         @Override
         protected void updateMessage() {
             int value = AdrenalineConfigScreen.this.snapSliderValue(this.value);
-            this.setMessage(Component.literal(this.label + ": " + (value == 0 ? "Auto" : Integer.toString(value))));
+            this.setMessage(Component.translatable("gui.adrenaline.slider.threads", this.label, value == 0 ? Component.translatable("gui.adrenaline.value.auto") : Integer.toString(value)));
         }
 
         @Override
@@ -441,10 +436,10 @@ public class AdrenalineConfigScreen extends Screen {
         protected void updateMessage() {
             int value = AdrenalineConfigScreen.this.snapSpawnZoneRadiusSliderValue(this.value);
             if (value == AdrenalineConfig.DEFAULT_SPAWN_ZONE_RADIUS) {
-                this.setMessage(Component.literal("Spawn zone radius: Default"));
+                this.setMessage(Component.translatable("gui.adrenaline.slider.spawn_zone_radius.default"));
                 return;
             }
-            this.setMessage(Component.literal(value == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? "Spawn zone radius: Instant" : "Spawn zone radius: " + value));
+            this.setMessage(value == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? Component.translatable("gui.adrenaline.slider.spawn_zone_radius.instant") : Component.translatable("gui.adrenaline.slider.spawn_zone_radius.value", value));
         }
 
         @Override
@@ -468,7 +463,7 @@ public class AdrenalineConfigScreen extends Screen {
         @Override
         protected void updateMessage() {
             int radius = AdrenalineConfigScreen.this.snapFeatureSafetyRadiusSliderValue(this.value);
-            this.setMessage(Component.literal("Feature safety radius: " + radius + " chunks"));
+            this.setMessage(Component.translatable("gui.adrenaline.slider.feature_safety_radius", radius));
         }
 
         @Override
@@ -531,7 +526,11 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private Component stageLabel(String stage, int color) {
-        return Component.literal("Parallelize ").append(Component.literal(stage).withStyle(style -> style.withColor(color)));
+        return Component.translatable("gui.adrenaline.parallelize").append(Component.translatable(this.stageKey(stage)).withStyle(style -> style.withColor(color)));
+    }
+
+    private String stageKey(String stage) {
+        return "gui.adrenaline.chunk_status." + stage.toLowerCase(Locale.ROOT);
     }
 
     @FunctionalInterface
@@ -552,18 +551,31 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private enum PerformanceImpact {
-        NONE("None", 0xAAAAAA),
-        LOW("Low", 0x55FF55),
-        MEDIUM("Medium", 0xFFFF55),
-        HIGH("High", 0xFF5555),
-        EXTREME("Extreme", 0xAA00AA);
+        NONE("tooltip.adrenaline.performance.none", 0xAAAAAA),
+        LOW("tooltip.adrenaline.performance.low", 0x55FF55),
+        MEDIUM("tooltip.adrenaline.performance.medium", 0xFFFF55),
+        HIGH("tooltip.adrenaline.performance.high", 0xFF5555),
+        EXTREME("tooltip.adrenaline.performance.extreme", 0xAA00AA);
 
-        private final String label;
+        private final String key;
         private final int color;
 
-        PerformanceImpact(String label, int color) {
-            this.label = label;
+        PerformanceImpact(String key, int color) {
+            this.key = key;
             this.color = color;
+        }
+
+        private String key() {
+            return this.key;
+        }
+    }
+
+    private static final class MutableBoolean {
+
+        private boolean value;
+
+        private MutableBoolean(boolean value) {
+            this.value = value;
         }
     }
 }

@@ -16,13 +16,13 @@ public class ModernFixCompatScreen extends Screen {
     private Component status = Component.empty();
 
     public ModernFixCompatScreen() {
-        super(Component.literal("Adrenaline Compatibility"));
+        super(Component.translatable("gui.adrenaline.compat.title"));
     }
 
     @Override
     protected void init() {
         int buttonWidth = 160;
-        this.addRenderableWidget(Button.builder(Component.literal("Fix and restart"), button -> this.fixAndRestart()).bounds(this.width / 2 - buttonWidth / 2, this.height - 52, buttonWidth, 20).build());
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.compat.fix_and_restart"), button -> this.fixAndRestart()).bounds(this.width / 2 - buttonWidth / 2, this.height - 52, buttonWidth, 20).build());
     }
 
     @Override
@@ -55,19 +55,19 @@ public class ModernFixCompatScreen extends Screen {
 
     private List<FormattedLine> bodyLines() {
         return List.of(
-            new FormattedLine(Component.literal("ModernFix has chunk and worldgen patches enabled that conflict with Adrenaline."), 0xFFE0E0E0),
-            new FormattedLine(Component.literal("Adrenaline can disable the overlapping ModernFix mixins for you."), 0xFFE0E0E0),
-            new FormattedLine(Component.literal("Press Fix and restart, then launch the game again."), 0xFFFFD060)
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.modernfix.line1"), 0xFFE0E0E0),
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.modernfix.line2"), 0xFFE0E0E0),
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.modernfix.line3"), 0xFFFFD060)
         );
     }
 
     private void fixAndRestart() {
         if (!ModernFixCompat.applyConfigFix()) {
-            this.status = Component.literal("Failed to update modernfix-mixins.properties");
+            this.status = Component.translatable("gui.adrenaline.compat.modernfix.status.failed");
             return;
         }
 
-        this.status = Component.literal("Config updated. Closing Minecraft...");
+        this.status = Component.translatable("gui.adrenaline.compat.modernfix.status.updated");
         if (this.minecraft != null) {
             this.minecraft.stop();
         }

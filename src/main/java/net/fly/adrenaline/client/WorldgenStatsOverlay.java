@@ -66,7 +66,7 @@ public final class WorldgenStatsOverlay {
 
     private static int setEnabled(CommandSourceStack source, boolean enabled) {
         WorldgenStageStats.setEnabled(enabled);
-        source.sendSuccess(() -> Component.literal("Adrenaline stats " + (enabled ? "enabled" : "disabled")), false);
+        source.sendSuccess(() -> Component.translatable(enabled ? "message.adrenaline.stats.enabled" : "message.adrenaline.stats.disabled"), false);
         return 1;
     }
 
@@ -82,15 +82,32 @@ public final class WorldgenStatsOverlay {
         List<String> lines = new ArrayList<>(timings.size());
         for (StageTiming timing : timings) {
             long milliseconds = Math.round(timing.averageNanos() / 1_000_000.0D);
+            String name = displayName(timing.name());
             if ("WAITING".equals(timing.name())) {
-                lines.add(String.format(Locale.ROOT, "%-20s %dms", timing.name(), milliseconds));
+                lines.add(String.format(Locale.ROOT, "%-20s %dms", name, milliseconds));
                 continue;
             }
             int bars = timing.averageNanos() == 0L || maxNanos == 0L
                 ? 0
                 : Math.max(1, (int) Math.round((double) timing.averageNanos() * MAX_BARS / maxNanos));
-            lines.add(String.format(Locale.ROOT, "%-20s %s %dms", timing.name(), "|".repeat(bars), milliseconds));
+            lines.add(String.format(Locale.ROOT, "%-20s %s %dms", name, "|".repeat(bars), milliseconds));
         }
         return lines;
+    }
+
+    private static String displayName(String name) {
+        String key = switch (name.trim()) {
+            case "SCHEDULING" -> "gui.adrenaline.worldgen_stats.scheduling";
+            case "WAITING" -> "gui.adrenaline.worldgen_stats.waiting";
+            case "SETUP" -> "gui.adrenaline.worldgen_stats.setup";
+            case "SLICE SAMPLING" -> "gui.adrenaline.worldgen_stats.slice_sampling";
+            case "CELL CACHE" -> "gui.adrenaline.worldgen_stats.cell_cache";
+            case "INTERPOLATION" -> "gui.adrenaline.worldgen_stats.interpolation";
+            case "BLOCK STATE" -> "gui.adrenaline.worldgen_stats.block_state";
+            case "BLOCK WRITE" -> "gui.adrenaline.worldgen_stats.block_write";
+            case "FINALIZE" -> "gui.adrenaline.worldgen_stats.finalize";
+            default -> null;
+        };
+        return key == null ? name : Component.translatable(key).getString();
     }
 }

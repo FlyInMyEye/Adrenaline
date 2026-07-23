@@ -12,13 +12,13 @@ public class FastloadCompatScreen extends Screen {
     private static final ResourceLocation PANEL_TEXTURE = new ResourceLocation("textures/gui/options_background.png");
 
     public FastloadCompatScreen() {
-        super(Component.literal("Adrenaline Compatibility"));
+        super(Component.translatable("gui.adrenaline.compat.title"));
     }
 
     @Override
     protected void init() {
         int buttonWidth = 160;
-        this.addRenderableWidget(Button.builder(Component.literal("Quit Game"), button -> {
+        this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.compat.quit_game"), button -> {
             if (this.minecraft != null) {
                 this.minecraft.stop();
             }
@@ -51,9 +51,9 @@ public class FastloadCompatScreen extends Screen {
 
     private List<FormattedLine> bodyLines() {
         return List.of(
-            new FormattedLine(Component.literal("Fastload overlaps Adrenaline's startup loading optimizations."), 0xFFE0E0E0),
-            new FormattedLine(Component.literal("Adrenaline already provides spawn and startup loading tuning in its settings."), 0xFFE0E0E0),
-            new FormattedLine(Component.literal("Remove Fastload and restart Minecraft."), 0xFFFFD060)
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.fastload.line1"), 0xFFE0E0E0),
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.fastload.line2"), 0xFFE0E0E0),
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.fastload.line3"), 0xFFFFD060)
         );
     }
 

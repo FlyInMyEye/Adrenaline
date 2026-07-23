@@ -4,6 +4,7 @@ import net.fly.adrenaline.BuildConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.network.chat.Component;
 import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -33,7 +34,7 @@ public final class BuildWarningOverlay {
     }
 
     private static void render(GuiGraphics graphics, int width, net.minecraft.client.gui.Font font, int y) {
-        String message = "you are running dev build, consider download prod version";
+        String message = Component.translatable("gui.adrenaline.dev_build_warning").getString();
         int textWidth = font.width(message);
         int x = (width - textWidth) / 2;
         graphics.drawString(font, message, x, y, TEXT_COLOR, true);
