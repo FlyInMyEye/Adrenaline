@@ -96,7 +96,8 @@ public final class WorldgenStatsOverlay {
     }
 
     private static String displayName(String name) {
-        String key = switch (name.trim()) {
+        String trimmedName = name.trim();
+        String key = switch (trimmedName) {
             case "SCHEDULING" -> "gui.adrenaline.worldgen_stats.scheduling";
             case "WAITING" -> "gui.adrenaline.worldgen_stats.waiting";
             case "SETUP" -> "gui.adrenaline.worldgen_stats.setup";
@@ -108,6 +109,10 @@ public final class WorldgenStatsOverlay {
             case "FINALIZE" -> "gui.adrenaline.worldgen_stats.finalize";
             default -> null;
         };
-        return key == null ? name : Component.translatable(key).getString();
+        if (key == null) {
+            return name;
+        }
+        int indentation = name.length() - name.stripLeading().length();
+        return " ".repeat(indentation) + Component.translatable(key).getString();
     }
 }
