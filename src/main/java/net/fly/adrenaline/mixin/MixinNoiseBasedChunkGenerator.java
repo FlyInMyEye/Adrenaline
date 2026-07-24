@@ -11,6 +11,7 @@ import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseProfile;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseSubstage;
 import net.fly.adrenaline.worldgen.FastHeightmap;
+import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
 import net.fly.adrenaline.worldgen.NoiseSectionWriter;
 import net.fly.adrenaline.worldgen.WorldgenHeightmapTracker;
 import net.minecraft.SharedConstants;
@@ -116,6 +117,8 @@ public class MixinNoiseBasedChunkGenerator {
         NoiseGeneratorSettings noiseGeneratorSettings = this.settings.value();
         BlockState defaultBlock = noiseGeneratorSettings.defaultBlock();
         Aquifer aquifer = noiseChunk.aquifer();
+        AdrenalineNoiseChunkMaterialAccess materialAccess = (AdrenalineNoiseChunkMaterialAccess) noiseChunk;
+        boolean directMaterialPath = materialAccess.adrenaline$hasDirectMaterialPath();
         WorldgenHeightmapTracker heightmapTracker = new WorldgenHeightmapTracker(chunk.getMinBuildHeight());
         NoiseSectionWriter[] sectionWriters = new NoiseSectionWriter[chunk.getSectionsCount()];
         MutableBlockPos mutableBlockPos = new MutableBlockPos();
@@ -165,6 +168,8 @@ public class MixinNoiseBasedChunkGenerator {
                         phaseStart = System.nanoTime();
                     }
                     noiseChunk.selectCellYZ(cellY, cellZ);
+                    double[] finalDensityValues = directMaterialPath ? materialAccess.adrenaline$finalDensityValues() : null;
+                    int materialIndex = 0;
                     if (BuildConfig.DEBUG && profile != null) {
                         profile.add(NoiseSubstage.CELL_CACHE, System.nanoTime() - phaseStart);
                     }
@@ -214,9 +219,21 @@ public class MixinNoiseBasedChunkGenerator {
                                     profile.add(NoiseSubstage.INTERPOLATION, System.nanoTime() - phaseStart);
                                     phaseStart = System.nanoTime();
                                 }
-                                BlockState state = noiseChunkAccessor.adrenaline$getInterpolatedState();
-                                if (state == null) {
-                                    state = defaultBlock;
+                                BlockState state;
+                                if (directMaterialPath) {
+                                    double density = finalDensityValues[materialIndex++];
+                                    state = density > 0.0D ? null : aquifer.computeSubstance(noiseChunk, density);
+                                    if (state == null) {
+                                        state = y >= -60 && y <= 50 ? materialAccess.adrenaline$calculateOre(noiseChunk) : null;
+                                        if (state == null) {
+                                            state = defaultBlock;
+                                        }
+                                    }
+                                } else {
+                                    state = noiseChunkAccessor.adrenaline$getInterpolatedState();
+                                    if (state == null) {
+                                        state = defaultBlock;
+                                    }
                                 }
 
                                 state = this.debugPreliminarySurfaceLevel(noiseChunk, x, y, z, state);
