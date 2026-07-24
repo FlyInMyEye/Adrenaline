@@ -53,6 +53,33 @@ public abstract class MixinNoiseBasedAquifer {
     @Unique
     private short[] adrenaline$packedAquiferLocations;
 
+    @Unique
+    private int[] adrenaline$searchCacheIndices;
+
+    @Unique
+    private int[] adrenaline$searchDistances;
+
+    @Unique
+    private int[] adrenaline$searchDeltaZ;
+
+    @Unique
+    private int adrenaline$lastSearchX = Integer.MIN_VALUE;
+
+    @Unique
+    private int adrenaline$lastSearchY;
+
+    @Unique
+    private int adrenaline$lastSearchZ;
+
+    @Unique
+    private int adrenaline$lastSearchGridX;
+
+    @Unique
+    private int adrenaline$lastSearchGridY;
+
+    @Unique
+    private int adrenaline$lastSearchGridZ;
+
     @Inject(method = "<init>", at = @At("TAIL"))
     private void adrenaline$prewarmCenterCache(CallbackInfo ci) {
         if (!AdrenalineConfig.aquiferOptimizationsEnabled() || aquiferLocationCache.length > 4096) {
@@ -62,6 +89,9 @@ public abstract class MixinNoiseBasedAquifer {
         int gridPlane = gridSizeX * gridSizeZ;
         int sizeY = aquiferLocationCache.length / gridPlane;
         adrenaline$packedAquiferLocations = new short[aquiferLocationCache.length];
+        adrenaline$searchCacheIndices = new int[12];
+        adrenaline$searchDistances = new int[12];
+        adrenaline$searchDeltaZ = new int[12];
         for (int dy = 0; dy < sizeY; dy++) {
             for (int dz = 0; dz < gridSizeZ; dz++) {
                 for (int dx = 0; dx < gridSizeX; dx++) {
@@ -115,38 +145,66 @@ public abstract class MixinNoiseBasedAquifer {
         int nearest = Integer.MAX_VALUE;
         int secondNearest = Integer.MAX_VALUE;
         int thirdNearest = Integer.MAX_VALUE;
-        int order = 0;
-
-        for (int offsetX = 0; offsetX <= 1; offsetX++) {
-            int centerGridX = gridX + offsetX;
-            int localX = localGridX + offsetX;
-            for (int offsetY = -1; offsetY <= 1; offsetY++) {
-                int centerGridY = gridY + offsetY;
-                int localY = localGridY + offsetY;
-                int row = (localY * gridSizeZ + localGridZ) * gridSizeX + localX;
-                for (int offsetZ = 0; offsetZ <= 1; offsetZ++) {
-                    int cacheIndex = row + offsetZ * gridSizeX;
-                    int packedLocation = adrenaline$packedAquiferLocations[cacheIndex] & 0xFFFF;
-                    int deltaX = centerGridX * 16 + (packedLocation >> 8) - x;
-                    int deltaY = centerGridY * 12 + (packedLocation >> 4 & 15) - y;
-                    int deltaZ = (gridZ + offsetZ) * 16 + (packedLocation & 15) - z;
-                    int distance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
-                    int packedCandidate = distance << 16 | (11 - order) << 12 | cacheIndex;
-                    order++;
-                    if (packedCandidate <= nearest) {
-                        thirdNearest = secondNearest;
-                        secondNearest = nearest;
-                        nearest = packedCandidate;
-                    } else if (packedCandidate <= secondNearest) {
-                        thirdNearest = secondNearest;
-                        secondNearest = packedCandidate;
-                    } else if (packedCandidate <= thirdNearest) {
-                        thirdNearest = packedCandidate;
+        boolean reusableSearch = x == adrenaline$lastSearchX && y == adrenaline$lastSearchY && z >= adrenaline$lastSearchZ
+            && gridX == adrenaline$lastSearchGridX && gridY == adrenaline$lastSearchGridY && gridZ == adrenaline$lastSearchGridZ;
+        if (reusableSearch) {
+            int zAdvance = z - adrenaline$lastSearchZ;
+            for (int order = 0; order < 12; order++) {
+                int oldDeltaZ = adrenaline$searchDeltaZ[order];
+                int newDeltaZ = oldDeltaZ - zAdvance;
+                int distance;
+                if (zAdvance == 1) {
+                    distance = adrenaline$searchDistances[order] - 2 * oldDeltaZ + 1;
+                } else {
+                    distance = adrenaline$searchDistances[order] + newDeltaZ * newDeltaZ - oldDeltaZ * oldDeltaZ;
+                }
+                adrenaline$searchDeltaZ[order] = newDeltaZ;
+                adrenaline$searchDistances[order] = distance;
+            }
+        } else {
+            int order = 0;
+            for (int offsetX = 0; offsetX <= 1; offsetX++) {
+                int centerGridX = gridX + offsetX;
+                int localX = localGridX + offsetX;
+                for (int offsetY = -1; offsetY <= 1; offsetY++) {
+                    int centerGridY = gridY + offsetY;
+                    int localY = localGridY + offsetY;
+                    int row = (localY * gridSizeZ + localGridZ) * gridSizeX + localX;
+                    for (int offsetZ = 0; offsetZ <= 1; offsetZ++) {
+                        int cacheIndex = row + offsetZ * gridSizeX;
+                        int packedLocation = adrenaline$packedAquiferLocations[cacheIndex] & 0xFFFF;
+                        int deltaX = centerGridX * 16 + (packedLocation >> 8) - x;
+                        int deltaY = centerGridY * 12 + (packedLocation >> 4 & 15) - y;
+                        int deltaZ = (gridZ + offsetZ) * 16 + (packedLocation & 15) - z;
+                        int distance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+                        adrenaline$searchCacheIndices[order] = cacheIndex;
+                        adrenaline$searchDistances[order] = distance;
+                        adrenaline$searchDeltaZ[order] = deltaZ;
+                        order++;
                     }
                 }
             }
         }
-
+        for (int order = 0; order < 12; order++) {
+            int packedCandidate = adrenaline$searchDistances[order] << 16 | (11 - order) << 12
+                | adrenaline$searchCacheIndices[order];
+            if (packedCandidate <= nearest) {
+                thirdNearest = secondNearest;
+                secondNearest = nearest;
+                nearest = packedCandidate;
+            } else if (packedCandidate <= secondNearest) {
+                thirdNearest = secondNearest;
+                secondNearest = packedCandidate;
+            } else if (packedCandidate <= thirdNearest) {
+                thirdNearest = packedCandidate;
+            }
+        }
+        adrenaline$lastSearchX = x;
+        adrenaline$lastSearchY = y;
+        adrenaline$lastSearchZ = z;
+        adrenaline$lastSearchGridX = gridX;
+        adrenaline$lastSearchGridY = gridY;
+        adrenaline$lastSearchGridZ = gridZ;
         int nearestDistance = nearest >>> 16;
         int secondDistance = secondNearest >>> 16;
         int thirdDistance = thirdNearest >>> 16;
