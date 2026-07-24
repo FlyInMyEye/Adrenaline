@@ -17,6 +17,7 @@
     "MixinMessageAccessor",
     "MixinMaterialRuleList",
     "MixinWorldGenRegion",
+    "MixinAquiferFluidStatusAccessor",
     "MixinNoiseBasedAquifer",
     "MixinNoiseBasedChunkGenerator",
     "MixinNoiseChunkAccessor",
