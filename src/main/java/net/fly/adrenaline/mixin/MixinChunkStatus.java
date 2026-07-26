@@ -181,7 +181,7 @@ public class MixinChunkStatus {
                     result.complete(value);
                 }
             });
-            future.join();
+            return future;
         }, () -> result.complete(ChunkHolder.UNLOADED_CHUNK), contextClassLoader, debugLabel);
         job.trackWaiting(centerPos, status);
         if (BuildConfig.DEBUG) {

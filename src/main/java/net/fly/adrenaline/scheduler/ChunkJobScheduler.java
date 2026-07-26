@@ -25,7 +25,8 @@ public final class ChunkJobScheduler {
     private long epoch;
     private boolean cancelling;
 
-    private int activeCount = 0;
+    private int runningCount;
+    private int yieldedCount;
     private final HashSet<Long> activeFootprint = new HashSet<>();
     private final HashSet<ChunkJob> activeJobs = new HashSet<>();
 
@@ -72,7 +73,7 @@ public final class ChunkJobScheduler {
             }
             conflictPending.add(job);
             indexJob(job);
-        } else if (activeCount >= maxActive) {
+        } else if (runningCount >= maxActive) {
             job.transitionWaiting(WaitingReason.CAPACITY);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 Adrenaline.LOGGER.info("Queued capacity job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
@@ -92,6 +93,17 @@ public final class ChunkJobScheduler {
         return true;
     }
 
+    synchronized void releaseWorker(ChunkJob job) {
+        if (job.schedulerEpoch() != this.epoch || !job.releaseCapacity()) {
+            return;
+        }
+        this.runningCount--;
+        if (job.markYielded()) {
+            this.yieldedCount++;
+        }
+        this.drainCapacityQueue();
+    }
+
     synchronized void onComplete(ChunkJob job) {
         this.activeJobs.remove(job);
         notifyAll();
@@ -99,9 +111,14 @@ public final class ChunkJobScheduler {
             return;
         }
         this.refreshPoolIfNeeded();
+        if (job.releaseCapacity()) {
+            this.runningCount--;
+        }
+        if (job.clearYielded()) {
+            this.yieldedCount--;
+        }
         Set<Long> footprint = job.footprint();
         this.activeFootprint.removeAll(footprint);
-        this.activeCount--;
 
         notifyAll();
 
@@ -117,7 +134,7 @@ public final class ChunkJobScheduler {
             if (conflictPending.contains(candidate) && !conflicts(candidate.footprint())) {
                 conflictPending.remove(candidate);
                 removeFromIndex(candidate);
-                if (activeCount < maxActive) {
+                if (runningCount < maxActive) {
                     dispatch(candidate);
                 } else {
                     candidate.transitionWaiting(WaitingReason.CAPACITY);
@@ -126,7 +143,11 @@ public final class ChunkJobScheduler {
             }
         }
 
-        while (activeCount < maxActive && !capacityQueue.isEmpty()) {
+        this.drainCapacityQueue();
+    }
+
+    private void drainCapacityQueue() {
+        while (runningCount < maxActive && !capacityQueue.isEmpty()) {
             ChunkJob queuedJob = capacityQueue.pollFirst();
             if (conflicts(queuedJob.footprint())) {
                 queuedJob.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
@@ -151,7 +172,8 @@ public final class ChunkJobScheduler {
             activeJobCount = this.activeJobs.size();
             this.epoch++;
             this.cancelling = true;
-            this.activeCount = 0;
+            this.runningCount = 0;
+            this.yieldedCount = 0;
             this.activeFootprint.clear();
             this.conflictPending.clear();
             this.waitIndex.clear();
@@ -202,7 +224,8 @@ public final class ChunkJobScheduler {
         }
         activeFootprint.addAll(job.footprint());
         activeJobs.add(job);
-        activeCount++;
+        runningCount++;
+        job.acquireCapacity();
         job.transitionWaiting(WaitingReason.EXECUTOR_QUEUE);
         pool.execute(job);
     }
@@ -241,4 +264,5 @@ public final class ChunkJobScheduler {
             current.shutdown();
         }
     }
+
 }

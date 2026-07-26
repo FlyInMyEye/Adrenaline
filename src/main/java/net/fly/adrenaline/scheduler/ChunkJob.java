@@ -8,12 +8,14 @@ import net.minecraft.world.level.chunk.ChunkStatus;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 public final class ChunkJob implements Runnable {
 
     private final Set<Long> footprint;
-    private final Runnable work;
+    private final Supplier<CompletableFuture<?>> work;
     private final Runnable cancelWork;
     private final ClassLoader contextClassLoader;
     private final String debugLabel;
@@ -24,27 +26,37 @@ public final class ChunkJob implements Runnable {
     private ChunkStatus waitingStatus;
     private WaitingReason waitingReason;
     private long waitingStartedNanos;
+    private boolean capacityHeld;
+    private boolean yielded;
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, ClassLoader contextClassLoader) {
-        this(buildFootprint(center, writeRadius), work, () -> {
+        this(buildFootprint(center, writeRadius), asAsync(work), () -> {
         }, contextClassLoader, center.x + "," + center.z);
     }
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, Runnable cancelWork, ClassLoader contextClassLoader) {
+        this(buildFootprint(center, writeRadius), asAsync(work), cancelWork, contextClassLoader, center.x + "," + center.z);
+    }
+
+    public ChunkJob(ChunkPos center, int writeRadius, Supplier<CompletableFuture<?>> work, Runnable cancelWork, ClassLoader contextClassLoader) {
         this(buildFootprint(center, writeRadius), work, cancelWork, contextClassLoader, center.x + "," + center.z);
     }
 
     public ChunkJob(Set<Long> footprint, Runnable work, ClassLoader contextClassLoader) {
-        this(footprint, work, () -> {
+        this(footprint, asAsync(work), () -> {
         }, contextClassLoader, "custom");
     }
 
     public ChunkJob(Set<Long> footprint, Runnable work, ClassLoader contextClassLoader, String debugLabel) {
-        this(footprint, work, () -> {
+        this(footprint, asAsync(work), () -> {
         }, contextClassLoader, debugLabel);
     }
 
     public ChunkJob(Set<Long> footprint, Runnable work, Runnable cancelWork, ClassLoader contextClassLoader, String debugLabel) {
+        this(footprint, asAsync(work), cancelWork, contextClassLoader, debugLabel);
+    }
+
+    public ChunkJob(Set<Long> footprint, Supplier<CompletableFuture<?>> work, Runnable cancelWork, ClassLoader contextClassLoader, String debugLabel) {
         this.footprint = new HashSet<>(footprint);
         this.work = work;
         this.cancelWork = cancelWork;
@@ -100,6 +112,34 @@ public final class ChunkJob implements Runnable {
         this.started = true;
     }
 
+    void acquireCapacity() {
+        this.capacityHeld = true;
+    }
+
+    boolean releaseCapacity() {
+        if (!this.capacityHeld) {
+            return false;
+        }
+        this.capacityHeld = false;
+        return true;
+    }
+
+    boolean markYielded() {
+        if (this.yielded) {
+            return false;
+        }
+        this.yielded = true;
+        return true;
+    }
+
+    boolean clearYielded() {
+        if (!this.yielded) {
+            return false;
+        }
+        this.yielded = false;
+        return true;
+    }
+
     void cancel() {
         this.finishWaiting();
         if (!this.started && this.cancellationHandled.compareAndSet(false, true)) {
@@ -111,22 +151,40 @@ public final class ChunkJob implements Runnable {
     public void run() {
         Thread currentThread = Thread.currentThread();
         ClassLoader previousClassLoader = currentThread.getContextClassLoader();
+        boolean began = false;
+        boolean handedOff = false;
         try {
             if (!ChunkJobScheduler.get().begin(this)) {
                 this.cancel();
                 return;
             }
+            began = true;
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
             }
-            work.run();
+            CompletableFuture<?> completion = this.work.get();
             DeferredNotificationBuffer.flush();
+            ChunkJobScheduler.get().releaseWorker(this);
+            if (completion == null) {
+                completion = CompletableFuture.completedFuture(null);
+            }
+            completion.whenComplete((value, throwable) -> ChunkJobScheduler.get().onComplete(this));
+            handedOff = true;
         } finally {
             if (currentThread.getContextClassLoader() != previousClassLoader) {
                 currentThread.setContextClassLoader(previousClassLoader);
             }
-            ChunkJobScheduler.get().onComplete(this);
+            if (began && !handedOff) {
+                ChunkJobScheduler.get().onComplete(this);
+            }
         }
+    }
+
+    private static Supplier<CompletableFuture<?>> asAsync(Runnable work) {
+        return () -> {
+            work.run();
+            return CompletableFuture.completedFuture(null);
+        };
     }
 
     private static Set<Long> buildFootprint(ChunkPos center, int radius) {

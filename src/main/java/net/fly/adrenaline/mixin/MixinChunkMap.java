@@ -142,6 +142,8 @@ public class MixinChunkMap {
                     Runnable runnable = taskFunction.apply(discardedCompletionHandle);
                     WorldgenStageStats.finishSchedulingWork(executionWork);
                     runnable.run();
+                    CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
+                    return future == null ? CompletableFuture.completedFuture(null) : future;
                 }, () -> {
                     CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
                     if (future != null) {
@@ -150,7 +152,11 @@ public class MixinChunkMap {
                 }, contextClassLoader);
                 WorldgenStageStats.finishSchedulingWork(resumedWork);
             } else {
-                job = new ChunkJob(pos, 0, () -> taskFunction.apply(discardedCompletionHandle).run(), () -> {
+                job = new ChunkJob(pos, 0, () -> {
+                    taskFunction.apply(discardedCompletionHandle).run();
+                    CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
+                    return future == null ? CompletableFuture.completedFuture(null) : future;
+                }, () -> {
                     CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
                     if (future != null) {
                         future.complete(ChunkHolder.UNLOADED_CHUNK);
