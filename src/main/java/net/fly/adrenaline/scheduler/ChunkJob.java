@@ -1,7 +1,10 @@
 package net.fly.adrenaline.scheduler;
 
 import net.fly.adrenaline.util.DeferredNotificationBuffer;
+import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.ChunkStatus;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -17,6 +20,10 @@ public final class ChunkJob implements Runnable {
     private final AtomicBoolean cancellationHandled = new AtomicBoolean();
     private long schedulerEpoch = Long.MIN_VALUE;
     private volatile boolean started;
+    private ChunkPos waitingPos;
+    private ChunkStatus waitingStatus;
+    private WaitingReason waitingReason;
+    private long waitingStartedNanos;
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, ClassLoader contextClassLoader) {
         this(buildFootprint(center, writeRadius), work, () -> {
@@ -53,6 +60,34 @@ public final class ChunkJob implements Runnable {
         return debugLabel;
     }
 
+    public ChunkJob trackWaiting(ChunkPos pos, ChunkStatus status) {
+        this.waitingPos = pos;
+        this.waitingStatus = status;
+        return this;
+    }
+
+    synchronized void transitionWaiting(WaitingReason reason) {
+        if (this.waitingPos == null || this.waitingStatus == null || !WorldgenStageStats.isEnabled()) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (this.waitingReason != null) {
+            WorldgenStageStats.addWaitingInterval(this.waitingPos, this.waitingStatus, this.waitingReason, this.waitingStartedNanos, now);
+        }
+        this.waitingReason = reason;
+        this.waitingStartedNanos = now;
+    }
+
+    synchronized void finishWaiting() {
+        if (this.waitingReason == null) {
+            return;
+        }
+        long now = System.nanoTime();
+        WorldgenStageStats.addWaitingInterval(this.waitingPos, this.waitingStatus, this.waitingReason, this.waitingStartedNanos, now);
+        this.waitingReason = null;
+        this.waitingStartedNanos = 0L;
+    }
+
     void setSchedulerEpoch(long schedulerEpoch) {
         this.schedulerEpoch = schedulerEpoch;
     }
@@ -66,6 +101,7 @@ public final class ChunkJob implements Runnable {
     }
 
     void cancel() {
+        this.finishWaiting();
         if (!this.started && this.cancellationHandled.compareAndSet(false, true)) {
             this.cancelWork.run();
         }

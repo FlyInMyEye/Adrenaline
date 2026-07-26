@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import net.fly.adrenaline.BuildConfig;
@@ -23,6 +24,8 @@ public final class WorldgenStageStats {
     private static final ConcurrentHashMap<Long, AtomicLong> LAST_STAGE_FINISH_NANOS = new ConcurrentHashMap<>();
     private static final AtomicLong SCHEDULING_AVERAGE_NANOS = new AtomicLong();
     private static final AtomicLong WAITING_AVERAGE_NANOS = new AtomicLong();
+    private static final WaitingReason[] WAITING_REASONS = WaitingReason.values();
+    private static final AtomicLongArray WAITING_REASON_AVERAGE_NANOS = new AtomicLongArray(WAITING_REASONS.length);
     private static final AtomicLong EPOCH = new AtomicLong();
     private static volatile boolean enabled;
 
@@ -54,6 +57,9 @@ public final class WorldgenStageStats {
             LAST_STAGE_FINISH_NANOS.clear();
             SCHEDULING_AVERAGE_NANOS.set(0L);
             WAITING_AVERAGE_NANOS.set(0L);
+            for (int i = 0; i < WAITING_REASONS.length; i++) {
+                WAITING_REASON_AVERAGE_NANOS.set(i, 0L);
+            }
         }
     }
 
@@ -91,6 +97,26 @@ public final class WorldgenStageStats {
         work.state.schedulingNanos.addAndGet(System.nanoTime() - work.startedNanos);
     }
 
+    public static void markDependenciesReady(ChunkPos pos, ChunkStatus status) {
+        if (!BuildConfig.DEBUG || !enabled) {
+            return;
+        }
+        SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
+        if (state != null && EPOCH.get() == state.epoch) {
+            state.dependenciesReadyNanos.compareAndSet(0L, System.nanoTime());
+        }
+    }
+
+    public static void addWaitingInterval(ChunkPos pos, ChunkStatus status, WaitingReason reason, long startedNanos, long finishedNanos) {
+        if (!BuildConfig.DEBUG || !enabled || finishedNanos <= startedNanos) {
+            return;
+        }
+        SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
+        if (state != null && EPOCH.get() == state.epoch) {
+            state.waitingIntervals.add(new WaitingInterval(reason, startedNanos, finishedNanos));
+        }
+    }
+
     public static long beginStage(ChunkPos pos, ChunkStatus status) {
         if (!BuildConfig.DEBUG || !enabled) {
             return 0L;
@@ -102,9 +128,35 @@ public final class WorldgenStageStats {
             long waitingStartedNanos = lastStageFinish == null ? state.startedNanos : Math.max(state.startedNanos, lastStageFinish.get());
             long totalNanos = now - waitingStartedNanos;
             long schedulingNanos = Math.min(totalNanos, state.schedulingNanos.get());
+            long waitingNanos = totalNanos - schedulingNanos;
             ChunkScheduling chunkScheduling = CHUNK_SCHEDULING.computeIfAbsent(pos.toLong(), ignored -> new ChunkScheduling());
             chunkScheduling.schedulingNanos.addAndGet(schedulingNanos);
-            chunkScheduling.waitingNanos.addAndGet(totalNanos - schedulingNanos);
+            chunkScheduling.waitingNanos.addAndGet(waitingNanos);
+
+            long categorizedNanos = 0L;
+            for (WaitingInterval interval : state.waitingIntervals) {
+                long intervalStart = Math.max(waitingStartedNanos, interval.startedNanos);
+                long intervalEnd = Math.min(now, interval.finishedNanos);
+                if (intervalEnd > intervalStart) {
+                    long duration = Math.min(intervalEnd - intervalStart, waitingNanos - categorizedNanos);
+                    if (duration > 0L) {
+                        chunkScheduling.waitingReasonNanos.addAndGet(interval.reason.ordinal(), duration);
+                        categorizedNanos += duration;
+                    }
+                }
+            }
+
+            long dependenciesReady = state.dependenciesReadyNanos.get();
+            if (categorizedNanos < waitingNanos && dependenciesReady > waitingStartedNanos) {
+                long dependencyNanos = Math.min(Math.min(now, dependenciesReady) - waitingStartedNanos, waitingNanos - categorizedNanos);
+                if (dependencyNanos > 0L) {
+                    chunkScheduling.waitingReasonNanos.addAndGet(WaitingReason.DEPENDENCY.ordinal(), dependencyNanos);
+                    categorizedNanos += dependencyNanos;
+                }
+            }
+            if (categorizedNanos < waitingNanos) {
+                chunkScheduling.waitingReasonNanos.addAndGet(WaitingReason.UNCLASSIFIED.ordinal(), waitingNanos - categorizedNanos);
+            }
         }
         return now;
     }
@@ -139,6 +191,10 @@ public final class WorldgenStageStats {
                     if (chunkScheduling != null) {
                         updateAverage(SCHEDULING_AVERAGE_NANOS, chunkScheduling.schedulingNanos.get());
                         updateAverage(WAITING_AVERAGE_NANOS, chunkScheduling.waitingNanos.get());
+                        for (WaitingReason reason : WAITING_REASONS) {
+                            updateAverage(WAITING_REASON_AVERAGE_NANOS, reason.ordinal(),
+                                chunkScheduling.waitingReasonNanos.get(reason.ordinal()));
+                        }
                     }
                     LAST_STAGE_FINISH_NANOS.remove(pos.toLong());
                 }
@@ -178,6 +234,9 @@ public final class WorldgenStageStats {
             timings.addAll(noiseIndex + 1, noiseTimings);
         }
         timings.add(new StageTiming("WAITING", WAITING_AVERAGE_NANOS.get()));
+        for (WaitingReason reason : WAITING_REASONS) {
+            timings.add(new StageTiming("  " + reason.displayName, WAITING_REASON_AVERAGE_NANOS.get(reason.ordinal())));
+        }
         return timings;
     }
 
@@ -215,6 +274,20 @@ public final class WorldgenStageStats {
         }
     }
 
+    public enum WaitingReason {
+        DEPENDENCY("DEPENDENCY"),
+        CAPACITY("CAPACITY"),
+        FOOTPRINT_CONFLICT("FOOTPRINT CONFLICT"),
+        EXECUTOR_QUEUE("EXECUTOR QUEUE"),
+        UNCLASSIFIED("UNCLASSIFIED");
+
+        private final String displayName;
+
+        WaitingReason(String displayName) {
+            this.displayName = displayName;
+        }
+    }
+
     public static final class NoiseProfile {
         private final long epoch;
         private final long[] elapsedNanos = new long[NOISE_SUBSTAGES.length];
@@ -235,6 +308,8 @@ public final class WorldgenStageStats {
         private final long epoch;
         private final long startedNanos;
         private final AtomicLong schedulingNanos = new AtomicLong();
+        private final AtomicLong dependenciesReadyNanos = new AtomicLong();
+        private final ConcurrentLinkedQueue<WaitingInterval> waitingIntervals = new ConcurrentLinkedQueue<>();
 
         private SchedulingState(long epoch, long startedNanos) {
             this.epoch = epoch;
@@ -245,6 +320,10 @@ public final class WorldgenStageStats {
     private static final class ChunkScheduling {
         private final AtomicLong schedulingNanos = new AtomicLong();
         private final AtomicLong waitingNanos = new AtomicLong();
+        private final AtomicLongArray waitingReasonNanos = new AtomicLongArray(WAITING_REASONS.length);
+    }
+
+    private record WaitingInterval(WaitingReason reason, long startedNanos, long finishedNanos) {
     }
 
     public static final class SchedulingWork {

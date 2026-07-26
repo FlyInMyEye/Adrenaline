@@ -111,6 +111,9 @@ public class MixinChunkStatus {
         List<ChunkAccess> chunks,
         ChunkAccess centerChunk
     ) {
+        if (BuildConfig.DEBUG) {
+            WorldgenStageStats.markDependenciesReady(centerChunk.getPos(), status);
+        }
         if ((Object) this == ChunkStatus.FEATURES && AdrenalineConfig.parallelWorldgenEnabled() && AdrenalineConfig.parallelChunkStatusEnabled(status)) {
             return scheduleFeature(generationTask, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
@@ -180,6 +183,7 @@ public class MixinChunkStatus {
             });
             future.join();
         }, () -> result.complete(ChunkHolder.UNLOADED_CHUNK), contextClassLoader, debugLabel);
+        job.trackWaiting(centerPos, status);
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.finishSchedulingWork(schedulingWork);
         }

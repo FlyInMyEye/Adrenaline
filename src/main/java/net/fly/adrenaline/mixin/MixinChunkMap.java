@@ -102,6 +102,7 @@ public class MixinChunkMap {
                 @SuppressWarnings("unchecked")
                 Function<ProcessorHandle<Unit>, Runnable> originalTask = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
                 Function<ProcessorHandle<Unit>, Runnable> measuredTask = completionHandle -> () -> {
+                    WorldgenStageStats.markDependenciesReady(pos, scheduledStatus);
                     SchedulingWork resumedWork = WorldgenStageStats.beginSchedulingWork(pos, scheduledStatus);
                     Runnable runnable = originalTask.apply(completionHandle);
                     WorldgenStageStats.finishSchedulingWork(resumedWork);
@@ -128,6 +129,9 @@ public class MixinChunkMap {
         @SuppressWarnings("unchecked")
         Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
         Function<ProcessorHandle<Unit>, Runnable> wrappedTask = completionHandle -> () -> {
+            if (BuildConfig.DEBUG) {
+                WorldgenStageStats.markDependenciesReady(pos, scheduledStatus);
+            }
             ProcessorHandle<Unit> discardedCompletionHandle = ProcessorHandle.of("adrenaline-wrap", unit -> {
             });
             ChunkJob job;
@@ -153,6 +157,7 @@ public class MixinChunkMap {
                     }
                 }, contextClassLoader);
             }
+            job.trackWaiting(pos, scheduledStatus);
             ChunkJobScheduler.get().submit(job);
             completionHandle.tell(Unit.INSTANCE);
         };

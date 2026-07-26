@@ -3,6 +3,7 @@ package net.fly.adrenaline.scheduler;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -65,12 +66,14 @@ public final class ChunkJobScheduler {
         this.refreshPoolIfNeeded();
         job.setSchedulerEpoch(this.epoch);
         if (conflicts(job.footprint())) {
+            job.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 Adrenaline.LOGGER.info("Queued conflicting job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
             conflictPending.add(job);
             indexJob(job);
         } else if (activeCount >= maxActive) {
+            job.transitionWaiting(WaitingReason.CAPACITY);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 Adrenaline.LOGGER.info("Queued capacity job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
@@ -84,6 +87,7 @@ public final class ChunkJobScheduler {
         if (this.cancelling || job.schedulerEpoch() != this.epoch) {
             return false;
         }
+        job.finishWaiting();
         job.markStarted();
         return true;
     }
@@ -116,6 +120,7 @@ public final class ChunkJobScheduler {
                 if (activeCount < maxActive) {
                     dispatch(candidate);
                 } else {
+                    candidate.transitionWaiting(WaitingReason.CAPACITY);
                     capacityQueue.addLast(candidate);
                 }
             }
@@ -124,6 +129,7 @@ public final class ChunkJobScheduler {
         while (activeCount < maxActive && !capacityQueue.isEmpty()) {
             ChunkJob queuedJob = capacityQueue.pollFirst();
             if (conflicts(queuedJob.footprint())) {
+                queuedJob.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
                 conflictPending.add(queuedJob);
                 indexJob(queuedJob);
             } else {
@@ -197,6 +203,7 @@ public final class ChunkJobScheduler {
         activeFootprint.addAll(job.footprint());
         activeJobs.add(job);
         activeCount++;
+        job.transitionWaiting(WaitingReason.EXECUTOR_QUEUE);
         pool.execute(job);
     }
 

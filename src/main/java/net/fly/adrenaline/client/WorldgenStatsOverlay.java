@@ -74,7 +74,7 @@ public final class WorldgenStatsOverlay {
         List<StageTiming> timings = WorldgenStageStats.snapshot();
         long maxNanos = 0L;
         for (StageTiming timing : timings) {
-            if (!"WAITING".equals(timing.name())) {
+            if (!isWaitingTiming(timing.name())) {
                 maxNanos = Math.max(maxNanos, timing.averageNanos());
             }
         }
@@ -83,7 +83,7 @@ public final class WorldgenStatsOverlay {
         for (StageTiming timing : timings) {
             long milliseconds = Math.round(timing.averageNanos() / 1_000_000.0D);
             String name = displayName(timing.name());
-            if ("WAITING".equals(timing.name())) {
+            if (isWaitingTiming(timing.name())) {
                 lines.add(String.format(Locale.ROOT, "%-20s %dms", name, milliseconds));
                 continue;
             }
@@ -93,6 +93,13 @@ public final class WorldgenStatsOverlay {
             lines.add(String.format(Locale.ROOT, "%-20s %s %dms", name, "|".repeat(bars), milliseconds));
         }
         return lines;
+    }
+
+    private static boolean isWaitingTiming(String name) {
+        return switch (name.trim()) {
+            case "WAITING", "DEPENDENCY", "CAPACITY", "FOOTPRINT CONFLICT", "EXECUTOR QUEUE", "UNCLASSIFIED" -> true;
+            default -> false;
+        };
     }
 
     private static String displayName(String name) {
