@@ -46,6 +46,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button oreVeinOptimizationsButton;
     private Button initialSpawnOptimizationButton;
     private Button parallelWorldgenButton;
+    private Button prioritizeHigherStagesButton;
     private Button fastLegacyRandomButton;
     private Button showCancelButton;
     private Button showThreadVisualizerButton;
@@ -90,6 +91,8 @@ public class AdrenalineConfigScreen extends Screen {
         this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.worldgen_optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("tooltip.adrenaline.config.worldgen_optimization", PerformanceImpact.EXTREME));
         y += 24;
         this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH));
+        y += 24;
+        this.prioritizeHigherStagesButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prioritize_higher_stages"), this.config.prioritizeHigherStages, value -> this.config.prioritizeHigherStages = value, tooltip("tooltip.adrenaline.config.prioritize_higher_stages", PerformanceImpact.MEDIUM));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.worldgen", y);
@@ -366,6 +369,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.oreVeinOptimizationsButton.active = worldgenOptimizations;
         this.initialSpawnOptimizationButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
+        this.prioritizeHigherStagesButton.active = this.config.parallelWorldgen;
         this.featureSafetyRadiusSlider.active = this.config.parallelWorldgen;
         for (Button button : this.stageParallelButtons) {
             button.active = this.config.parallelWorldgen;

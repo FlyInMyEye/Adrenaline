@@ -8,6 +8,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -176,7 +177,10 @@ public final class ChunkJobScheduler {
             if (conflictPending.contains(candidate) && !conflicts(candidate.footprint())) {
                 conflictPending.remove(candidate);
                 removeFromIndex(candidate);
-                if (runningCount < maxActive) {
+                if (AdrenalineConfig.prioritizeHigherStagesEnabled()) {
+                    candidate.transitionWaiting(WaitingReason.CAPACITY);
+                    capacityQueue.addLast(candidate);
+                } else if (runningCount < maxActive) {
                     dispatch(candidate);
                 } else {
                     candidate.transitionWaiting(WaitingReason.CAPACITY);
@@ -190,7 +194,7 @@ public final class ChunkJobScheduler {
 
     private void drainCapacityQueue() {
         while (runningCount < maxActive && !capacityQueue.isEmpty()) {
-            ChunkJob queuedJob = capacityQueue.pollFirst();
+            ChunkJob queuedJob = this.pollCapacityJob();
             if (conflicts(queuedJob.footprint())) {
                 queuedJob.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
                 conflictPending.add(queuedJob);
@@ -199,6 +203,25 @@ public final class ChunkJobScheduler {
                 dispatch(queuedJob);
             }
         }
+    }
+
+    private ChunkJob pollCapacityJob() {
+        if (!AdrenalineConfig.prioritizeHigherStagesEnabled()) {
+            return this.capacityQueue.pollFirst();
+        }
+        Iterator<ChunkJob> iterator = this.capacityQueue.iterator();
+        ChunkJob selected = iterator.next();
+        int highestStage = selected.stageIndex();
+        while (iterator.hasNext()) {
+            ChunkJob candidate = iterator.next();
+            int stage = candidate.stageIndex();
+            if (stage > highestStage) {
+                selected = candidate;
+                highestStage = stage;
+            }
+        }
+        this.capacityQueue.remove(selected);
+        return selected;
     }
 
     public void cancel(Executor cancellationExecutor) {

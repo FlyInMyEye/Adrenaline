@@ -78,6 +78,10 @@ public final class ChunkJob implements Runnable {
         return this;
     }
 
+    int stageIndex() {
+        return this.waitingStatus == null ? Integer.MIN_VALUE : this.waitingStatus.getIndex();
+    }
+
     synchronized void transitionWaiting(WaitingReason reason) {
         if (this.waitingPos == null || this.waitingStatus == null || !WorldgenStageStats.isEnabled()) {
             return;

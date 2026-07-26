@@ -54,6 +54,10 @@ public class AdrenalineConfig {
         return get().parallelWorldgen;
     }
 
+    public static boolean prioritizeHigherStagesEnabled() {
+        return get().prioritizeHigherStages;
+    }
+
     public static boolean parallelChunkStatusEnabled(ChunkStatus status) {
         if (status == null) {
             return true;
@@ -178,6 +182,7 @@ public class AdrenalineConfig {
         public int serializationWorkerThreads = 0;
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
+        public boolean prioritizeHigherStages = true;
         public String featureCompatibility = "classic";
         public int featureSafetyRadius;
         public boolean parallelizeStructureStarts = true;
@@ -213,6 +218,7 @@ public class AdrenalineConfig {
             this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
+            this.prioritizeHigherStages = other.prioritizeHigherStages;
             this.featureCompatibility = other.featureCompatibility;
             this.featureSafetyRadius = other.featureSafetyRadius;
             this.parallelizeStructureStarts = other.parallelizeStructureStarts;
