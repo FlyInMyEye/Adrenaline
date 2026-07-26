@@ -47,6 +47,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button initialSpawnOptimizationButton;
     private Button parallelWorldgenButton;
     private Button fastLegacyRandomButton;
+    private Button showCancelButton;
     private Button debugLoggingButton;
     private Button doneButton;
     private int scrollOffset;
@@ -134,6 +135,10 @@ public class AdrenalineConfigScreen extends Screen {
         this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FULL", 16777215), this.config.parallelizeFull, value -> this.config.parallelizeFull = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.full"))));
         y += 24;
         this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_legacy_random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("tooltip.adrenaline.config.fast_legacy_random", PerformanceImpact.LOW));
+        y += 24;
+
+        y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
+        this.showCancelButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_cancel_button"), this.config.showCancelButton, value -> this.config.showCancelButton = value, tooltip("tooltip.adrenaline.config.show_cancel_button", PerformanceImpact.NONE));
         y += 24;
 
         if (BuildConfig.DEBUG) {
@@ -363,6 +368,7 @@ public class AdrenalineConfigScreen extends Screen {
             button.active = this.config.parallelWorldgen;
         }
         this.fastLegacyRandomButton.active = true;
+        this.showCancelButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
             this.debugLoggingButton.active = true;
         }

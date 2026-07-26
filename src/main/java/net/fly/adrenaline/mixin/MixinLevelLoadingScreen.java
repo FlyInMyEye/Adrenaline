@@ -41,11 +41,18 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Override
     protected void init() {
-        this.adrenaline$cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.cancel"), this::adrenaline$cancelWorldCreation).bounds((this.width - 100) / 2, this.height - 28, 100, 20).build());
+        if (AdrenalineConfig.showCancelButton()) {
+            this.adrenaline$cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.cancel"), this::adrenaline$cancelWorldCreation).bounds((this.width - 100) / 2, this.height - 28, 100, 20).build());
+        } else {
+            this.adrenaline$cancelButton = null;
+        }
     }
 
     @Inject(method = "render", at = @At("TAIL"))
     private void adrenaline$renderCancelButton(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
+        if (this.adrenaline$cancelButton == null) {
+            return;
+        }
         IntegratedServer server = Minecraft.getInstance().getSingleplayerServer();
         this.adrenaline$cancelButton.active = server != null && !server.isShutdown() && !WorldLoadCancellation.isRequested();
         super.render(guiGraphics, mouseX, mouseY, partialTick);

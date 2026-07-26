@@ -3,6 +3,7 @@
   "gui.adrenaline.config.section.general": "General",
   "gui.adrenaline.config.section.worldgen": "Worldgen Optimization",
   "gui.adrenaline.config.section.compatibility": "Compatibility",
+  "gui.adrenaline.config.section.features_plushies": "Features & Plushies",
   "gui.adrenaline.config.section.diagnostics": "Diagnostics",
   "gui.adrenaline.config.generation_threads": "Generation Threads",
   "gui.adrenaline.config.serialization_threads": "Serialization Threads",
@@ -17,6 +18,7 @@
   "gui.adrenaline.config.ore_vein_optimizations": "Ore Vein Optimizations",
   "gui.adrenaline.config.initial_spawn_optimization": "Initial Spawn Optimization",
   "gui.adrenaline.config.fast_legacy_random": "Fast Legacy Random",
+  "gui.adrenaline.config.show_cancel_button": "Show Cancel Button",
   "gui.adrenaline.config.debug_logging": "Debug Logging",
   "gui.adrenaline.toggle.on": "On",
   "gui.adrenaline.toggle.off": "Off",
@@ -90,5 +92,6 @@
   "tooltip.adrenaline.config.feature_safety_radius": "Reserves nearby chunks during feature generation. Increase this for mods with features extending beyond adjacent chunks.",
   "tooltip.adrenaline.config.stage_parallel": "Controls whether the %s stage is redirected to Adrenaline's parallel scheduler.",
   "tooltip.adrenaline.config.fast_legacy_random": "Replaces legacy random with a faster implementation.",
+  "tooltip.adrenaline.config.show_cancel_button": "Shows the cancel button during initial world generation.",
   "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console."
 }

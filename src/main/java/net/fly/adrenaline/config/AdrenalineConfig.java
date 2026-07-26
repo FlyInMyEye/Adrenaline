@@ -152,6 +152,10 @@ public class AdrenalineConfig {
         return get().fastLegacyRandom;
     }
 
+    public static boolean showCancelButton() {
+        return get().showCancelButton;
+    }
+
     public static boolean debugLoggingEnabled() {
         return BuildConfig.DEBUG && get().debugLogging;
     }
@@ -184,6 +188,7 @@ public class AdrenalineConfig {
         public boolean parallelizeSpawn = true;
         public boolean parallelizeFull = true;
         public boolean fastLegacyRandom = true;
+        public boolean showCancelButton = true;
         public boolean debugLogging = false;
 
         public Data() {
@@ -217,6 +222,7 @@ public class AdrenalineConfig {
             this.parallelizeSpawn = other.parallelizeSpawn;
             this.parallelizeFull = other.parallelizeFull;
             this.fastLegacyRandom = other.fastLegacyRandom;
+            this.showCancelButton = other.showCancelButton;
             this.debugLogging = other.debugLogging;
         }
     }
