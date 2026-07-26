@@ -19,6 +19,7 @@
   "gui.adrenaline.config.initial_spawn_optimization": "Initial Spawn Optimization",
   "gui.adrenaline.config.fast_legacy_random": "Fast Legacy Random",
   "gui.adrenaline.config.show_cancel_button": "Show Cancel Button",
+  "gui.adrenaline.config.show_thread_visualizer": "Show Thread Visualizer",
   "gui.adrenaline.config.debug_logging": "Debug Logging",
   "gui.adrenaline.toggle.on": "On",
   "gui.adrenaline.toggle.off": "Off",
@@ -93,5 +94,6 @@
   "tooltip.adrenaline.config.stage_parallel": "Controls whether the %s stage is redirected to Adrenaline's parallel scheduler.",
   "tooltip.adrenaline.config.fast_legacy_random": "Replaces legacy random with a faster implementation.",
   "tooltip.adrenaline.config.show_cancel_button": "Shows the cancel button during initial world generation.",
+  "tooltip.adrenaline.config.show_thread_visualizer": "Shows generation worker activity during initial world generation.",
   "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console."
 }

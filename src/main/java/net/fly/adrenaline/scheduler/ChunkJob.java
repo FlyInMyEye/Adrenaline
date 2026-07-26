@@ -159,6 +159,7 @@ public final class ChunkJob implements Runnable {
                 return;
             }
             began = true;
+            ChunkJobScheduler.get().markCurrentWorkerActive();
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
             }
@@ -174,6 +175,7 @@ public final class ChunkJob implements Runnable {
             if (currentThread.getContextClassLoader() != previousClassLoader) {
                 currentThread.setContextClassLoader(previousClassLoader);
             }
+            ChunkJobScheduler.get().markCurrentWorkerIdle();
             if (began && !handedOff) {
                 ChunkJobScheduler.get().onComplete(this);
             }

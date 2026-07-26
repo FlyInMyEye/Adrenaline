@@ -42,6 +42,7 @@ public class MixinChunkMap {
     )
     private void captureStatus(ChunkHolder holder, ChunkStatus status, CallbackInfoReturnable<CompletableFuture<?>> cir) {
         PENDING_STATUS.computeIfAbsent(holder, ignored -> new ConcurrentLinkedDeque<>()).addLast(status);
+        ChunkJobScheduler.get().dependencyScheduled();
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.beginScheduling(holder.getPos(), status);
         }
@@ -82,6 +83,9 @@ public class MixinChunkMap {
             Deque<ChunkStatus> pending = PENDING_STATUS.get(holder);
             if (pending != null) {
                 nextStatus = pending.pollFirst();
+                if (nextStatus != null) {
+                    ChunkJobScheduler.get().dependencyReady();
+                }
                 if (pending.isEmpty()) {
                     PENDING_STATUS.remove(holder, pending);
                 }

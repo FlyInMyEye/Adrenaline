@@ -50,12 +50,14 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Inject(method = "render", at = @At("TAIL"))
     private void adrenaline$renderCancelButton(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
-        if (this.adrenaline$cancelButton == null) {
-            return;
+        if (this.adrenaline$cancelButton != null) {
+            IntegratedServer server = Minecraft.getInstance().getSingleplayerServer();
+            this.adrenaline$cancelButton.active = server != null && !server.isShutdown() && !WorldLoadCancellation.isRequested();
         }
-        IntegratedServer server = Minecraft.getInstance().getSingleplayerServer();
-        this.adrenaline$cancelButton.active = server != null && !server.isShutdown() && !WorldLoadCancellation.isRequested();
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        if (AdrenalineConfig.showThreadVisualizer()) {
+            this.adrenaline$renderThreadVisualizer(guiGraphics);
+        }
     }
 
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;renderChunks(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/server/level/progress/StoringChunkProgressListener;IIII)V"))
@@ -88,6 +90,28 @@ public abstract class MixinLevelLoadingScreen extends Screen {
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;getFormattedProgress()Ljava/lang/String;"))
     private String adrenaline$replaceInstantProgressText(LevelLoadingScreen screen) {
         return AdrenalineConfig.resolvedSpawnZoneRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? Component.translatable("gui.adrenaline.loading.searching_spawnpoint").getString() : this.getFormattedProgress();
+    }
+
+    @Unique
+    private void adrenaline$renderThreadVisualizer(GuiGraphics guiGraphics) {
+        int[] states = ChunkJobScheduler.get().workerSnapshot();
+        int rows = (states.length + 1) / 2;
+        int step = Math.max(3, Math.min(10, (this.height - 16) / Math.max(1, rows)));
+        int size = Math.max(2, step - 2);
+        int startX = this.width - step * 2 - 4;
+        int startY = (this.height - rows * step) / 2;
+        for (int i = 0; i < states.length; i++) {
+            int color = switch (states[i]) {
+                case ChunkJobScheduler.WORKER_ACTIVE -> 0xFF55FF55;
+                case ChunkJobScheduler.WORKER_WAITING -> 0xFFFFFF55;
+                case ChunkJobScheduler.WORKER_IDLE -> 0xFFFF5555;
+                default -> 0xFF555555;
+            };
+            int x = startX + (i & 1) * step;
+            int y = startY + (i >> 1) * step;
+            guiGraphics.fill(x - 1, y - 1, x + size + 1, y + size + 1, 0xFF000000);
+            guiGraphics.fill(x, y, x + size, y + size, color);
+        }
     }
 
     @Unique

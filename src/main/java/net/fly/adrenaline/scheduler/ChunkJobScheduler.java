@@ -13,15 +13,24 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 
 import net.minecraft.world.level.ChunkPos;
 
 public final class ChunkJobScheduler {
 
+    public static final int WORKER_IDLE = 0;
+    public static final int WORKER_ACTIVE = 1;
+    public static final int WORKER_WAITING = 2;
+
     private static final ChunkJobScheduler INSTANCE = new ChunkJobScheduler();
 
-    private volatile ForkJoinPool pool = new ForkJoinPool(AdrenalineConfig.resolvedGenerationWorkerThreads());
+    private volatile AtomicIntegerArray workerStates;
+    private volatile ForkJoinPool pool = this.createPool(AdrenalineConfig.resolvedGenerationWorkerThreads());
     private volatile int maxActive = pool.getParallelism();
+    private final AtomicInteger pendingDependencies = new AtomicInteger();
     private long epoch;
     private boolean cancelling;
 
@@ -50,6 +59,39 @@ public final class ChunkJobScheduler {
     public Executor executor() {
         this.refreshPoolIfNeeded();
         return this.pool;
+    }
+
+    public void dependencyScheduled() {
+        this.pendingDependencies.incrementAndGet();
+    }
+
+    public void dependencyReady() {
+        this.pendingDependencies.updateAndGet(value -> Math.max(0, value - 1));
+    }
+
+    public synchronized int[] workerSnapshot() {
+        this.refreshPoolIfNeeded();
+        int processors = Runtime.getRuntime().availableProcessors();
+        int[] snapshot = new int[processors];
+        AtomicIntegerArray states = this.workerStates;
+        boolean waitingWork = this.pendingDependencies.get() > 0 || this.yieldedCount > 0 || !this.conflictPending.isEmpty() || !this.capacityQueue.isEmpty();
+        int configuredWorkers = Math.min(this.maxActive, processors);
+        for (int i = 0; i < configuredWorkers; i++) {
+            int state = i < states.length() ? states.get(i) : WORKER_IDLE;
+            snapshot[i] = state == WORKER_IDLE && waitingWork ? WORKER_WAITING : state;
+        }
+        for (int i = configuredWorkers; i < processors; i++) {
+            snapshot[i] = -1;
+        }
+        return snapshot;
+    }
+
+    public void markCurrentWorkerActive() {
+        this.markCurrentWorker(WORKER_ACTIVE);
+    }
+
+    void markCurrentWorkerIdle() {
+        this.markCurrentWorker(WORKER_IDLE);
     }
 
     public synchronized void awaitNotActive(ChunkPos pos) throws InterruptedException {
@@ -178,6 +220,7 @@ public final class ChunkJobScheduler {
             this.conflictPending.clear();
             this.waitIndex.clear();
             this.capacityQueue.clear();
+            this.pendingDependencies.set(0);
             notifyAll();
         }
 
@@ -258,10 +301,45 @@ public final class ChunkJobScheduler {
                 return;
             }
 
-            ForkJoinPool replacement = new ForkJoinPool(threads);
+            ForkJoinPool replacement = this.createPool(threads);
             this.pool = replacement;
             this.maxActive = replacement.getParallelism();
             current.shutdown();
+        }
+    }
+
+    private ForkJoinPool createPool(int threads) {
+        AtomicIntegerArray states = new AtomicIntegerArray(threads);
+        AtomicInteger nextWorker = new AtomicInteger();
+        this.workerStates = states;
+        return new ForkJoinPool(threads, pool -> {
+            int index = nextWorker.getAndIncrement();
+            return new GenerationWorkerThread(pool, states, index);
+        }, null, false);
+    }
+
+    private void markCurrentWorker(int state) {
+        Thread thread = Thread.currentThread();
+        if (thread instanceof GenerationWorkerThread worker) {
+            worker.setState(state);
+        }
+    }
+
+    private static final class GenerationWorkerThread extends ForkJoinWorkerThread {
+
+        private final AtomicIntegerArray states;
+        private final int index;
+
+        private GenerationWorkerThread(ForkJoinPool pool, AtomicIntegerArray states, int index) {
+            super(pool);
+            this.states = states;
+            this.index = index;
+        }
+
+        private void setState(int state) {
+            if (this.index < this.states.length()) {
+                this.states.set(this.index, state);
+            }
         }
     }
 
