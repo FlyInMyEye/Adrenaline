@@ -114,6 +114,23 @@ public final class WorldgenStatsOverlay {
             case "BLOCK STATE" -> "gui.adrenaline.worldgen_stats.block_state";
             case "BLOCK WRITE" -> "gui.adrenaline.worldgen_stats.block_write";
             case "FINALIZE" -> "gui.adrenaline.worldgen_stats.finalize";
+            case "DEPENDENCY" -> "gui.adrenaline.worldgen_stats.dependency";
+            case "CAPACITY" -> "gui.adrenaline.worldgen_stats.capacity";
+            case "FOOTPRINT CONFLICT" -> "gui.adrenaline.worldgen_stats.footprint_conflict";
+            case "EXECUTOR QUEUE" -> "gui.adrenaline.worldgen_stats.executor_queue";
+            case "UNCLASSIFIED" -> "gui.adrenaline.worldgen_stats.unclassified";
+            case "EMPTY" -> "gui.adrenaline.chunk_status.empty";
+            case "STRUCTURE_STARTS" -> "gui.adrenaline.chunk_status.structure_starts";
+            case "STRUCTURE_REFERENCES" -> "gui.adrenaline.chunk_status.structure_references";
+            case "BIOMES" -> "gui.adrenaline.chunk_status.biomes";
+            case "NOISE" -> "gui.adrenaline.chunk_status.noise";
+            case "SURFACE" -> "gui.adrenaline.chunk_status.surface";
+            case "CARVERS" -> "gui.adrenaline.chunk_status.carvers";
+            case "FEATURES" -> "gui.adrenaline.chunk_status.features";
+            case "INITIALIZE_LIGHT" -> "gui.adrenaline.chunk_status.initialize_light";
+            case "LIGHT" -> "gui.adrenaline.chunk_status.light";
+            case "SPAWN" -> "gui.adrenaline.chunk_status.spawn";
+            case "FULL" -> "gui.adrenaline.chunk_status.full";
             default -> null;
         };
         if (key == null) {
