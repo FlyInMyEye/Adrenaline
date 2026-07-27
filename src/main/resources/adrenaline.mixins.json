@@ -8,6 +8,7 @@
   "mixins": [
     "MixinChunkMap",
     "MixinChunkStatus",
+    "MixinStructureCheck",
     "MixinChunkSerializer",
     "MixinChunkAccessAccessor",
     "MixinLevelChunkSectionAccessor",

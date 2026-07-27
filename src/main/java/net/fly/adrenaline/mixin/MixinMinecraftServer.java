@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.minecraft.core.BlockPos;
@@ -24,6 +25,12 @@ public class MixinMinecraftServer {
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$resetDeferredSpawnSearch(CallbackInfo ci) {
         DeferredSpawnSearch.reset();
+    }
+
+    @Inject(method = "stopServer", at = @At("HEAD"))
+    private void adrenaline$cancelWorldgenJobsOnStop(CallbackInfo ci) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        ChunkJobScheduler.get().cancel(server);
     }
 
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
