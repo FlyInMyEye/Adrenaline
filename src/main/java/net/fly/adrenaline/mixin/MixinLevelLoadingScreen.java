@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.WorldLoadCancellation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,6 +15,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.progress.StoringChunkProgressListener;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -32,8 +34,15 @@ public abstract class MixinLevelLoadingScreen extends Screen {
         return null;
     }
 
+    @Shadow
+    @Final
+    private StoringChunkProgressListener progressListener;
+
     @Unique
     private Button adrenaline$cancelButton;
+
+    @Unique
+    private Button adrenaline$earlyEntryButton;
 
     protected MixinLevelLoadingScreen(Component title) {
         super(title);
@@ -41,10 +50,34 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Override
     protected void init() {
+        AdrenalineConfig.StartBeforehandMode startMode = AdrenalineConfig.startBeforehandMode();
+        if (startMode != AdrenalineConfig.StartBeforehandMode.OFF) {
+            Component message = Component.translatable(startMode == AdrenalineConfig.StartBeforehandMode.BORING ? "gui.adrenaline.enter_early_boring" : "gui.adrenaline.enter_early");
+            this.adrenaline$earlyEntryButton = this.addRenderableWidget(Button.builder(message, this::adrenaline$requestEarlyEntry).bounds((this.width - 160) / 2, this.height - 52, 160, 20).build());
+        } else {
+            this.adrenaline$earlyEntryButton = null;
+        }
         if (AdrenalineConfig.showCancelButton()) {
             this.adrenaline$cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.cancel"), this::adrenaline$cancelWorldCreation).bounds((this.width - 100) / 2, this.height - 28, 100, 20).build());
         } else {
             this.adrenaline$cancelButton = null;
+        }
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (EarlyWorldEntry.isFullChunkReady()) {
+            return;
+        }
+        int diameter = this.progressListener.getDiameter();
+        for (int x = 0; x < diameter; x++) {
+            for (int z = 0; z < diameter; z++) {
+                if (this.progressListener.getStatus(x, z) == ChunkStatus.FULL) {
+                    EarlyWorldEntry.markFullChunkReady();
+                    return;
+                }
+            }
         }
     }
 
@@ -53,6 +86,10 @@ public abstract class MixinLevelLoadingScreen extends Screen {
         if (this.adrenaline$cancelButton != null) {
             IntegratedServer server = Minecraft.getInstance().getSingleplayerServer();
             this.adrenaline$cancelButton.active = server != null && !server.isShutdown() && !WorldLoadCancellation.isRequested();
+        }
+        if (this.adrenaline$earlyEntryButton != null) {
+            IntegratedServer server = Minecraft.getInstance().getSingleplayerServer();
+            this.adrenaline$earlyEntryButton.active = !EarlyWorldEntry.isRequested() && server != null && !server.isShutdown() && !WorldLoadCancellation.isRequested();
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         if (AdrenalineConfig.showThreadVisualizer()) {
@@ -127,6 +164,12 @@ public abstract class MixinLevelLoadingScreen extends Screen {
         button.active = false;
         button.setMessage(Component.translatable("gui.adrenaline.loading.cancelling_world_creation"));
         server.halt(false);
+    }
+
+    @Unique
+    private void adrenaline$requestEarlyEntry(Button button) {
+        EarlyWorldEntry.request();
+        button.active = false;
     }
 
 }

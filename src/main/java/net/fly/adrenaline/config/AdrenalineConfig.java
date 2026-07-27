@@ -164,6 +164,10 @@ public class AdrenalineConfig {
         return get().showThreadVisualizer;
     }
 
+    public static StartBeforehandMode startBeforehandMode() {
+        return get().startBeforehand;
+    }
+
     public static boolean debugLoggingEnabled() {
         return BuildConfig.DEBUG && get().debugLogging;
     }
@@ -199,6 +203,7 @@ public class AdrenalineConfig {
         public boolean fastLegacyRandom = true;
         public boolean showCancelButton = true;
         public boolean showThreadVisualizer;
+        public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
         public boolean debugLogging = false;
 
         public Data() {
@@ -235,7 +240,14 @@ public class AdrenalineConfig {
             this.fastLegacyRandom = other.fastLegacyRandom;
             this.showCancelButton = other.showCancelButton;
             this.showThreadVisualizer = other.showThreadVisualizer;
+            this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
         }
+    }
+
+    public enum StartBeforehandMode {
+        ON,
+        OFF,
+        BORING
     }
 }

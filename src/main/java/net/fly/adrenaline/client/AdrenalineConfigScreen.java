@@ -50,6 +50,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button fastLegacyRandomButton;
     private Button showCancelButton;
     private Button showThreadVisualizerButton;
+    private Button startBeforehandButton;
     private Button debugLoggingButton;
     private Button doneButton;
     private int scrollOffset;
@@ -146,6 +147,8 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
         this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
         y += 24;
+        this.startBeforehandButton = this.addStartBeforehandRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.start_beforehand", PerformanceImpact.NONE));
+        y += 24;
 
         if (BuildConfig.DEBUG) {
             y = this.addSectionHeader("gui.adrenaline.config.section.diagnostics", y);
@@ -228,6 +231,20 @@ public class AdrenalineConfigScreen extends Screen {
         return this.addScrollableWidget(this.createToggleButton(buttonX, y, buttonWidth, initialValue, consumer), y, tooltip);
     }
 
+    private Button addStartBeforehandRow(int labelX, int buttonX, int y, int buttonWidth, TooltipData tooltip) {
+        this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.start_beforehand"), labelX, y, false, tooltip));
+        Button button = Button.builder(this.startBeforehandLabel(), pressed -> {
+            this.config.startBeforehand = switch (this.config.startBeforehand) {
+                case ON -> AdrenalineConfig.StartBeforehandMode.OFF;
+                case OFF -> AdrenalineConfig.StartBeforehandMode.BORING;
+                case BORING -> AdrenalineConfig.StartBeforehandMode.ON;
+            };
+            pressed.setMessage(this.startBeforehandLabel());
+            this.saveConfig();
+        }).bounds(buttonX, y, buttonWidth, 20).build();
+        return this.addScrollableWidget(button, y, tooltip);
+    }
+
     private int addSectionHeader(String title, int y) {
         this.scrollableLabels.add(new ScrollableLabel(Component.translatable(title), 0, y, true, null));
         return y + 16;
@@ -236,6 +253,20 @@ public class AdrenalineConfigScreen extends Screen {
     private Component toggleLabel(boolean value) {
         int color = value ? 0x55FF55 : 0xFF5555;
         return Component.translatable(value ? "gui.adrenaline.toggle.on" : "gui.adrenaline.toggle.off").withStyle(style -> style.withColor(color));
+    }
+
+    private Component startBeforehandLabel() {
+        String key = switch (this.config.startBeforehand) {
+            case ON -> "gui.adrenaline.toggle.on";
+            case OFF -> "gui.adrenaline.toggle.off";
+            case BORING -> "gui.adrenaline.toggle.boring";
+        };
+        int color = switch (this.config.startBeforehand) {
+            case ON -> 0x55FF55;
+            case OFF -> 0xFF5555;
+            case BORING -> 0xFFFF55;
+        };
+        return Component.translatable(key).withStyle(style -> style.withColor(color));
     }
 
     private void saveConfig() {
@@ -377,6 +408,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.fastLegacyRandomButton.active = true;
         this.showCancelButton.active = true;
         this.showThreadVisualizerButton.active = true;
+        this.startBeforehandButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
             this.debugLoggingButton.active = true;
         }

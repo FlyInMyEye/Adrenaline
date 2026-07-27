@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.WorldLoadCancellation;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.minecraft.client.Minecraft;
@@ -15,6 +16,7 @@ public class MixinMinecraft {
     @Inject(method = "doWorldLoad", at = @At("HEAD"))
     private void adrenaline$resetWorldLoadCancellation(CallbackInfo ci) {
         ChunkJobScheduler.get().resume();
+        EarlyWorldEntry.reset();
         WorldLoadCancellation.reset();
     }
 

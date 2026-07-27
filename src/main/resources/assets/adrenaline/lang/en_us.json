@@ -21,9 +21,11 @@
   "gui.adrenaline.config.fast_legacy_random": "Fast Legacy Random",
   "gui.adrenaline.config.show_cancel_button": "Show Cancel Button",
   "gui.adrenaline.config.show_thread_visualizer": "Show Thread Visualizer",
+  "gui.adrenaline.config.start_beforehand": "Start Beforehand",
   "gui.adrenaline.config.debug_logging": "Debug Logging",
   "gui.adrenaline.toggle.on": "On",
   "gui.adrenaline.toggle.off": "Off",
+  "gui.adrenaline.toggle.boring": "Boring",
   "gui.adrenaline.value.auto": "Auto",
   "gui.adrenaline.parallelize": "Parallelize ",
   "gui.adrenaline.parallelize": "Parallelize ",
@@ -59,6 +61,8 @@
   "gui.adrenaline.compat.fastload.line3": "Remove Fastload and restart Minecraft.",
   "gui.adrenaline.dev_build_warning": "You are running a dev build; consider downloading the production version.",
   "gui.adrenaline.cancel": "Cancel",
+  "gui.adrenaline.enter_early": "Shut up and let me in",
+  "gui.adrenaline.enter_early_boring": "Enter now",
   "gui.adrenaline.loading.searching_spawnpoint": "Searching for spawnpoint",
   "gui.adrenaline.loading.cancelling_world_creation": "Cancelling world creation...",
   "gui.adrenaline.worldgen_stats.scheduling": "Scheduling",
@@ -97,5 +101,6 @@
   "tooltip.adrenaline.config.fast_legacy_random": "Replaces legacy random with a faster implementation.",
   "tooltip.adrenaline.config.show_cancel_button": "Shows the cancel button during initial world generation.",
   "tooltip.adrenaline.config.show_thread_visualizer": "Shows generation worker activity during initial world generation.",
+  "tooltip.adrenaline.config.start_beforehand": "Shows a button that enters the world after the first full chunk is ready.",
   "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console."
 }
