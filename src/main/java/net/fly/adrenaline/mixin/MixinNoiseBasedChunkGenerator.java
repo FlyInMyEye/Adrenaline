@@ -32,10 +32,11 @@ import net.minecraft.world.level.levelgen.Aquifer;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(NoiseBasedChunkGenerator.class)
 public class MixinNoiseBasedChunkGenerator {
@@ -96,14 +97,10 @@ public class MixinNoiseBasedChunkGenerator {
         return future.whenCompleteAsync(action, executor);
     }
 
-    /**
-     * @author Fly
-     * @reason Fast worldgen terrain writes
-     */
-    @Overwrite
-    public ChunkAccess doFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY) {
+    @Inject(method = "doFill", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$fastFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY, CallbackInfoReturnable<ChunkAccess> cir) {
         if (!AdrenalineConfig.terrainFillOptimizationsEnabled()) {
-            return this.doFillFallback(blender, structureManager, randomState, chunk, minCellY, cellCountY);
+            return;
         }
 
         NoiseProfile profile = BuildConfig.DEBUG ? WorldgenStageStats.beginNoiseProfile() : null;
@@ -298,75 +295,6 @@ public class MixinNoiseBasedChunkGenerator {
             profile.add(NoiseSubstage.FINALIZE, System.nanoTime() - phaseStart);
             WorldgenStageStats.finishNoiseProfile(profile);
         }
-        return chunk;
-    }
-
-    private ChunkAccess doFillFallback(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY) {
-        NoiseChunk noiseChunk = chunk.getOrCreateNoiseChunk(access -> this.createNoiseChunk(access, structureManager, blender, randomState));
-        Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
-        Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
-        ChunkPos chunkPos = chunk.getPos();
-        int minBlockX = chunkPos.getMinBlockX();
-        int minBlockZ = chunkPos.getMinBlockZ();
-        Aquifer aquifer = noiseChunk.aquifer();
-        int cellWidth = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$cellWidth();
-        int cellHeight = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$cellHeight();
-        int cellCountX = 16 / cellWidth;
-        int cellCountZ = 16 / cellWidth;
-        MutableBlockPos mutableBlockPos = new MutableBlockPos();
-
-        noiseChunk.initializeForFirstCellX();
-
-        for (int cellX = 0; cellX < cellCountX; cellX++) {
-            noiseChunk.advanceCellX(cellX);
-            for (int cellZ = 0; cellZ < cellCountZ; cellZ++) {
-                int sectionIndex = chunk.getSectionsCount() - 1;
-                LevelChunkSection section = chunk.getSection(sectionIndex);
-                for (int cellY = cellCountY - 1; cellY >= 0; cellY--) {
-                    noiseChunk.selectCellYZ(cellY, cellZ);
-                    for (int yInCell = cellHeight - 1; yInCell >= 0; yInCell--) {
-                        int y = (minCellY + cellY) * cellHeight + yInCell;
-                        int localY = y & 15;
-                        int targetSectionIndex = chunk.getSectionIndex(y);
-
-                        if (sectionIndex != targetSectionIndex) {
-                            sectionIndex = targetSectionIndex;
-                            section = chunk.getSection(sectionIndex);
-                        }
-
-                        noiseChunk.updateForY(y, (double) yInCell / (double) cellHeight);
-                        for (int xInCell = 0; xInCell < cellWidth; xInCell++) {
-                            int x = minBlockX + cellX * cellWidth + xInCell;
-                            int localX = x & 15;
-                            noiseChunk.updateForX(x, (double) xInCell / (double) cellWidth);
-                            for (int zInCell = 0; zInCell < cellWidth; zInCell++) {
-                                int z = minBlockZ + cellZ * cellWidth + zInCell;
-                                int localZ = z & 15;
-                                noiseChunk.updateForZ(z, (double) zInCell / (double) cellWidth);
-                                BlockState state = ((MixinNoiseChunkAccessor) noiseChunk).adrenaline$getInterpolatedState();
-                                if (state == null) {
-                                    state = this.settings.value().defaultBlock();
-                                }
-                                state = this.debugPreliminarySurfaceLevel(noiseChunk, x, y, z, state);
-                                if (state == AIR || SharedConstants.debugVoidTerrain(chunkPos)) {
-                                    continue;
-                                }
-                                section.setBlockState(localX, localY, localZ, state, false);
-                                oceanFloor.update(localX, y, localZ, state);
-                                worldSurface.update(localX, y, localZ, state);
-                                if (aquifer.shouldScheduleFluidUpdate() && !state.getFluidState().isEmpty()) {
-                                    mutableBlockPos.set(x, y, z);
-                                    chunk.markPosForPostprocessing(mutableBlockPos);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            noiseChunk.swapSlices();
-        }
-
-        noiseChunk.stopInterpolation();
-        return chunk;
+        cir.setReturnValue(chunk);
     }
 }
