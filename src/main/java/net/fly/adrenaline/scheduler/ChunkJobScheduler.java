@@ -212,12 +212,15 @@ public final class ChunkJobScheduler {
         Iterator<ChunkJob> iterator = this.capacityQueue.iterator();
         ChunkJob selected = iterator.next();
         int highestStage = selected.stageIndex();
+        int closestLevel = selected.queueLevel();
         while (iterator.hasNext()) {
             ChunkJob candidate = iterator.next();
             int stage = candidate.stageIndex();
-            if (stage > highestStage) {
+            int queueLevel = candidate.queueLevel();
+            if (stage > highestStage || stage == highestStage && queueLevel < closestLevel) {
                 selected = candidate;
                 highestStage = stage;
+                closestLevel = queueLevel;
             }
         }
         this.capacityQueue.remove(selected);

@@ -14,6 +14,8 @@ import java.util.function.Supplier;
 
 public final class ChunkJob implements Runnable {
 
+    private static final ThreadLocal<Integer> CURRENT_QUEUE_LEVEL = ThreadLocal.withInitial(() -> Integer.MAX_VALUE);
+
     private final Set<Long> footprint;
     private final Supplier<CompletableFuture<?>> work;
     private final Runnable cancelWork;
@@ -28,6 +30,7 @@ public final class ChunkJob implements Runnable {
     private long waitingStartedNanos;
     private boolean capacityHeld;
     private boolean yielded;
+    private int queueLevel = CURRENT_QUEUE_LEVEL.get();
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, ClassLoader contextClassLoader) {
         this(buildFootprint(center, writeRadius), asAsync(work), () -> {
@@ -80,6 +83,14 @@ public final class ChunkJob implements Runnable {
 
     int stageIndex() {
         return this.waitingStatus == null ? Integer.MIN_VALUE : this.waitingStatus.getIndex();
+    }
+
+    int queueLevel() {
+        return this.queueLevel;
+    }
+
+    public void prioritize(int queueLevel) {
+        this.queueLevel = queueLevel;
     }
 
     synchronized void transitionWaiting(WaitingReason reason) {
@@ -157,12 +168,14 @@ public final class ChunkJob implements Runnable {
         ClassLoader previousClassLoader = currentThread.getContextClassLoader();
         boolean began = false;
         boolean handedOff = false;
+        int previousQueueLevel = CURRENT_QUEUE_LEVEL.get();
         try {
             if (!ChunkJobScheduler.get().begin(this)) {
                 this.cancel();
                 return;
             }
             began = true;
+            CURRENT_QUEUE_LEVEL.set(this.queueLevel);
             ChunkJobScheduler.get().markCurrentWorkerActive();
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
@@ -180,6 +193,7 @@ public final class ChunkJob implements Runnable {
                 currentThread.setContextClassLoader(previousClassLoader);
             }
             ChunkJobScheduler.get().markCurrentWorkerIdle();
+            CURRENT_QUEUE_LEVEL.set(previousQueueLevel);
             if (began && !handedOff) {
                 ChunkJobScheduler.get().onComplete(this);
             }

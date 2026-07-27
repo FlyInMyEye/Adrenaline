@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.util.Unit;
 import net.minecraft.util.thread.ProcessorHandle;
@@ -20,4 +21,7 @@ public interface MixinMessageAccessor {
 
     @Accessor("pos")
     long getPos();
+
+    @Accessor("level")
+    IntSupplier getLevel();
 }

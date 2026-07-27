@@ -7,6 +7,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -130,6 +131,7 @@ public class MixinChunkMap {
         }
 
         ChunkStatus scheduledStatus = nextStatus;
+        IntSupplier queueLevel = accessor.getLevel();
         @SuppressWarnings("unchecked")
         Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
         Function<ProcessorHandle<Unit>, Runnable> wrappedTask = completionHandle -> () -> {
@@ -168,6 +170,7 @@ public class MixinChunkMap {
                 }, contextClassLoader);
             }
             job.trackWaiting(pos, scheduledStatus);
+            job.prioritize(queueLevel.getAsInt());
             ChunkJobScheduler.get().submit(job);
             completionHandle.tell(Unit.INSTANCE);
         };
