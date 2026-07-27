@@ -16,7 +16,6 @@ import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MinecraftServer.class)
@@ -59,18 +58,8 @@ public class MixinMinecraftServer {
 
     @ModifyConstant(method = "prepareLevels", constant = @Constant(intValue = 441))
     private int adrenaline$useConfiguredSpawnZoneChunkCount(int chunkCount) {
-        int radius = AdrenalineConfig.internalSpawnPreparationRadius();
-        if (radius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
-            return 0;
-        }
-        int diameter = radius * 2 - 1;
-        return diameter * diameter;
-    }
-
-    @Redirect(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getTickingGenerated()I"))
-    private int adrenaline$finishSpawnPreparationForEarlyEntry(ServerChunkCache chunkSource) {
-        if (!EarlyWorldEntry.canEnter() || DeferredSpawnSearch.isPending()) {
-            return chunkSource.getTickingGenerated();
+        if (EarlyWorldEntry.canEnter() && !DeferredSpawnSearch.isPending()) {
+            return ((MinecraftServer) (Object) this).overworld().getChunkSource().getTickingGenerated();
         }
         int radius = AdrenalineConfig.internalSpawnPreparationRadius();
         if (radius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
