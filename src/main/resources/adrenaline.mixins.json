@@ -12,9 +12,7 @@
     "MixinChunkSerializer",
     "MixinChunkAccessAccessor",
     "MixinLevelChunkSectionAccessor",
-    "MixinLevelLoadingScreen",
     "MixinMinecraftServer",
-    "MixinMinecraft",
     "MixinMessageAccessor",
     "MixinMaterialRuleList",
     "MixinWorldGenRegion",
@@ -35,6 +33,8 @@
     "MixinNoiseChunkOreVeinifier"
   ],
   "client": [
+    "MixinLevelLoadingScreen",
+    "MixinMinecraft",
     "MixinOptionsScreen"
   ],
   "server": [],
