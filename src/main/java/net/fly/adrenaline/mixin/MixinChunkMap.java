@@ -25,6 +25,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -34,15 +35,24 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChunkMap.class)
 public class MixinChunkMap {
 
-    private static final ThreadLocal<ChunkHolder> CURRENT_HOLDER = new ThreadLocal<>();
-    private static final Map<ChunkHolder, Deque<ChunkStatus>> PENDING_STATUS = new ConcurrentHashMap<>();
+    @Unique
+    private ThreadLocal<ChunkHolder> adrenaline$currentHolder;
+
+    @Unique
+    private Map<ChunkHolder, Deque<ChunkStatus>> adrenaline$pendingStatus;
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
+        this.adrenaline$currentHolder = new ThreadLocal<>();
+        this.adrenaline$pendingStatus = new ConcurrentHashMap<>();
+    }
 
     @Inject(
         method = "scheduleChunkGeneration",
         at = @At("HEAD")
     )
     private void captureStatus(ChunkHolder holder, ChunkStatus status, CallbackInfoReturnable<CompletableFuture<?>> cir) {
-        PENDING_STATUS.computeIfAbsent(holder, ignored -> new ConcurrentLinkedDeque<>()).addLast(status);
+        this.adrenaline$pendingStatus.computeIfAbsent(holder, ignored -> new ConcurrentLinkedDeque<>()).addLast(status);
         ChunkJobScheduler.get().dependencyScheduled();
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.beginScheduling(holder.getPos(), status);
@@ -65,7 +75,7 @@ public class MixinChunkMap {
         at = @At("HEAD")
     )
     private void captureHolder(ChunkHolder holder, Runnable task, CallbackInfo ci) {
-        CURRENT_HOLDER.set(holder);
+        this.adrenaline$currentHolder.set(holder);
     }
 
     @Redirect(
@@ -78,17 +88,17 @@ public class MixinChunkMap {
         )
     )
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
-        ChunkHolder holder = CURRENT_HOLDER.get();
+        ChunkHolder holder = this.adrenaline$currentHolder.get();
         ChunkStatus nextStatus = null;
         if (holder != null) {
-            Deque<ChunkStatus> pending = PENDING_STATUS.get(holder);
+            Deque<ChunkStatus> pending = this.adrenaline$pendingStatus.get(holder);
             if (pending != null) {
                 nextStatus = pending.pollFirst();
                 if (nextStatus != null) {
                     ChunkJobScheduler.get().dependencyReady();
                 }
                 if (pending.isEmpty()) {
-                    PENDING_STATUS.remove(holder, pending);
+                    this.adrenaline$pendingStatus.remove(holder, pending);
                 }
             }
         }
@@ -187,7 +197,7 @@ public class MixinChunkMap {
         at = @At("RETURN")
     )
     private void clearHolder(ChunkHolder holder, Runnable task, CallbackInfo ci) {
-        CURRENT_HOLDER.remove();
+        this.adrenaline$currentHolder.remove();
     }
 
 }

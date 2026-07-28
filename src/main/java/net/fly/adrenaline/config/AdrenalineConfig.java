@@ -13,15 +13,18 @@ public class AdrenalineConfig {
     public static final int MIN_FEATURE_SAFETY_RADIUS = 1;
     public static final int MAX_FEATURE_SAFETY_RADIUS = 8;
 
-    private static JsonConfigManager<Data> MANAGER;
+    private static final Data DEFAULTS = new Data();
+    private static volatile JsonConfigManager<Data> MANAGER;
 
     public static void init() {
-        MANAGER = new JsonConfigManager<>("adrenaline.json", Data.class, Data::new, null);
-        MANAGER.init();
+        JsonConfigManager<Data> manager = new JsonConfigManager<>("adrenaline.json", Data.class, Data::new, null);
+        manager.init();
+        MANAGER = manager;
     }
 
     public static Data get() {
-        return MANAGER.get();
+        JsonConfigManager<Data> manager = MANAGER;
+        return manager == null ? DEFAULTS : manager.get();
     }
 
     public static Data copy() {
