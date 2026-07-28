@@ -54,40 +54,11 @@ Project pages:
 
 ---
 
-## Configuration
+## Why not C2ME?
 
-Adrenaline creates `config/adrenaline.json` on first launch.
+Adrenaline takes a more aggressive approach to speeding up world generation. Instead of keeping Minecraft’s slower systems mostly unchanged, it replaces some of them with faster ones.
 
-Settings:
-
-- `worldgenOptimizations` - master switch for worldgen changes
-- `terrainFillOptimizations` - speeds up terrain fill during noise generation
-- `surfaceOptimizations` - speeds up surface rule evaluation and block placement
-- `noiseChunkOptimizations` - optimizes hot paths in noise chunk sampling
-- `materialRuleOptimizations` - reduces material rule dispatch overhead
-- `aquiferOptimizations` - reduces aquifer lookup and fluid decision cost
-- `beardifierOptimizations` - speeds up structure terrain blending
-- `oreVeinOptimizations` - speeds up ore vein sampling
-- `initialSpawnOptimization` - skips vanilla's slow spawn refinement pass
-- `generationWorkerThreads` - number of chunk generation workers
-- `serializationWorkerThreads` - number of chunk save workers
-- `spawnZoneRadius` - spawn generation radius in chunks
-- `parallelWorldgen` - enables parallel world generation
-- `featureCompatibility` - compatibility mode for widened feature writes
-- `featureSafetyRadius` - reserved radius for feature generation
-- `parallelizeStructureStarts` - parallelize the STRUCTURE_STARTS stage
-- `parallelizeStructureReferences` - parallelize the STRUCTURE_REFERENCES stage
-- `parallelizeBiomes` - parallelize the BIOMES stage
-- `parallelizeNoise` - parallelize the NOISE stage
-- `parallelizeSurface` - parallelize the SURFACE stage
-- `parallelizeCarvers` - parallelize the CARVERS stage
-- `parallelizeFeatures` - parallelize the FEATURES stage
-- `parallelizeInitializeLight` - parallelize the INITIALIZE_LIGHT stage
-- `parallelizeLight` - parallelize the LIGHT stage
-- `parallelizeSpawn` - parallelize the SPAWN stage
-- `parallelizeFull` - parallelize the FULL stage
-- `fastLegacyRandom` - use the faster legacy random implementation
-- `debugLogging` - emit extra diagnostics to the console
+C2ME keeps more of Minecraft’s original world generation system, that can be less disruptive, but it may also reveal problems in Minecraft or other mods that were never designed to run that way, which is often why crashes happen.
 
 ---
 
