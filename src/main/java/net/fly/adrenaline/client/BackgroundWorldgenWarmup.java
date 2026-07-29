@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;
@@ -37,16 +38,27 @@ public final class BackgroundWorldgenWarmup {
 
         Minecraft minecraft = Minecraft.getInstance();
         Screen screen = minecraft.screen;
-        if (running && (!AdrenalineConfig.warmupOnStartup() || server != null && server.isReady() || screen instanceof ConnectScreen)) {
+        if (!AdrenalineConfig.prepareWorldCreationContext() && WorldCreationContextWaiter.get() != null) {
+            WorldCreationContextWaiter.consume();
+        }
+        boolean completed = server != null && server.isReady();
+        if (running && (!AdrenalineConfig.warmupOnStartup() || completed || screen instanceof ConnectScreen)) {
             stop(minecraft);
         }
         if (!started && AdrenalineConfig.warmupOnStartup() && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null) {
+            started = true;
+            if (AdrenalineConfig.prepareWorldCreationContext()) {
+                WorldCreationContextWaiter.preload(minecraft);
+            }
             start(minecraft);
+        }
+        if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.get() == null && !WorldCreationContextWaiter.isPreloading()) {
+            WorldCreationContextWaiter.preload(minecraft);
         }
     }
 
     public static boolean isRunning() {
-        return running;
+        return running || WorldCreationContextWaiter.isPreloading();
     }
 
     public static String branding() {
@@ -99,7 +111,6 @@ public final class BackgroundWorldgenWarmup {
     }
 
     private static void start(Minecraft minecraft) {
-        started = true;
         running = true;
         BackgroundWorldgenWarmupState.begin();
         levelId = LEVEL_PREFIX + UUID.randomUUID().toString().replace("-", "");

@@ -2,6 +2,8 @@ package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
 import net.fly.adrenaline.client.WorldDeletion;
+import net.fly.adrenaline.client.WorldCreationContextWaiter;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.WorldLoadCancellation;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -34,6 +36,9 @@ public class MixinMinecraft {
         CallbackInfo ci
     ) {
         BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
+        if (AdrenalineConfig.prepareWorldCreationContext() && !BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
+            WorldCreationContextWaiter.consume();
+        }
         ChunkJobScheduler.get().resume();
         EarlyWorldEntry.reset();
         WorldLoadCancellation.reset(levelId, newWorld);

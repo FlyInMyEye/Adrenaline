@@ -35,6 +35,8 @@
   ],
   "client": [
     "MixinBrandingControl",
+    "MixinCreateWorldScreen",
+    "MixinCreateWorldScreenInvoker",
     "MixinLevelLoadingScreen",
     "MixinLevelStorageSource",
     "MixinMinecraft",

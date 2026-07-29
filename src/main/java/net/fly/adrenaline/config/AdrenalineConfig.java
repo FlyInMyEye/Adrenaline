@@ -171,6 +171,10 @@ public class AdrenalineConfig {
         return get().warmupOnStartup;
     }
 
+    public static boolean prepareWorldCreationContext() {
+        return get().prepareWorldCreationContext;
+    }
+
     public static StartBeforehandMode startBeforehandMode() {
         return get().startBeforehand;
     }
@@ -211,6 +215,7 @@ public class AdrenalineConfig {
         public boolean showCancelButton = true;
         public boolean showThreadVisualizer;
         public boolean warmupOnStartup = true;
+        public boolean prepareWorldCreationContext = true;
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
         public boolean debugLogging = false;
 
@@ -249,6 +254,7 @@ public class AdrenalineConfig {
             this.showCancelButton = other.showCancelButton;
             this.showThreadVisualizer = other.showThreadVisualizer;
             this.warmupOnStartup = other.warmupOnStartup;
+            this.prepareWorldCreationContext = other.prepareWorldCreationContext;
             this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
         }
