@@ -40,6 +40,7 @@
     "MixinLevelLoadingScreen",
     "MixinLevelStorageSource",
     "MixinMinecraft",
+    "MixinReceivingLevelScreen",
     "MixinOptionsScreen"
   ],
   "server": [],

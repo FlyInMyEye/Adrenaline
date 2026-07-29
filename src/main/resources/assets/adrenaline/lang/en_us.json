@@ -23,6 +23,7 @@
   "gui.adrenaline.config.show_thread_visualizer": "Show Thread Visualizer",
   "gui.adrenaline.config.warmup_on_startup": "Warmup on Startup",
   "gui.adrenaline.config.prepare_world_creation_context": "Prepare Create World",
+  "gui.adrenaline.config.fast_terrain_loading": "Fast Terrain Loading",
   "gui.adrenaline.config.start_beforehand": "Start Beforehand",
   "gui.adrenaline.config.debug_logging": "Debug Logging",
   "gui.adrenaline.toggle.on": "On",
@@ -110,6 +111,7 @@
   "tooltip.adrenaline.config.show_thread_visualizer": "Shows generation worker activity during initial world generation.",
   "tooltip.adrenaline.config.warmup_on_startup": "Warms up world generation in the background from the title screen.",
   "tooltip.adrenaline.config.prepare_world_creation_context": "Prepares and reuses a clean Create World context to avoid repeated datapack loading.",
+  "tooltip.adrenaline.config.fast_terrain_loading": "Enters the world when the center chunk arrives instead of waiting for it to finish render compilation.",
   "tooltip.adrenaline.config.start_beforehand": "Shows a button that enters the world after the first full chunk is ready.",
   "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console."
 }
