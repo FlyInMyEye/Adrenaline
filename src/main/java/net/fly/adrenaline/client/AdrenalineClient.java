@@ -18,6 +18,7 @@ public final class AdrenalineClient {
         );
 
         MinecraftForge.EVENT_BUS.register(new ModernFixCompatController());
+        MinecraftForge.EVENT_BUS.register(new BackgroundWorldgenWarmup());
         if (BuildConfig.DEBUG) {
             MinecraftForge.EVENT_BUS.register(new BuildWarningOverlay());
             MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());

@@ -5,6 +5,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.EarlyWorldEntry;
+import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
@@ -54,6 +55,9 @@ public class MixinMinecraftServer {
 
     @ModifyConstant(method = "loadLevel", constant = @Constant(intValue = 11))
     private int adrenaline$useConfiguredSpawnZoneRadiusForProgress(int radius) {
+        if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
+            return BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS;
+        }
         int configuredRadius = AdrenalineConfig.resolvedSpawnZoneRadius();
         return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
     }
@@ -63,7 +67,12 @@ public class MixinMinecraftServer {
         if (EarlyWorldEntry.canEnter() && !DeferredSpawnSearch.isPending()) {
             return ((MinecraftServer) (Object) this).overworld().getChunkSource().getTickingGenerated();
         }
-        int radius = AdrenalineConfig.internalSpawnPreparationRadius();
+        int radius;
+        if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
+            radius = BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
+        } else {
+            radius = AdrenalineConfig.internalSpawnPreparationRadius();
+        }
         if (radius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return 0;
         }

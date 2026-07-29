@@ -50,6 +50,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button fastLegacyRandomButton;
     private Button showCancelButton;
     private Button showThreadVisualizerButton;
+    private Button warmupOnStartupButton;
     private Button startBeforehandButton;
     private Button debugLoggingButton;
     private Button doneButton;
@@ -146,6 +147,8 @@ public class AdrenalineConfigScreen extends Screen {
         this.showCancelButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_cancel_button"), this.config.showCancelButton, value -> this.config.showCancelButton = value, tooltip("tooltip.adrenaline.config.show_cancel_button", PerformanceImpact.NONE));
         y += 24;
         this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
+        y += 24;
+        this.warmupOnStartupButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.warmup_on_startup"), this.config.warmupOnStartup, value -> this.config.warmupOnStartup = value, tooltip("tooltip.adrenaline.config.warmup_on_startup", PerformanceImpact.MEDIUM));
         y += 24;
         this.startBeforehandButton = this.addStartBeforehandRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.start_beforehand", PerformanceImpact.NONE));
         y += 24;

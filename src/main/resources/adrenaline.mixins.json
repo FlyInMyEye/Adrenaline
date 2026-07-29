@@ -34,7 +34,9 @@
     "MixinNoiseChunkOreVeinifier"
   ],
   "client": [
+    "MixinBrandingControl",
     "MixinLevelLoadingScreen",
+    "MixinLevelStorageSource",
     "MixinMinecraft",
     "MixinOptionsScreen"
   ],

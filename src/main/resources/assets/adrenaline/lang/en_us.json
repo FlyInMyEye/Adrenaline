@@ -21,6 +21,7 @@
   "gui.adrenaline.config.fast_legacy_random": "Fast Legacy Random",
   "gui.adrenaline.config.show_cancel_button": "Show Cancel Button",
   "gui.adrenaline.config.show_thread_visualizer": "Show Thread Visualizer",
+  "gui.adrenaline.config.warmup_on_startup": "Warmup on Startup",
   "gui.adrenaline.config.start_beforehand": "Start Beforehand",
   "gui.adrenaline.config.debug_logging": "Debug Logging",
   "gui.adrenaline.toggle.on": "On",
@@ -106,6 +107,7 @@
   "tooltip.adrenaline.config.fast_legacy_random": "Replaces legacy random with a faster implementation.",
   "tooltip.adrenaline.config.show_cancel_button": "Shows the cancel button during initial world generation.",
   "tooltip.adrenaline.config.show_thread_visualizer": "Shows generation worker activity during initial world generation.",
+  "tooltip.adrenaline.config.warmup_on_startup": "Warms up world generation in the background from the title screen.",
   "tooltip.adrenaline.config.start_beforehand": "Shows a button that enters the world after the first full chunk is ready.",
   "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console."
 }

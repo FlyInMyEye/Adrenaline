@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.TicketType;
@@ -15,6 +16,10 @@ public class MixinMinecraftServerSpawnTicket {
 
     @WrapOperation(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;addRegionTicket(Lnet/minecraft/server/level/TicketType;Lnet/minecraft/world/level/ChunkPos;ILjava/lang/Object;)V"))
     private <T> void adrenaline$useConfiguredSpawnZoneRadiusForTickets(ServerChunkCache chunkSource, TicketType<T> ticketType, ChunkPos chunkPos, int radius, T identifier, Operation<Void> original) {
+        if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
+            original.call(chunkSource, ticketType, chunkPos, BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1, identifier);
+            return;
+        }
         int configuredRadius = AdrenalineConfig.internalSpawnPreparationRadius();
         original.call(chunkSource, ticketType, chunkPos, configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius, identifier);
     }
