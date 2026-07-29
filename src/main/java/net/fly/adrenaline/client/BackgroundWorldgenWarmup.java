@@ -52,7 +52,7 @@ public final class BackgroundWorldgenWarmup {
             }
             start(minecraft);
         }
-        if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.get() == null && !WorldCreationContextWaiter.isPreloading()) {
+        if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
             WorldCreationContextWaiter.preload(minecraft);
         }
     }

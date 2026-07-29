@@ -37,6 +37,7 @@ public class MixinMinecraft {
     ) {
         BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
         if (AdrenalineConfig.prepareWorldCreationContext() && !BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
+            WorldCreationContextWaiter.beginWorldLoad();
             WorldCreationContextWaiter.consume();
         }
         ChunkJobScheduler.get().resume();
@@ -95,6 +96,9 @@ public class MixinMinecraft {
         CallbackInfo ci
     ) {
         BackgroundWorldgenWarmup.exitWorldLoad(levelId);
+        if (!BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
+            WorldCreationContextWaiter.finishWorldLoad();
+        }
     }
 
     private void adrenaline$cancelWorldLoad(CallbackInfo ci) {

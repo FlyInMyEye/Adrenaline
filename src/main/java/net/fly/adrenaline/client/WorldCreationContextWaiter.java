@@ -11,6 +11,7 @@ public final class WorldCreationContextWaiter {
 
     private static CompletableFuture<WorldCreationContext> future;
     private static boolean preloading;
+    private static boolean worldLoadActive;
 
     private WorldCreationContextWaiter() {
     }
@@ -26,6 +27,10 @@ public final class WorldCreationContextWaiter {
 
     public static boolean isPreloading() {
         return preloading;
+    }
+
+    public static boolean canPreload() {
+        return !worldLoadActive && !preloading && get() == null;
     }
 
     public static void preload(Minecraft minecraft) {
@@ -63,5 +68,13 @@ public final class WorldCreationContextWaiter {
 
     public static void consume() {
         future = null;
+    }
+
+    public static void beginWorldLoad() {
+        worldLoadActive = true;
+    }
+
+    public static void finishWorldLoad() {
+        worldLoadActive = false;
     }
 }
