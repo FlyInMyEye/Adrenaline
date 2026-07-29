@@ -5,12 +5,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class WorldLoadCancellation {
 
     private static final AtomicBoolean REQUESTED = new AtomicBoolean();
+    private static volatile String levelId;
+    private static volatile boolean deleteOnCancel;
 
     private WorldLoadCancellation() {
     }
 
-    public static void reset() {
+    public static void reset(String activeLevelId, boolean newWorld) {
         REQUESTED.set(false);
+        levelId = activeLevelId;
+        deleteOnCancel = newWorld;
     }
 
     public static void request() {
@@ -19,6 +23,10 @@ public final class WorldLoadCancellation {
 
     public static boolean isRequested() {
         return REQUESTED.get();
+    }
+
+    public static String levelToDelete() {
+        return REQUESTED.get() && deleteOnCancel ? levelId : null;
     }
 
 }
