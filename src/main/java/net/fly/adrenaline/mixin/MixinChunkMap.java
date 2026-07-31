@@ -13,9 +13,11 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.util.WorldgenPreparation;
 import net.fly.adrenaline.util.WorldgenWarmup;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.SchedulingWork;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
@@ -23,7 +25,11 @@ import net.minecraft.util.Unit;
 import net.minecraft.util.thread.ProcessorHandle;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
 import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.structure.StructureSet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -45,6 +51,18 @@ public class MixinChunkMap {
     private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
         this.adrenaline$currentHolder = new ThreadLocal<>();
         this.adrenaline$pendingStatus = new ConcurrentHashMap<>();
+    }
+
+    @Redirect(
+        method = "<init>",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/world/level/chunk/ChunkGenerator;createState(Lnet/minecraft/core/HolderLookup;Lnet/minecraft/world/level/levelgen/RandomState;J)Lnet/minecraft/world/level/chunk/ChunkGeneratorStructureState;"
+        )
+    )
+    private ChunkGeneratorStructureState adrenaline$usePreparedStructureState(ChunkGenerator generator, HolderLookup<StructureSet> structureSets, RandomState randomState, long seed) {
+        ChunkGeneratorStructureState prepared = WorldgenPreparation.take(generator, seed);
+        return prepared == null ? generator.createState(structureSets, randomState, seed) : prepared;
     }
 
     @Inject(

@@ -7,6 +7,7 @@
   "refmap": "adrenaline.refmap.json",
   "mixins": [
     "MixinChunkMap",
+    "MixinChunkTaskPriorityQueueSorter",
     "MixinChunkStatus",
     "MixinStructureCheck",
     "MixinChunkSerializer",

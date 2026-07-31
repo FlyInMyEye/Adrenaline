@@ -2,6 +2,7 @@ package net.fly.adrenaline.client;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import net.fly.adrenaline.util.WorldgenPreparation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationContext;
@@ -23,6 +24,11 @@ public final class WorldCreationContextWaiter {
 
     public static void set(WorldCreationContext context) {
         future = CompletableFuture.completedFuture(context);
+        if (context.options().generateStructures()) {
+            WorldgenPreparation.prepare(context.selectedDimensions().overworld(), context.worldgenLoadContext(), context.options().seed());
+        } else {
+            WorldgenPreparation.clear();
+        }
     }
 
     public static boolean isPreloading() {
