@@ -140,7 +140,7 @@ tasks.named('compileJava', JavaCompile).configure {
 
 tasks.named('jar', Jar).configure {
     if (prodBuild.get()) {
-        archiveClassifier.set('prod')
+        archiveClassifier.set('prod-slim')
         exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
     }
 
@@ -159,6 +159,13 @@ tasks.named('jar', Jar).configure {
 
 
     finalizedBy 'reobfJar'
+}
+
+tasks.named('jarJar', Jar).configure {
+    if (prodBuild.get()) {
+        archiveClassifier.set('prod')
+        exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
+    }
 }
 
 mixin {
