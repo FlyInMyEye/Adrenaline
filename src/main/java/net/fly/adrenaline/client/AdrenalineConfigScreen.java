@@ -99,6 +99,20 @@ public class AdrenalineConfigScreen extends Screen {
         this.prioritizeHigherStagesButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prioritize_higher_stages"), this.config.prioritizeHigherStages, value -> this.config.prioritizeHigherStages = value, tooltip("tooltip.adrenaline.config.prioritize_higher_stages", PerformanceImpact.MEDIUM));
         y += 24;
 
+        y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
+        this.showCancelButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_cancel_button"), this.config.showCancelButton, value -> this.config.showCancelButton = value, tooltip("tooltip.adrenaline.config.show_cancel_button", PerformanceImpact.NONE));
+        y += 24;
+        this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
+        y += 24;
+        this.warmupOnStartupButton = this.addWarmupModeRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.warmup_on_startup", PerformanceImpact.MEDIUM));
+        y += 24;
+        this.prepareWorldCreationContextButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prepare_world_creation_context"), this.config.prepareWorldCreationContext, value -> this.config.prepareWorldCreationContext = value, tooltip("tooltip.adrenaline.config.prepare_world_creation_context", PerformanceImpact.LOW));
+        y += 24;
+        this.fastTerrainLoadingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_terrain_loading"), this.config.fastTerrainLoading, value -> this.config.fastTerrainLoading = value, tooltip("tooltip.adrenaline.config.fast_terrain_loading", PerformanceImpact.LOW));
+        y += 24;
+        this.startBeforehandButton = this.addStartBeforehandRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.start_beforehand", PerformanceImpact.NONE));
+        y += 24;
+
         y = this.addSectionHeader("gui.adrenaline.config.section.worldgen", y);
         this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.terrain_fill_optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value, tooltip("tooltip.adrenaline.config.terrain_fill_optimizations", PerformanceImpact.EXTREME));
         y += 24;
@@ -143,20 +157,6 @@ public class AdrenalineConfigScreen extends Screen {
         this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FULL", 16777215), this.config.parallelizeFull, value -> this.config.parallelizeFull = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.full"))));
         y += 24;
         this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_legacy_random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("tooltip.adrenaline.config.fast_legacy_random", PerformanceImpact.LOW));
-        y += 24;
-
-        y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
-        this.showCancelButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_cancel_button"), this.config.showCancelButton, value -> this.config.showCancelButton = value, tooltip("tooltip.adrenaline.config.show_cancel_button", PerformanceImpact.NONE));
-        y += 24;
-        this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
-        y += 24;
-        this.warmupOnStartupButton = this.addWarmupModeRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.warmup_on_startup", PerformanceImpact.MEDIUM));
-        y += 24;
-        this.prepareWorldCreationContextButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prepare_world_creation_context"), this.config.prepareWorldCreationContext, value -> this.config.prepareWorldCreationContext = value, tooltip("tooltip.adrenaline.config.prepare_world_creation_context", PerformanceImpact.LOW));
-        y += 24;
-        this.fastTerrainLoadingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_terrain_loading"), this.config.fastTerrainLoading, value -> this.config.fastTerrainLoading = value, tooltip("tooltip.adrenaline.config.fast_terrain_loading", PerformanceImpact.LOW));
-        y += 24;
-        this.startBeforehandButton = this.addStartBeforehandRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.start_beforehand", PerformanceImpact.NONE));
         y += 24;
 
         if (BuildConfig.DEBUG) {
