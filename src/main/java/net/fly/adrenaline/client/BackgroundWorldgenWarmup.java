@@ -41,16 +41,21 @@ public final class BackgroundWorldgenWarmup {
         if (!AdrenalineConfig.prepareWorldCreationContext() && WorldCreationContextWaiter.get() != null) {
             WorldCreationContextWaiter.consume();
         }
+        AdrenalineConfig.WarmupMode warmupMode = AdrenalineConfig.warmupMode();
         boolean completed = server != null && server.isReady();
-        if (running && (!AdrenalineConfig.warmupOnStartup() || completed || screen instanceof ConnectScreen)) {
+        if (running && (warmupMode == AdrenalineConfig.WarmupMode.OFF || completed || screen instanceof ConnectScreen)) {
             stop(minecraft);
         }
-        if (!started && AdrenalineConfig.warmupOnStartup() && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null) {
+        if (!started && warmupMode != AdrenalineConfig.WarmupMode.OFF && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null) {
             started = true;
             if (AdrenalineConfig.prepareWorldCreationContext()) {
                 WorldCreationContextWaiter.preload(minecraft);
             }
             start(minecraft);
+            if (warmupMode == AdrenalineConfig.WarmupMode.ON && running) {
+                minecraft.managedBlock(() -> !running || server != null && (server.isReady() || server.isShutdown()));
+                stop(minecraft);
+            }
         }
         if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
             WorldCreationContextWaiter.preload(minecraft);

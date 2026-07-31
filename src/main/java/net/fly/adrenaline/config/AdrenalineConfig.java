@@ -167,8 +167,8 @@ public class AdrenalineConfig {
         return get().showThreadVisualizer;
     }
 
-    public static boolean warmupOnStartup() {
-        return get().warmupOnStartup;
+    public static WarmupMode warmupMode() {
+        return get().warmupMode();
     }
 
     public static boolean prepareWorldCreationContext() {
@@ -219,6 +219,7 @@ public class AdrenalineConfig {
         public boolean showCancelButton = true;
         public boolean showThreadVisualizer;
         public boolean warmupOnStartup = true;
+        public boolean blockingWarmupOnStartup = true;
         public boolean prepareWorldCreationContext = true;
         public boolean fastTerrainLoading = true;
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
@@ -259,11 +260,30 @@ public class AdrenalineConfig {
             this.showCancelButton = other.showCancelButton;
             this.showThreadVisualizer = other.showThreadVisualizer;
             this.warmupOnStartup = other.warmupOnStartup;
+            this.blockingWarmupOnStartup = other.blockingWarmupOnStartup;
             this.prepareWorldCreationContext = other.prepareWorldCreationContext;
             this.fastTerrainLoading = other.fastTerrainLoading;
             this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
         }
+
+        public WarmupMode warmupMode() {
+            if (!this.warmupOnStartup) {
+                return WarmupMode.OFF;
+            }
+            return this.blockingWarmupOnStartup ? WarmupMode.ON : WarmupMode.NON_BLOCK;
+        }
+
+        public void setWarmupMode(WarmupMode mode) {
+            this.warmupOnStartup = mode != WarmupMode.OFF;
+            this.blockingWarmupOnStartup = mode == WarmupMode.ON;
+        }
+    }
+
+    public enum WarmupMode {
+        ON,
+        NON_BLOCK,
+        OFF
     }
 
     public enum StartBeforehandMode {
