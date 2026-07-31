@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
@@ -19,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(MinecraftServer.class)
+@Mixin(value = MinecraftServer.class, priority = 1100)
 public class MixinMinecraftServer {
 
     @Inject(method = "loadLevel", at = @At("HEAD"))
@@ -57,13 +58,7 @@ public class MixinMinecraftServer {
         return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
     }
 
-    @ModifyConstant(method = "prepareLevels", constant = @Constant(intValue = 11))
-    private int adrenaline$useConfiguredSpawnZoneRadiusForTickets(int radius) {
-        int configuredRadius = AdrenalineConfig.internalSpawnPreparationRadius();
-        return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
-    }
-
-    @ModifyConstant(method = "prepareLevels", constant = @Constant(intValue = 441))
+    @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "CONSTANT", args = "intValue=441"))
     private int adrenaline$useConfiguredSpawnZoneChunkCount(int chunkCount) {
         if (EarlyWorldEntry.canEnter() && !DeferredSpawnSearch.isPending()) {
             return ((MinecraftServer) (Object) this).overworld().getChunkSource().getTickingGenerated();

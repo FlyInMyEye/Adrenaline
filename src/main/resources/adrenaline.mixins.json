@@ -13,6 +13,7 @@
     "MixinChunkAccessAccessor",
     "MixinLevelChunkSectionAccessor",
     "MixinMinecraftServer",
+    "MixinMinecraftServerSpawnTicket",
     "MixinMessageAccessor",
     "MixinMaterialRuleList",
     "MixinWorldGenRegion",

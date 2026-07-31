@@ -107,6 +107,10 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
+    compileOnly(annotationProcessor("io.github.llamalad7:mixinextras-common:0.5.4"))
+    implementation(jarJar("io.github.llamalad7:mixinextras-forge:0.5.4")) {
+        jarJar.ranged(it, "[0.5.4,)")
+    }
     implementation fg.deobf("maven.modrinth:flys-config-lib:k0XWlBZR")
     implementation fg.deobf("maven.modrinth:datafly-lib:UTiwQ7Uz")
     compileOnly fg.deobf("maven.modrinth:blueprint:xtEwbO0X")
