@@ -60,8 +60,8 @@ public class AdrenalineConfigScreen extends Screen {
     private int scrollOffset;
     private int targetScrollOffset;
     private int maxScroll;
-    private int contentBottom;
     private double animatedScrollOffset;
+    private boolean scrolling;
 
     public AdrenalineConfigScreen(Screen parent) {
         super(Component.translatable("gui.adrenaline.config.title"));
@@ -79,6 +79,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.scrollOffset = 0;
         this.targetScrollOffset = 0;
         this.animatedScrollOffset = 0.0D;
+        this.scrolling = false;
         int centerX = this.width / 2;
         int y = 54 + this.warningLines().size() * 10;
         int leftX = centerX - 185;
@@ -169,7 +170,6 @@ public class AdrenalineConfigScreen extends Screen {
         }
 
         this.doneButton = this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).bounds(centerX - 50, this.height - 26, 100, 20).build());
-        this.contentBottom = y;
         this.maxScroll = Math.max(0, y - (this.doneButton.getY() - 20));
         this.applyScroll();
         this.updateButtonStates();
@@ -224,6 +224,44 @@ public class AdrenalineConfigScreen extends Screen {
         }
 
         this.targetScrollOffset = Math.max(0, Math.min(this.maxScroll, this.targetScrollOffset - (int) Math.signum(delta) * 16));
+        return true;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && this.maxScroll > 0 && mouseX >= this.scrollbarX() && mouseX < this.scrollbarX() + 6 && mouseY >= this.scrollbarTop() && mouseY <= this.scrollbarBottom()) {
+            this.scrolling = true;
+            this.setDragging(true);
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        this.scrolling = false;
+        this.setDragging(false);
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (button != 0 || !this.scrolling) {
+            return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        }
+
+        int top = this.scrollbarTop();
+        int bottom = this.scrollbarBottom();
+        if (mouseY < top) {
+            this.setScrollImmediate(0.0D);
+        } else if (mouseY > bottom) {
+            this.setScrollImmediate(this.maxScroll);
+        } else {
+            int trackHeight = bottom - top;
+            int thumbHeight = this.scrollbarThumbHeight(trackHeight);
+            double scrollRate = Math.max(1.0D, (double) this.maxScroll / (double) (trackHeight - thumbHeight));
+            this.setScrollImmediate(this.scrollOffset + dragY * scrollRate);
+        }
         return true;
     }
 
@@ -402,14 +440,39 @@ public class AdrenalineConfigScreen extends Screen {
         }
 
         int trackHeight = bottom - top;
-        int barX = this.width - 10;
-        int totalContentHeight = Math.max(trackHeight, this.contentBottom - 32);
-        int thumbHeight = Math.max(24, trackHeight * trackHeight / totalContentHeight);
+        int barX = this.scrollbarX();
+        int thumbHeight = this.scrollbarThumbHeight(trackHeight);
         int travel = trackHeight - thumbHeight;
         int thumbY = top + (travel * this.scrollOffset / this.maxScroll);
 
-        guiGraphics.fill(barX, top, barX + 4, bottom, 0xFF3A3A3A);
-        guiGraphics.fill(barX, thumbY, barX + 4, thumbY + thumbHeight, 0xFFA0A0A0);
+        guiGraphics.fill(barX, top, barX + 6, bottom, 0xFF000000);
+        guiGraphics.fill(barX, thumbY, barX + 6, thumbY + thumbHeight, 0xFF808080);
+        guiGraphics.fill(barX, thumbY, barX + 5, thumbY + thumbHeight - 1, 0xFFC0C0C0);
+    }
+
+    private int scrollbarX() {
+        return this.width / 2 + 190;
+    }
+
+    private int scrollbarTop() {
+        return 32 + this.warningLines().size() * 10 + 18;
+    }
+
+    private int scrollbarBottom() {
+        return this.doneButton.getY() - 6;
+    }
+
+    private int scrollbarThumbHeight(int trackHeight) {
+        int totalHeight = trackHeight + this.maxScroll;
+        return Math.max(32, Math.min(trackHeight * trackHeight / totalHeight, trackHeight - 8));
+    }
+
+    private void setScrollImmediate(double offset) {
+        int value = (int) Math.round(Math.max(0.0D, Math.min(this.maxScroll, offset)));
+        this.targetScrollOffset = value;
+        this.animatedScrollOffset = value;
+        this.scrollOffset = value;
+        this.applyScroll();
     }
 
     private void renderTiledPanel(GuiGraphics guiGraphics, int x, int y, int width, int height) {
