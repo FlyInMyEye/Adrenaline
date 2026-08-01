@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.client.AprilFoolsEasterEgg;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.EarlyWorldEntry;
@@ -99,6 +100,11 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;renderChunks(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/server/level/progress/StoringChunkProgressListener;IIII)V"))
     private void adrenaline$renderScaledChunkMap(GuiGraphics guiGraphics, StoringChunkProgressListener progressListener, int centerX, int centerY, int cellSize, int padding) {
+        if (AprilFoolsEasterEgg.shouldRender()) {
+            int mapSize = DEFAULT_DIAMETER * (cellSize + padding) - padding;
+            AprilFoolsEasterEgg.render(guiGraphics, centerX, centerY, mapSize);
+            return;
+        }
         if (AdrenalineConfig.resolvedSpawnZoneRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return;
         }

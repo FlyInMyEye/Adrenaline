@@ -29,4 +29,8 @@ public final class WorldLoadCancellation {
         return REQUESTED.get() && deleteOnCancel ? levelId : null;
     }
 
+    public static boolean isNewWorld() {
+        return deleteOnCancel;
+    }
+
 }
