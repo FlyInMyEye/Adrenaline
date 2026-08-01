@@ -3,18 +3,23 @@ package net.fly.adrenaline.scheduler;
 import net.fly.adrenaline.util.DeferredNotificationBuffer;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 public final class ChunkJob implements Runnable {
 
-    private static final ThreadLocal<Integer> CURRENT_QUEUE_LEVEL = ThreadLocal.withInitial(() -> Integer.MAX_VALUE);
+    private static final ConcurrentHashMap<ServerLevel, long[]> PRIORITY_FOCI = new ConcurrentHashMap<>();
 
     private final Set<Long> footprint;
     private final Supplier<CompletableFuture<?>> work;
@@ -30,7 +35,10 @@ public final class ChunkJob implements Runnable {
     private long waitingStartedNanos;
     private boolean capacityHeld;
     private boolean yielded;
-    private int queueLevel = CURRENT_QUEUE_LEVEL.get();
+    private ServerLevel priorityLevel;
+    private ChunkPos priorityPos;
+    private long[] cachedPriorityFoci;
+    private long cachedProximity = Long.MAX_VALUE;
 
     public ChunkJob(ChunkPos center, int writeRadius, Runnable work, ClassLoader contextClassLoader) {
         this(buildFootprint(center, writeRadius), asAsync(work), () -> {
@@ -85,12 +93,58 @@ public final class ChunkJob implements Runnable {
         return this.waitingStatus == null ? Integer.MIN_VALUE : this.waitingStatus.getIndex();
     }
 
-    int queueLevel() {
-        return this.queueLevel;
+    long proximity() {
+        if (this.priorityLevel == null || this.priorityPos == null) {
+            return Long.MAX_VALUE;
+        }
+
+        long[] foci = PRIORITY_FOCI.get(this.priorityLevel);
+        if (foci == null) {
+            long[] spawnFocus = new long[]{new ChunkPos(this.priorityLevel.getSharedSpawnPos()).toLong()};
+            long[] existing = PRIORITY_FOCI.putIfAbsent(this.priorityLevel, spawnFocus);
+            foci = existing == null ? spawnFocus : existing;
+        }
+        if (foci == this.cachedPriorityFoci) {
+            return this.cachedProximity;
+        }
+
+        long nearest = Long.MAX_VALUE;
+        for (long focusKey : foci) {
+            long dx = this.priorityPos.x - ChunkPos.getX(focusKey);
+            long dz = this.priorityPos.z - ChunkPos.getZ(focusKey);
+            nearest = Math.min(nearest, dx * dx + dz * dz);
+        }
+        this.cachedPriorityFoci = foci;
+        this.cachedProximity = nearest;
+        return nearest;
     }
 
-    public void prioritize(int queueLevel) {
-        this.queueLevel = queueLevel;
+    public void prioritizeNearest(ServerLevel level, ChunkPos pos) {
+        this.priorityLevel = level;
+        this.priorityPos = pos;
+    }
+
+    public static void updatePriorityFoci(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            long[] foci;
+            if (level.players().isEmpty()) {
+                foci = new long[]{new ChunkPos(level.getSharedSpawnPos()).toLong()};
+            } else {
+                foci = new long[level.players().size()];
+                for (int i = 0; i < foci.length; i++) {
+                    ServerPlayer player = level.players().get(i);
+                    foci[i] = player.chunkPosition().toLong();
+                }
+            }
+            long[] previous = PRIORITY_FOCI.get(level);
+            if (!Arrays.equals(previous, foci)) {
+                PRIORITY_FOCI.put(level, foci);
+            }
+        }
+    }
+
+    public static void clearPriorityFoci() {
+        PRIORITY_FOCI.clear();
     }
 
     synchronized void transitionWaiting(WaitingReason reason) {
@@ -168,14 +222,12 @@ public final class ChunkJob implements Runnable {
         ClassLoader previousClassLoader = currentThread.getContextClassLoader();
         boolean began = false;
         boolean handedOff = false;
-        int previousQueueLevel = CURRENT_QUEUE_LEVEL.get();
         try {
             if (!ChunkJobScheduler.get().begin(this)) {
                 this.cancel();
                 return;
             }
             began = true;
-            CURRENT_QUEUE_LEVEL.set(this.queueLevel);
             ChunkJobScheduler.get().markCurrentWorkerActive();
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
@@ -193,7 +245,6 @@ public final class ChunkJob implements Runnable {
                 currentThread.setContextClassLoader(previousClassLoader);
             }
             ChunkJobScheduler.get().markCurrentWorkerIdle();
-            CURRENT_QUEUE_LEVEL.set(previousQueueLevel);
             if (began && !handedOff) {
                 ChunkJobScheduler.get().onComplete(this);
             }

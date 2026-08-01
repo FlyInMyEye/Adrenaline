@@ -46,7 +46,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button oreVeinOptimizationsButton;
     private Button initialSpawnOptimizationButton;
     private Button parallelWorldgenButton;
-    private Button prioritizeHigherStagesButton;
+    private Button stagePriorityButton;
     private Button fastLegacyRandomButton;
     private Button showCancelButton;
     private Button showThreadVisualizerButton;
@@ -98,7 +98,7 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
         this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH));
         y += 24;
-        this.prioritizeHigherStagesButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prioritize_higher_stages"), this.config.prioritizeHigherStages, value -> this.config.prioritizeHigherStages = value, tooltip("tooltip.adrenaline.config.prioritize_higher_stages", PerformanceImpact.MEDIUM));
+        this.stagePriorityButton = this.addStagePriorityRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.stage_priority", PerformanceImpact.MEDIUM));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
@@ -295,6 +295,21 @@ public class AdrenalineConfigScreen extends Screen {
         return this.addScrollableWidget(button, y, tooltip);
     }
 
+    private Button addStagePriorityRow(int labelX, int buttonX, int y, int buttonWidth, TooltipData tooltip) {
+        this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.stage_priority"), labelX, y, false, tooltip));
+        Button button = Button.builder(this.stagePriorityLabel(), pressed -> {
+            AdrenalineConfig.StagePriority priority = switch (this.config.stagePriority()) {
+                case FIFO -> AdrenalineConfig.StagePriority.HIGHEST;
+                case HIGHEST -> AdrenalineConfig.StagePriority.NEAREST;
+                case NEAREST -> AdrenalineConfig.StagePriority.FIFO;
+            };
+            this.config.setStagePriority(priority);
+            pressed.setMessage(this.stagePriorityLabel());
+            this.saveConfig();
+        }).bounds(buttonX, y, buttonWidth, 20).build();
+        return this.addScrollableWidget(button, y, tooltip);
+    }
+
     private Button addWarmupModeRow(int labelX, int buttonX, int y, int buttonWidth, TooltipData tooltip) {
         this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.warmup_on_startup"), labelX, y, false, tooltip));
         Button button = Button.builder(this.warmupModeLabel(), pressed -> {
@@ -330,6 +345,21 @@ public class AdrenalineConfigScreen extends Screen {
             case ON -> 0x55FF55;
             case OFF -> 0xFF5555;
             case BORING -> 0xFFFF55;
+        };
+        return Component.translatable(key).withStyle(style -> style.withColor(color));
+    }
+
+    private Component stagePriorityLabel() {
+        AdrenalineConfig.StagePriority priority = this.config.stagePriority();
+        String key = switch (priority) {
+            case FIFO -> "gui.adrenaline.stage_priority.fifo";
+            case HIGHEST -> "gui.adrenaline.stage_priority.highest";
+            case NEAREST -> "gui.adrenaline.stage_priority.nearest";
+        };
+        int color = switch (priority) {
+            case FIFO -> 0xAAAAAA;
+            case HIGHEST -> 0xFFFF55;
+            case NEAREST -> 0x55FF55;
         };
         return Component.translatable(key).withStyle(style -> style.withColor(color));
     }
@@ -504,7 +534,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.oreVeinOptimizationsButton.active = worldgenOptimizations;
         this.initialSpawnOptimizationButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
-        this.prioritizeHigherStagesButton.active = this.config.parallelWorldgen;
+        this.stagePriorityButton.active = this.config.parallelWorldgen;
         this.featureSafetyRadiusSlider.active = this.config.parallelWorldgen;
         for (Button button : this.stageParallelButtons) {
             button.active = this.config.parallelWorldgen;

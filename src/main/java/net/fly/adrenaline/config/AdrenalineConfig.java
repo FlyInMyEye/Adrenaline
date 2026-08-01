@@ -19,6 +19,11 @@ public class AdrenalineConfig {
     public static void init() {
         JsonConfigManager<Data> manager = new JsonConfigManager<>("adrenaline.json", Data.class, Data::new, null);
         manager.init();
+        Data data = manager.get();
+        if (data.stagePriority == null) {
+            data.stagePriority = data.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO;
+            manager.save(data);
+        }
         MANAGER = manager;
     }
 
@@ -57,8 +62,8 @@ public class AdrenalineConfig {
         return get().parallelWorldgen;
     }
 
-    public static boolean prioritizeHigherStagesEnabled() {
-        return get().prioritizeHigherStages;
+    public static StagePriority stagePriority() {
+        return get().stagePriority();
     }
 
     public static boolean parallelChunkStatusEnabled(ChunkStatus status) {
@@ -209,6 +214,7 @@ public class AdrenalineConfig {
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
         public boolean prioritizeHigherStages = true;
+        public StagePriority stagePriority;
         public String featureCompatibility = "classic";
         public int featureSafetyRadius;
         public boolean parallelizeStructureStarts = true;
@@ -251,6 +257,7 @@ public class AdrenalineConfig {
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
             this.prioritizeHigherStages = other.prioritizeHigherStages;
+            this.stagePriority = other.stagePriority;
             this.featureCompatibility = other.featureCompatibility;
             this.featureSafetyRadius = other.featureSafetyRadius;
             this.parallelizeStructureStarts = other.parallelizeStructureStarts;
@@ -287,6 +294,15 @@ public class AdrenalineConfig {
             this.warmupOnStartup = mode != WarmupMode.OFF;
             this.blockingWarmupOnStartup = mode == WarmupMode.ON;
         }
+
+        public StagePriority stagePriority() {
+            return this.stagePriority == null ? (this.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO) : this.stagePriority;
+        }
+
+        public void setStagePriority(StagePriority priority) {
+            this.stagePriority = priority;
+            this.prioritizeHigherStages = priority != StagePriority.FIFO;
+        }
     }
 
     public enum WarmupMode {
@@ -299,5 +315,11 @@ public class AdrenalineConfig {
         ON,
         OFF,
         BORING
+    }
+
+    public enum StagePriority {
+        FIFO,
+        HIGHEST,
+        NEAREST
     }
 }

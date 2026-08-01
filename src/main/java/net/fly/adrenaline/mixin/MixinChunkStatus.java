@@ -184,6 +184,7 @@ public class MixinChunkStatus {
             return future;
         }, () -> result.complete(ChunkHolder.UNLOADED_CHUNK), contextClassLoader, debugLabel);
         job.trackWaiting(centerPos, status);
+        job.prioritizeNearest(level, centerPos);
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.finishSchedulingWork(schedulingWork);
         }
