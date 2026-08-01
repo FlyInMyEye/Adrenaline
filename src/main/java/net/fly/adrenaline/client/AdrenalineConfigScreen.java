@@ -55,6 +55,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button fastTerrainLoadingButton;
     private Button startBeforehandButton;
     private Button debugLoggingButton;
+    private Button forceEasterEggButton;
     private Button doneButton;
     private int scrollOffset;
     private int targetScrollOffset;
@@ -162,6 +163,8 @@ public class AdrenalineConfigScreen extends Screen {
         if (BuildConfig.DEBUG) {
             y = this.addSectionHeader("gui.adrenaline.config.section.diagnostics", y);
             this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.debug_logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("tooltip.adrenaline.config.debug_logging", PerformanceImpact.NONE));
+            y += 24;
+            this.forceEasterEggButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.force_easter_egg"), this.config.forceEasterEgg, value -> this.config.forceEasterEgg = value, tooltip("tooltip.adrenaline.config.force_easter_egg", PerformanceImpact.NONE));
             y += 24;
         }
 
@@ -449,6 +452,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.startBeforehandButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
             this.debugLoggingButton.active = true;
+            this.forceEasterEggButton.active = true;
         }
         this.generationThreadsSlider.active = this.config.parallelWorldgen;
         this.serializationThreadsSlider.active = worldgenOptimizations;

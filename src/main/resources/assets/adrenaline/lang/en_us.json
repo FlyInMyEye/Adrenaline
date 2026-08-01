@@ -26,6 +26,7 @@
   "gui.adrenaline.config.fast_terrain_loading": "Fast Terrain Loading",
   "gui.adrenaline.config.start_beforehand": "Start Beforehand",
   "gui.adrenaline.config.debug_logging": "Debug Logging",
+  "gui.adrenaline.config.force_easter_egg": "Force Easter Egg",
   "gui.adrenaline.toggle.on": "On",
   "gui.adrenaline.toggle.off": "Off",
   "gui.adrenaline.toggle.non_block": "Non-block",
@@ -114,5 +115,6 @@
   "tooltip.adrenaline.config.prepare_world_creation_context": "Prepares and reuses a clean Create World context to avoid repeated datapack loading.",
   "tooltip.adrenaline.config.fast_terrain_loading": "Enters the world when the center chunk arrives instead of waiting for it to finish render compilation.",
   "tooltip.adrenaline.config.start_beforehand": "Shows a button that enters the world after the first full chunk is ready.",
-  "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console."
+  "tooltip.adrenaline.config.debug_logging": "Logs extra Adrenaline diagnostics to the console.",
+  "tooltip.adrenaline.config.force_easter_egg": "Shows the April Fools animation during new world creation."
 }

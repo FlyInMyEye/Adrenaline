@@ -190,6 +190,10 @@ public class AdrenalineConfig {
         return BuildConfig.DEBUG && get().debugLogging;
     }
 
+    public static boolean forceEasterEgg() {
+        return BuildConfig.DEBUG && get().forceEasterEgg;
+    }
+
     public static class Data {
         public boolean worldgenOptimizations = true;
         public boolean terrainFillOptimizations = true;
@@ -227,6 +231,7 @@ public class AdrenalineConfig {
         public boolean fastTerrainLoading = true;
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
         public boolean debugLogging = false;
+        public boolean forceEasterEgg = false;
 
         public Data() {
         }
@@ -268,6 +273,7 @@ public class AdrenalineConfig {
             this.fastTerrainLoading = other.fastTerrainLoading;
             this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
+            this.forceEasterEgg = other.forceEasterEgg;
         }
 
         public WarmupMode warmupMode() {
