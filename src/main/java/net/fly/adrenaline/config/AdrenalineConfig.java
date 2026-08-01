@@ -104,6 +104,9 @@ public class AdrenalineConfig {
     }
 
     public static int resolvedFeatureSafetyRadius() {
+        if (!parallelWorldgenEnabled()) {
+            return DEFAULT_FEATURE_SAFETY_RADIUS;
+        }
         int radius = get().featureSafetyRadius;
         if (radius != 0) {
             return Math.max(MIN_FEATURE_SAFETY_RADIUS, Math.min(MAX_FEATURE_SAFETY_RADIUS, radius));

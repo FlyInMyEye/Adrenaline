@@ -450,7 +450,7 @@ public class AdrenalineConfigScreen extends Screen {
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
             this.debugLoggingButton.active = true;
         }
-        this.generationThreadsSlider.active = worldgenOptimizations;
+        this.generationThreadsSlider.active = this.config.parallelWorldgen;
         this.serializationThreadsSlider.active = worldgenOptimizations;
         this.spawnZoneRadiusSlider.active = true;
     }
