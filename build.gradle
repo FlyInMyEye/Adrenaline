@@ -139,6 +139,10 @@ tasks.named('compileJava', JavaCompile).configure {
 
 
 tasks.named('jar', Jar).configure {
+    from('LICENSE') {
+        into 'META-INF'
+    }
+
     if (prodBuild.get()) {
         archiveClassifier.set('prod-slim')
         exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
@@ -162,6 +166,10 @@ tasks.named('jar', Jar).configure {
 }
 
 tasks.named('jarJar', Jar).configure {
+    from('LICENSE') {
+        into 'META-INF'
+    }
+
     if (prodBuild.get()) {
         archiveClassifier.set('prod')
         exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
