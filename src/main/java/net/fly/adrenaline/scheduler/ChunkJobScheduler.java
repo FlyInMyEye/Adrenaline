@@ -173,19 +173,12 @@ public final class ChunkJobScheduler {
             }
         }
 
-        for (ChunkJob candidate : candidates) {
-            if (conflictPending.contains(candidate) && !conflicts(candidate.footprint())) {
+        for (ChunkJob candidate : new ArrayList<>(conflictPending)) {
+            if (candidates.contains(candidate) && !conflicts(candidate.footprint())) {
                 conflictPending.remove(candidate);
                 removeFromIndex(candidate);
-                if (AdrenalineConfig.prioritizeHigherStagesEnabled()) {
-                    candidate.transitionWaiting(WaitingReason.CAPACITY);
-                    capacityQueue.addLast(candidate);
-                } else if (runningCount < maxActive) {
-                    dispatch(candidate);
-                } else {
-                    candidate.transitionWaiting(WaitingReason.CAPACITY);
-                    capacityQueue.addLast(candidate);
-                }
+                candidate.transitionWaiting(WaitingReason.CAPACITY);
+                capacityQueue.addLast(candidate);
             }
         }
 
@@ -206,21 +199,25 @@ public final class ChunkJobScheduler {
     }
 
     private ChunkJob pollCapacityJob() {
-        if (!AdrenalineConfig.prioritizeHigherStagesEnabled()) {
+        AdrenalineConfig.StagePriority priority = AdrenalineConfig.stagePriority();
+        if (priority == AdrenalineConfig.StagePriority.FIFO) {
             return this.capacityQueue.pollFirst();
         }
         Iterator<ChunkJob> iterator = this.capacityQueue.iterator();
         ChunkJob selected = iterator.next();
         int highestStage = selected.stageIndex();
-        int closestLevel = selected.queueLevel();
+        long closestDistance = selected.proximity();
         while (iterator.hasNext()) {
             ChunkJob candidate = iterator.next();
             int stage = candidate.stageIndex();
-            int queueLevel = candidate.queueLevel();
-            if (stage > highestStage || stage == highestStage && queueLevel < closestLevel) {
+            long distance = candidate.proximity();
+            boolean preferred = priority == AdrenalineConfig.StagePriority.HIGHEST
+                ? stage > highestStage || stage == highestStage && distance < closestDistance
+                : distance < closestDistance || distance == closestDistance && stage > highestStage;
+            if (preferred) {
                 selected = candidate;
                 highestStage = stage;
-                closestLevel = queueLevel;
+                closestDistance = distance;
             }
         }
         this.capacityQueue.remove(selected);

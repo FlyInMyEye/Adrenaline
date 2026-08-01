@@ -7,7 +7,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Function;
-import java.util.function.IntSupplier;
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -21,6 +20,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Unit;
 import net.minecraft.util.thread.ProcessorHandle;
 import net.minecraft.world.level.ChunkPos;
@@ -31,6 +31,8 @@ import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -40,6 +42,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChunkMap.class)
 public class MixinChunkMap {
+
+    @Shadow
+    @Final
+    private ServerLevel level;
 
     @Unique
     private ThreadLocal<ChunkHolder> adrenaline$currentHolder;
@@ -124,6 +130,7 @@ public class MixinChunkMap {
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
         ChunkPos pos = new ChunkPos(accessor.getPos());
         SchedulingWork dispatchWork = BuildConfig.DEBUG && nextStatus != null ? WorldgenStageStats.beginSchedulingWork(pos, nextStatus) : null;
+        // TODO: Unify stage dispatch behind footprint-aware jobs so features do not need a separate scheduler entry point.
         if (
             !AdrenalineConfig.parallelWorldgenEnabled()
                 || nextStatus == null
@@ -159,7 +166,6 @@ public class MixinChunkMap {
         }
 
         ChunkStatus scheduledStatus = nextStatus;
-        IntSupplier queueLevel = accessor.getLevel();
         @SuppressWarnings("unchecked")
         Function<ProcessorHandle<Unit>, Runnable> taskFunction = (Function<ProcessorHandle<Unit>, Runnable>) accessor.getTask();
         Function<ProcessorHandle<Unit>, Runnable> wrappedTask = completionHandle -> () -> {
@@ -198,7 +204,7 @@ public class MixinChunkMap {
                 }, contextClassLoader);
             }
             job.trackWaiting(pos, scheduledStatus);
-            job.prioritize(queueLevel.getAsInt());
+            job.prioritizeNearest(this.level, pos);
             ChunkJobScheduler.get().submit(job);
             completionHandle.tell(Unit.INSTANCE);
         };
