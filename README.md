@@ -8,7 +8,7 @@
   <a href="https://github.com/FlyInMyEye/Adrenaline"><img src="https://img.shields.io/github/stars/FlyInMyEye/Adrenaline?style=flat&label=GitHub" alt="GitHub"></a>
   <a href="https://modrinth.com/mod/flys-adrenaline"><img src="https://img.shields.io/modrinth/dt/flys-adrenaline?logo=modrinth&label=Modrinth&style=flat&color=242629&labelColor=5CA424&logoColor=1C1C1C" alt="Modrinth"></a>
   <a href="https://www.curseforge.com/minecraft/mc-mods/flys-adrenaline"><img src="https://img.shields.io/badge/CurseForge-page-F16436?style=flat&logo=curseforge&logoColor=1C1C1C&labelColor=F16436&color=242629" alt="CurseForge"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0--only-blue.svg?style=flat" alt="License"></a>
 </p>
 
 <p align="center"><i>Generation multithreading, but better.</i></p>
