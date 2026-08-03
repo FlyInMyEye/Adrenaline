@@ -4,6 +4,7 @@
   "gui.adrenaline.config.section.worldgen": "Worldgen Optimization",
   "gui.adrenaline.config.section.compatibility": "Compatibility",
   "gui.adrenaline.config.section.features_plushies": "Features & Plushies",
+  "gui.adrenaline.config.section.chunk_saving": "Chunk Saving",
   "gui.adrenaline.config.section.diagnostics": "Diagnostics",
   "gui.adrenaline.config.generation_threads": "Generation Threads",
   "gui.adrenaline.config.serialization_threads": "Serialization Threads",

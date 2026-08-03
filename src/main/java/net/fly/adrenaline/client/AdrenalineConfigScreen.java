@@ -93,8 +93,6 @@ public class AdrenalineConfigScreen extends Screen {
         y = this.addSectionHeader("gui.adrenaline.config.section.general", y);
         this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.generation_threads"), () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH)), y, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH));
         y += 30;
-        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.serialization_threads"), () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value, tooltip("tooltip.adrenaline.config.serialization_threads", PerformanceImpact.MEDIUM)), y, tooltip("tooltip.adrenaline.config.serialization_threads", PerformanceImpact.MEDIUM));
-        y += 30;
         this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, tooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW)), y, tooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW));
         y += 30;
         this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.worldgen_optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("tooltip.adrenaline.config.worldgen_optimization", PerformanceImpact.EXTREME));
@@ -102,12 +100,6 @@ public class AdrenalineConfigScreen extends Screen {
         this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH));
         y += 24;
         this.stagePriorityButton = this.addStagePriorityRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.stage_priority", PerformanceImpact.MEDIUM));
-        y += 24;
-        this.saveChunksAfterWorldCreationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.save_chunks_after_world_creation"), this.config.saveChunksAfterWorldCreation, value -> this.config.saveChunksAfterWorldCreation = value, tooltip("tooltip.adrenaline.config.save_chunks_after_world_creation", PerformanceImpact.MEDIUM));
-        y += 24;
-        this.incrementalSaveIntervalButton = this.addIncrementalSaveIntervalRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.incremental_save_interval", PerformanceImpact.MEDIUM));
-        y += 24;
-        this.skipSavingScreenAfterExitButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.skip_saving_screen_after_exit"), this.config.skipSavingScreenAfterExit, value -> this.config.skipSavingScreenAfterExit = value, tooltip("tooltip.adrenaline.config.skip_saving_screen_after_exit", PerformanceImpact.NONE));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
@@ -122,6 +114,16 @@ public class AdrenalineConfigScreen extends Screen {
         this.fastTerrainLoadingButton = this.addFastTerrainLoadingRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.fast_terrain_loading", PerformanceImpact.LOW));
         y += 24;
         this.startBeforehandButton = this.addStartBeforehandRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.start_beforehand", PerformanceImpact.NONE));
+        y += 24;
+
+        y = this.addSectionHeader("gui.adrenaline.config.section.chunk_saving", y);
+        this.serializationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.serialization_threads"), () -> this.config.serializationWorkerThreads, value -> this.config.serializationWorkerThreads = value, tooltip("tooltip.adrenaline.config.serialization_threads", PerformanceImpact.MEDIUM)), y, tooltip("tooltip.adrenaline.config.serialization_threads", PerformanceImpact.MEDIUM));
+        y += 30;
+        this.saveChunksAfterWorldCreationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.save_chunks_after_world_creation"), this.config.saveChunksAfterWorldCreation, value -> this.config.saveChunksAfterWorldCreation = value, tooltip("tooltip.adrenaline.config.save_chunks_after_world_creation", PerformanceImpact.MEDIUM));
+        y += 24;
+        this.incrementalSaveIntervalButton = this.addIncrementalSaveIntervalRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.incremental_save_interval", PerformanceImpact.MEDIUM));
+        y += 24;
+        this.skipSavingScreenAfterExitButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.skip_saving_screen_after_exit"), this.config.skipSavingScreenAfterExit, value -> this.config.skipSavingScreenAfterExit = value, tooltip("tooltip.adrenaline.config.skip_saving_screen_after_exit", PerformanceImpact.NONE));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.worldgen", y);
