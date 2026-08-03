@@ -23,14 +23,24 @@ import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
-public class MixinMinecraftServer {
+public class MixinMinecraftServer implements InitialWorldCreationAccess {
 
     @Unique
     private int adrenaline$lastSpawnSaveCount;
 
+    @Unique
+    private boolean adrenaline$initialWorldCreation;
+
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$resetDeferredSpawnSearch(CallbackInfo ci) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        this.adrenaline$initialWorldCreation = !server.getWorldData().overworldData().isInitialized();
         DeferredSpawnSearch.reset();
+    }
+
+    @Override
+    public boolean adrenaline$isInitialWorldCreation() {
+        return this.adrenaline$initialWorldCreation;
     }
 
     @Inject(method = "stopServer", at = @At("HEAD"))
@@ -62,12 +72,18 @@ public class MixinMinecraftServer {
         if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
             return BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS;
         }
+        if (!this.adrenaline$initialWorldCreation && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
+            return 0;
+        }
         int configuredRadius = AdrenalineConfig.resolvedSpawnZoneRadius();
         return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
     }
 
     @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "CONSTANT", args = "intValue=441"))
     private int adrenaline$useConfiguredSpawnZoneChunkCount(int chunkCount) {
+        if (!this.adrenaline$initialWorldCreation && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
+            return 0;
+        }
         if (EarlyWorldEntry.canEnter() && !DeferredSpawnSearch.isPending()) {
             return ((MinecraftServer) (Object) this).overworld().getChunkSource().getTickingGenerated();
         }
@@ -116,7 +132,7 @@ public class MixinMinecraftServer {
     @Inject(method = "prepareLevels", at = @At("RETURN"))
     private void adrenaline$finishIncrementalSpawnSaving(ChunkProgressListener progressListener, CallbackInfo ci) {
         MinecraftServer server = (MinecraftServer) (Object) this;
-        if (AdrenalineConfig.saveChunksAfterWorldCreation() && !BackgroundWorldgenWarmupState.isServer(server)) {
+        if (this.adrenaline$initialWorldCreation && AdrenalineConfig.saveChunksAfterWorldCreation() && !BackgroundWorldgenWarmupState.isServer(server)) {
             server.overworld().getChunkSource().save(false);
         }
     }

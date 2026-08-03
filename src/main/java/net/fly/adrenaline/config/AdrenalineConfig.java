@@ -24,6 +24,10 @@ public class AdrenalineConfig {
             data.stagePriority = data.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO;
             manager.save(data);
         }
+        if (data.fastTerrainLoadingMode == null) {
+            data.fastTerrainLoadingMode = data.fastTerrainLoading ? FastTerrainLoadingMode.ON : FastTerrainLoadingMode.OFF;
+            manager.save(data);
+        }
         MANAGER = manager;
     }
 
@@ -196,8 +200,8 @@ public class AdrenalineConfig {
         return get().prepareWorldCreationContext;
     }
 
-    public static boolean fastTerrainLoading() {
-        return get().fastTerrainLoading;
+    public static FastTerrainLoadingMode fastTerrainLoadingMode() {
+        return get().fastTerrainLoadingMode();
     }
 
     public static StartBeforehandMode startBeforehandMode() {
@@ -251,6 +255,7 @@ public class AdrenalineConfig {
         public boolean blockingWarmupOnStartup = true;
         public boolean prepareWorldCreationContext = true;
         public boolean fastTerrainLoading = true;
+        public FastTerrainLoadingMode fastTerrainLoadingMode;
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
         public boolean debugLogging = false;
         public boolean forceEasterEgg = false;
@@ -297,6 +302,7 @@ public class AdrenalineConfig {
             this.blockingWarmupOnStartup = other.blockingWarmupOnStartup;
             this.prepareWorldCreationContext = other.prepareWorldCreationContext;
             this.fastTerrainLoading = other.fastTerrainLoading;
+            this.fastTerrainLoadingMode = other.fastTerrainLoadingMode;
             this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
             this.forceEasterEgg = other.forceEasterEgg;
@@ -314,6 +320,15 @@ public class AdrenalineConfig {
             this.blockingWarmupOnStartup = mode == WarmupMode.ON;
         }
 
+        public FastTerrainLoadingMode fastTerrainLoadingMode() {
+            return this.fastTerrainLoadingMode == null ? (this.fastTerrainLoading ? FastTerrainLoadingMode.ON : FastTerrainLoadingMode.OFF) : this.fastTerrainLoadingMode;
+        }
+
+        public void setFastTerrainLoadingMode(FastTerrainLoadingMode mode) {
+            this.fastTerrainLoadingMode = mode;
+            this.fastTerrainLoading = mode != FastTerrainLoadingMode.OFF;
+        }
+
         public StagePriority stagePriority() {
             return this.stagePriority == null ? (this.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO) : this.stagePriority;
         }
@@ -328,6 +343,12 @@ public class AdrenalineConfig {
         ON,
         NON_BLOCK,
         OFF
+    }
+
+    public enum FastTerrainLoadingMode {
+        OFF,
+        ON,
+        EXTREME
     }
 
     public enum StartBeforehandMode {
