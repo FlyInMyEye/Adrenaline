@@ -71,6 +71,9 @@ public final class ChunkJobScheduler {
     }
 
     public synchronized int[] workerSnapshot() {
+        if (!BuildConfig.DEBUG) {
+            return new int[0];
+        }
         this.refreshPoolIfNeeded();
         int processors = Runtime.getRuntime().availableProcessors();
         int[] snapshot = new int[processors];
@@ -332,7 +335,7 @@ public final class ChunkJobScheduler {
     }
 
     private ForkJoinPool createPool(int threads) {
-        AtomicIntegerArray states = new AtomicIntegerArray(threads);
+        AtomicIntegerArray states = BuildConfig.DEBUG ? new AtomicIntegerArray(threads) : null;
         AtomicInteger nextWorker = new AtomicInteger();
         this.workerStates = states;
         return new ForkJoinPool(threads, pool -> {
@@ -342,6 +345,9 @@ public final class ChunkJobScheduler {
     }
 
     private void markCurrentWorker(int state) {
+        if (!BuildConfig.DEBUG) {
+            return;
+        }
         Thread thread = Thread.currentThread();
         if (thread instanceof GenerationWorkerThread worker) {
             worker.setState(state);
@@ -360,7 +366,7 @@ public final class ChunkJobScheduler {
         }
 
         private void setState(int state) {
-            if (this.index < this.states.length()) {
+            if (this.states != null && this.index < this.states.length()) {
                 this.states.set(this.index, state);
             }
         }

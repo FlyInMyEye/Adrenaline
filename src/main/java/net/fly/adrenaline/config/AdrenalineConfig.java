@@ -189,7 +189,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean showThreadVisualizer() {
-        return get().showThreadVisualizer;
+        return BuildConfig.DEBUG && get().showThreadVisualizer;
     }
 
     public static WarmupMode warmupMode() {
