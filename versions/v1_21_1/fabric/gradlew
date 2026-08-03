@@ -1,0 +1,64 @@
+#!/usr/bin/env sh
+set -eu
+
+GRADLE_VERSION='9.4.0'
+DIST_NAME="gradle-${GRADLE_VERSION}-bin"
+DIST_URL="https://services.gradle.org/distributions/${DIST_NAME}.zip"
+GRADLE_USER_HOME="${GRADLE_USER_HOME:-${HOME:-${TMPDIR:-/tmp}/.gradle}}"
+DIST_ROOT="${GRADLE_USER_HOME}/wrapper/dists/${DIST_NAME}/portable"
+ZIP_PATH="${DIST_ROOT}/${DIST_NAME}.zip"
+TMP_PATH="${ZIP_PATH}.part"
+GRADLE_DIR="${DIST_ROOT}/gradle-${GRADLE_VERSION}"
+
+if [ -f "./gradle.properties" ]; then
+    while IFS='=' read -r key value; do
+        if [ "$key" = 'org.gradle.java.home' ] && [ -n "$value" ]; then
+            JAVA_HOME="$value"
+            export JAVA_HOME
+            break
+        fi
+    done < "./gradle.properties"
+fi
+
+download() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$DIST_URL" -o "$TMP_PATH"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO "$TMP_PATH" "$DIST_URL"
+    else
+        printf '%s
+' 'Unable to download Gradle: install curl or wget.' >&2
+        exit 1
+    fi
+    mv "$TMP_PATH" "$ZIP_PATH"
+}
+
+extract() {
+    if command -v unzip >/dev/null 2>&1; then
+        unzip -q -o "$ZIP_PATH" -d "$DIST_ROOT"
+    elif command -v python3 >/dev/null 2>&1; then
+        python3 - "$ZIP_PATH" "$DIST_ROOT" <<'PY'
+import sys
+import zipfile
+
+zip_path, dest = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(zip_path) as archive:
+    archive.extractall(dest)
+PY
+    else
+        printf '%s
+' 'Unable to extract Gradle: install unzip or python3.' >&2
+        exit 1
+    fi
+}
+
+mkdir -p "$DIST_ROOT"
+
+if [ ! -x "$GRADLE_DIR/bin/gradle" ]; then
+    if [ ! -f "$ZIP_PATH" ]; then
+        download
+    fi
+    extract
+fi
+
+exec "$GRADLE_DIR/bin/gradle" "$@"

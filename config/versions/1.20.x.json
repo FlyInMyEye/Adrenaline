@@ -1,0 +1,10 @@
+{
+  "java": "17/21",
+  "loaders": [
+    "fabric",
+    "forge"
+  ],
+  "minecraft_target": "[1.20, 1.21)",
+  "notes": "Covers 1.20 through 1.20.6",
+  "slug": "1.20.x"
+}

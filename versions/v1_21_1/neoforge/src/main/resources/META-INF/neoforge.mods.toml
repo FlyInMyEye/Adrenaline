@@ -1,0 +1,22 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="GPL-3.0-only"
+[[mods]]
+modId="adrenaline"
+version="0.1.2.4"
+displayName="Adrenaline"
+authors="Fly"
+logoFile="logo.png"
+description='''Generation multithreading, but better'''
+[[dependencies.adrenaline]]
+modId="neoforge"
+mandatory=true
+versionRange="[21.1.0,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.adrenaline]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21.1,1.22)"
+ordering="NONE"
+side="BOTH"

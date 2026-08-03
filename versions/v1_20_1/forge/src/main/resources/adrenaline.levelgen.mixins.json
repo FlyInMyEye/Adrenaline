@@ -1,0 +1,19 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.fly.adrenaline.mixin.levelgen",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "adrenaline.refmap.json",
+  "mixins": [
+    "AdrenalineMixinCacheAllInCellAccessor",
+    "AdrenalineMixinNoiseInterpolatorView",
+    "AdrenalineMixinSurfaceRulesContext",
+    "AdrenalineMixinSurfaceRulesContextApi",
+    "AdrenalineMixinSurfaceRulesContextMutable"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

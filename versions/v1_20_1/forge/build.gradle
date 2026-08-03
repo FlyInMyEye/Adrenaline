@@ -1,0 +1,205 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
+}
+
+def workspaceProperties = new Properties()
+def workspaceGradleProperties = file('../../../gradle.properties')
+workspaceGradleProperties.withInputStream { input -> workspaceProperties.load(input) }
+def sharedProperty = { key -> workspaceProperties.getProperty(key) }
+
+def modId = sharedProperty('mod_id')
+def modName = sharedProperty('mod_name')
+def modGroupId = sharedProperty('mod_group_id')
+def modVersion = sharedProperty('mod_version')
+def modAuthors = sharedProperty('mod_authors')
+def modLicense = sharedProperty('mod_license')
+def modDescription = sharedProperty('mod_description')
+def minecraftVersion = '1.20.1'
+def minecraftVersionRange = '[1.20.1,1.21)'
+def forgeVersion = '47.4.10'
+def forgeVersionRange = '[47,)'
+def loaderVersionRange = '[47,)'
+def prodBuild = providers.gradleProperty('prodBuild').map { it.toBoolean() }.orElse(false)
+def generatedBuildConfigDir = layout.buildDirectory.dir('generated/sources/buildConfig/java')
+
+version = modVersion
+group = modGroupId
+
+base {
+    archivesName = 'adrenaline-forge'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+sourceSets.main.java.setSrcDirs(['../../../common/src/main/java', '../common/src/main/java', 'src/main/java'])
+sourceSets.main.java.srcDir generatedBuildConfigDir
+sourceSets.main.resources.setSrcDirs(['../../../assets', 'src/main/resources', 'src/generated/resources'])
+
+minecraft {
+    mappings channel: 'official', version: minecraftVersion
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            mods {
+                "${modId}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', modId
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', modId
+            args '--nogui'
+        }
+
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', modId
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', modId, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+repositories {
+    maven {
+        url 'https://api.modrinth.com/maven'
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraftVersion}-${forgeVersion}"
+    compileOnly(annotationProcessor('io.github.llamalad7:mixinextras-common:0.5.4'))
+    implementation(jarJar('io.github.llamalad7:mixinextras-forge:0.5.4')) {
+        jarJar.ranged(it, '[0.5.4,)')
+    }
+    implementation fg.deobf('maven.modrinth:flys-config-lib:aRuhlvi5')
+    compileOnly fg.deobf('maven.modrinth:blueprint:xtEwbO0X')
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+tasks.register('generateBuildConfig') {
+    inputs.property('prodBuild', prodBuild)
+    outputs.dir(generatedBuildConfigDir)
+    doLast {
+        File outputFile = generatedBuildConfigDir.get().file('net/fly/adrenaline/BuildConfig.java').asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.text = """package net.fly.adrenaline;
+
+public final class BuildConfig {
+    public static final boolean DEBUG = ${!prodBuild.get()};
+
+    private BuildConfig() {
+    }
+}
+"""
+    }
+}
+
+tasks.named('compileJava', JavaCompile).configure {
+    dependsOn tasks.named('generateBuildConfig')
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def replaceProperties = [
+        minecraft_version: minecraftVersion,
+        minecraft_version_range: minecraftVersionRange,
+        forge_version: forgeVersion,
+        forge_version_range: forgeVersionRange,
+        loader_version_range: loaderVersionRange,
+        mod_id: modId,
+        mod_name: modName,
+        mod_license: modLicense,
+        mod_version: modVersion,
+        mod_authors: modAuthors,
+        mod_description: modDescription
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    from('../../../LICENSE') {
+        into 'META-INF'
+    }
+
+    if (prodBuild.get()) {
+        archiveFileName.set("adrenaline-forge-1.20.1-${modVersion}-prod-slim.jar")
+        exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
+    } else {
+        archiveFileName.set("adrenaline-forge-1.20.1-${modVersion}-slim.jar")
+    }
+
+    manifest {
+        attributes([
+            'Specification-Title': modId,
+            'Specification-Vendor': modAuthors,
+            'Specification-Version': '1',
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': modAuthors,
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+            'MixinConfigs': "${modId}.mixins.json,${modId}.compat.mixins.json,${modId}.levelgen.mixins.json"
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+
+tasks.named('jarJar', Jar).configure {
+    from('../../../LICENSE') {
+        into 'META-INF'
+    }
+    if (prodBuild.get()) {
+        archiveFileName.set("adrenaline-forge-1.20.1-${modVersion}-prod.jar")
+        exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
+    } else {
+        archiveFileName.set("adrenaline-forge-1.20.1-${modVersion}.jar")
+    }
+}
+
+mixin {
+    add sourceSets.main, "${modId}.refmap.json"
+    config "${modId}.mixins.json"
+    config "${modId}.compat.mixins.json"
+    config "${modId}.levelgen.mixins.json"
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.register('buildProd', GradleBuild) {
+    tasks = ['build']
+    startParameter.projectProperties.put('prodBuild', 'true')
+}

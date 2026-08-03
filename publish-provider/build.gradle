@@ -1,0 +1,60 @@
+import groovy.json.JsonSlurper
+import com.hypherionmc.modpublisher.properties.CurseEnvironment
+
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'com.hypherionmc.modutils.modpublisher' version '2.2.1'
+}
+
+def artifactPath = findProperty('artifactPath')?.toString()
+def gameVersionsValue = findProperty('gameVersions')?.toString() ?: ''
+def gameVersions = gameVersionsValue.split(',').collect { it.trim() }.findAll { !it.isEmpty() }
+def loaderId = findProperty('loaderId')?.toString()
+def displayName = findProperty('publishDisplayName')?.toString()
+def projectVersionValue = findProperty('publishProjectVersion')?.toString()
+def javaVersionValue = findProperty('publishJavaVersion')?.toString() ?: '17'
+def changelogOverride = findProperty('publishChangelog')?.toString() ?: ''
+def releaseTypeValue = findProperty('publishReleaseType')?.toString() ?: 'release'
+
+def secrets = [:]
+def publishCache = file('../.rmodcreator/publish.json')
+if (publishCache.exists()) {
+    secrets = (Map) new JsonSlurper().parse(publishCache)
+}
+
+def modrinthProjectId = (secrets.modrinth_project_id ?: '').toString()
+def curseforgeProjectId = (secrets.curseforge_project_id ?: '').toString()
+def modrinthToken = ((secrets.modrinth_token ?: System.getenv('MODRINTH_TOKEN')) ?: '').toString()
+def curseforgeToken = ((secrets.curseforge_token ?: System.getenv('CURSEFORGE_TOKEN') ?: System.getenv('CURSE_TOKEN')) ?: '').toString()
+def changelogFile = file('../CHANGELOG.md')
+def changelogValue = changelogOverride.trim().isEmpty() ? (changelogFile.exists() ? changelogFile.getText('UTF-8') : 'No changelog provided.') : changelogOverride
+
+repositories {
+    mavenCentral()
+}
+
+publisher {
+    apiKeys {
+        modrinth(modrinthToken)
+        curseforge(curseforgeToken)
+    }
+    setDebug(false)
+    setCurseID(curseforgeProjectId)
+    setModrinthID(modrinthProjectId)
+    setVersionType(releaseTypeValue)
+    setChangelog(changelogValue)
+    setProjectVersion(projectVersionValue)
+    setDisplayName(displayName)
+    setGameVersions(*gameVersions)
+    setLoaders(loaderId)
+    setCurseEnvironment(CurseEnvironment.BOTH)
+    setArtifact(artifactPath)
+    setDisableEmptyJarCheck(true)
+    javaVersions.add(JavaVersion.toVersion(javaVersionValue))
+    setIsManualRelease(true)
+}
+
+tasks.register('publishToModrinth') { dependsOn 'publishModrinth' }
+tasks.register('publishToCurseforge') { dependsOn 'publishCurseforge' }
+tasks.register('publishEverywhere') { dependsOn 'publishModrinth', 'publishCurseforge' }

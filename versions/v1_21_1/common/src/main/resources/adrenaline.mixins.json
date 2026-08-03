@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.fly.adrenaline.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "adrenaline.refmap.json",
+  "mixins": [],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.fly.adrenaline.mixin",
+  "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "MixinChunkMap",
+    "MixinChunkTaskPriorityQueueSorter",
+    "MixinChunkStatus",
+    "MixinStructureCheck",
+    "MixinChunkSerializer",
+    "MixinChunkAccessAccessor",
+    "MixinLevelChunkSectionAccessor",
+    "MixinMinecraftServer",
+    "MixinMinecraftServerSpawnTicket",
+    "MixinMessageAccessor",
+    "MixinMaterialRuleList",
+    "MixinWorldGenRegion",
+    "MixinAquiferFluidStatusAccessor",
+    "MixinNoiseBasedAquifer",
+    "MixinNoiseBasedChunkGenerator",
+    "MixinNoiseChunkAccessor",
+    "MixinNoiseChunk",
+    "MixinNoiseBasedChunkGeneratorRandom",
+    "MixinHeightmapAccessor",
+    "MixinBlock",
+    "MixinSurfaceSystem",
+    "MixinStructureTemplatePalette",
+    "MixinLegacyRandomSourceAccessor",
+    "MixinOreVeinifierInvoker",
+    "MixinBlender",
+    "MixinBeardifier",
+    "MixinNoiseChunkOreVeinifier"
+  ],
+  "client": [
+    "MixinCreateWorldScreen",
+    "MixinCreateWorldScreenInvoker",
+    "MixinLevelLoadingScreen",
+    "MixinLevelStorageSource",
+    "MixinDirectoryLock",
+    "MixinLevelSummary",
+    "MixinMinecraft",
+    "MixinReceivingLevelScreen",
+    "MixinOptionsScreen",
+    "MixinWorldListEntry",
+    "MixinWorldOpenFlows"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
