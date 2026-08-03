@@ -15,6 +15,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraftforge.event.ForgeEventFactory;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -23,6 +24,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
 public class MixinMinecraftServer {
+
+    @Unique
+    private int adrenaline$lastSpawnSaveCount;
 
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$resetDeferredSpawnSearch(CallbackInfo ci) {
@@ -86,6 +90,34 @@ public class MixinMinecraftServer {
         if (!((MinecraftServer) (Object) this).isRunning()) {
             progressListener.stop();
             ci.cancel();
+        }
+    }
+
+    @Inject(method = "prepareLevels", at = @At("HEAD"))
+    private void adrenaline$beginIncrementalSpawnSaving(ChunkProgressListener progressListener, CallbackInfo ci) {
+        this.adrenaline$lastSpawnSaveCount = 0;
+    }
+
+    @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V", ordinal = 0))
+    private void adrenaline$saveGeneratedSpawnChunks(ChunkProgressListener progressListener, CallbackInfo ci) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        if (BackgroundWorldgenWarmupState.isServer(server)) {
+            return;
+        }
+        ServerChunkCache chunkSource = server.overworld().getChunkSource();
+        int generated = chunkSource.getTickingGenerated();
+        int interval = AdrenalineConfig.incrementalSaveInterval();
+        if (interval > 0 && generated - this.adrenaline$lastSpawnSaveCount >= interval) {
+            chunkSource.save(false);
+            this.adrenaline$lastSpawnSaveCount = generated;
+        }
+    }
+
+    @Inject(method = "prepareLevels", at = @At("RETURN"))
+    private void adrenaline$finishIncrementalSpawnSaving(ChunkProgressListener progressListener, CallbackInfo ci) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        if (AdrenalineConfig.saveChunksAfterWorldCreation() && !BackgroundWorldgenWarmupState.isServer(server)) {
+            server.overworld().getChunkSource().save(false);
         }
     }
 
