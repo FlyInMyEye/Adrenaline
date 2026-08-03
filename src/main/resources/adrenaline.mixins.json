@@ -40,9 +40,13 @@
     "MixinCreateWorldScreenInvoker",
     "MixinLevelLoadingScreen",
     "MixinLevelStorageSource",
+    "MixinDirectoryLock",
+    "MixinLevelSummary",
     "MixinMinecraft",
     "MixinReceivingLevelScreen",
-    "MixinOptionsScreen"
+    "MixinOptionsScreen",
+    "MixinWorldListEntry",
+    "MixinWorldOpenFlows"
   ],
   "server": [],
   "injectors": {

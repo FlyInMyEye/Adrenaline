@@ -47,6 +47,9 @@ public class AdrenalineConfigScreen extends Screen {
     private Button initialSpawnOptimizationButton;
     private Button parallelWorldgenButton;
     private Button stagePriorityButton;
+    private Button saveChunksAfterWorldCreationButton;
+    private Button incrementalSaveIntervalButton;
+    private Button skipSavingScreenAfterExitButton;
     private Button fastLegacyRandomButton;
     private Button showCancelButton;
     private Button showThreadVisualizerButton;
@@ -99,6 +102,12 @@ public class AdrenalineConfigScreen extends Screen {
         this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH));
         y += 24;
         this.stagePriorityButton = this.addStagePriorityRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.stage_priority", PerformanceImpact.MEDIUM));
+        y += 24;
+        this.saveChunksAfterWorldCreationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.save_chunks_after_world_creation"), this.config.saveChunksAfterWorldCreation, value -> this.config.saveChunksAfterWorldCreation = value, tooltip("tooltip.adrenaline.config.save_chunks_after_world_creation", PerformanceImpact.MEDIUM));
+        y += 24;
+        this.incrementalSaveIntervalButton = this.addIncrementalSaveIntervalRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.incremental_save_interval", PerformanceImpact.MEDIUM));
+        y += 24;
+        this.skipSavingScreenAfterExitButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.skip_saving_screen_after_exit"), this.config.skipSavingScreenAfterExit, value -> this.config.skipSavingScreenAfterExit = value, tooltip("tooltip.adrenaline.config.skip_saving_screen_after_exit", PerformanceImpact.NONE));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
@@ -310,6 +319,24 @@ public class AdrenalineConfigScreen extends Screen {
         return this.addScrollableWidget(button, y, tooltip);
     }
 
+    private Button addIncrementalSaveIntervalRow(int labelX, int buttonX, int y, int buttonWidth, TooltipData tooltip) {
+        this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.incremental_save_interval"), labelX, y, false, tooltip));
+        Button button = Button.builder(this.incrementalSaveIntervalLabel(), pressed -> {
+            this.config.incrementalSaveInterval = switch (this.config.incrementalSaveInterval) {
+                case 0 -> 512;
+                case 512 -> 256;
+                case 256 -> 128;
+                case 128 -> 64;
+                case 64 -> 32;
+                case 32 -> 0;
+                default -> 128;
+            };
+            pressed.setMessage(this.incrementalSaveIntervalLabel());
+            this.saveConfig();
+        }).bounds(buttonX, y, buttonWidth, 20).build();
+        return this.addScrollableWidget(button, y, tooltip);
+    }
+
     private Button addWarmupModeRow(int labelX, int buttonX, int y, int buttonWidth, TooltipData tooltip) {
         this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.warmup_on_startup"), labelX, y, false, tooltip));
         Button button = Button.builder(this.warmupModeLabel(), pressed -> {
@@ -362,6 +389,14 @@ public class AdrenalineConfigScreen extends Screen {
             case NEAREST -> 0x55FF55;
         };
         return Component.translatable(key).withStyle(style -> style.withColor(color));
+    }
+
+    private Component incrementalSaveIntervalLabel() {
+        int interval = this.config.incrementalSaveInterval;
+        if (interval == 0) {
+            return Component.translatable("gui.adrenaline.toggle.off").withStyle(style -> style.withColor(0xFF5555));
+        }
+        return Component.literal(Integer.toString(interval)).withStyle(style -> style.withColor(0xFFFF55));
     }
 
     private Component warmupModeLabel() {
@@ -535,6 +570,9 @@ public class AdrenalineConfigScreen extends Screen {
         this.initialSpawnOptimizationButton.active = worldgenOptimizations;
         this.parallelWorldgenButton.active = true;
         this.stagePriorityButton.active = this.config.parallelWorldgen;
+        this.saveChunksAfterWorldCreationButton.active = true;
+        this.incrementalSaveIntervalButton.active = true;
+        this.skipSavingScreenAfterExitButton.active = true;
         this.featureSafetyRadiusSlider.active = this.config.parallelWorldgen;
         for (Button button : this.stageParallelButtons) {
             button.active = this.config.parallelWorldgen;

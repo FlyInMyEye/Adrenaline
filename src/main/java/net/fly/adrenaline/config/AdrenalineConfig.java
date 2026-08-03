@@ -54,6 +54,19 @@ public class AdrenalineConfig {
         return v == 0 ? Runtime.getRuntime().availableProcessors() : Math.max(1, v);
     }
 
+    public static boolean saveChunksAfterWorldCreation() {
+        return get().saveChunksAfterWorldCreation;
+    }
+
+    public static int incrementalSaveInterval() {
+        int interval = get().incrementalSaveInterval;
+        return interval == 0 || interval == 32 || interval == 64 || interval == 128 || interval == 256 || interval == 512 ? interval : 128;
+    }
+
+    public static boolean skipSavingScreenAfterExit() {
+        return get().skipSavingScreenAfterExit;
+    }
+
     public static int resolvedSpawnZoneRadius() {
         return Math.max(MIN_SPAWN_ZONE_RADIUS, Math.min(MAX_SPAWN_ZONE_RADIUS, get().spawnZoneRadius));
     }
@@ -211,6 +224,9 @@ public class AdrenalineConfig {
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
         public int serializationWorkerThreads = 0;
+        public boolean saveChunksAfterWorldCreation = true;
+        public int incrementalSaveInterval = 128;
+        public boolean skipSavingScreenAfterExit = true;
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
         public boolean prioritizeHigherStages = true;
@@ -254,6 +270,9 @@ public class AdrenalineConfig {
             this.initialSpawnOptimization = other.initialSpawnOptimization;
             this.generationWorkerThreads = other.generationWorkerThreads;
             this.serializationWorkerThreads = other.serializationWorkerThreads;
+            this.saveChunksAfterWorldCreation = other.saveChunksAfterWorldCreation;
+            this.incrementalSaveInterval = other.incrementalSaveInterval;
+            this.skipSavingScreenAfterExit = other.skipSavingScreenAfterExit;
             this.spawnZoneRadius = other.spawnZoneRadius;
             this.parallelWorldgen = other.parallelWorldgen;
             this.prioritizeHigherStages = other.prioritizeHigherStages;

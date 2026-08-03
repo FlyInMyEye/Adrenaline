@@ -46,7 +46,7 @@ public final class BackgroundWorldgenWarmup {
         if (running && (warmupMode == AdrenalineConfig.WarmupMode.OFF || completed || screen instanceof ConnectScreen)) {
             stop(minecraft);
         }
-        if (!started && warmupMode != AdrenalineConfig.WarmupMode.OFF && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null) {
+        if (!started && warmupMode != AdrenalineConfig.WarmupMode.OFF && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning()) {
             started = true;
             if (AdrenalineConfig.prepareWorldCreationContext()) {
                 WorldCreationContextWaiter.preload(minecraft);
@@ -57,7 +57,7 @@ public final class BackgroundWorldgenWarmup {
                 stop(minecraft);
             }
         }
-        if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
+        if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning() && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
             WorldCreationContextWaiter.preload(minecraft);
         }
     }

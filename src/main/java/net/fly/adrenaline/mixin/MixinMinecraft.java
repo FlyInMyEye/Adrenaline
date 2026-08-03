@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
+import net.fly.adrenaline.client.BackgroundWorldSave;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.client.WorldCreationContextWaiter;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -35,6 +36,7 @@ public class MixinMinecraft {
         boolean newWorld,
         CallbackInfo ci
     ) {
+        BackgroundWorldSave.awaitCompletion();
         BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
         if (AdrenalineConfig.prepareWorldCreationContext() && !BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
             WorldCreationContextWaiter.beginWorldLoad();
@@ -43,6 +45,20 @@ public class MixinMinecraft {
         ChunkJobScheduler.get().resume();
         EarlyWorldEntry.reset();
         WorldLoadCancellation.reset(levelId, newWorld);
+    }
+
+    @Redirect(method = "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;isShutdown()Z"))
+    private boolean adrenaline$saveWorldInBackground(IntegratedServer server) {
+        if (!AdrenalineConfig.skipSavingScreenAfterExit()) {
+            return server.isShutdown();
+        }
+        BackgroundWorldSave.detach(server);
+        return true;
+    }
+
+    @Inject(method = "destroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;close()V"))
+    private void adrenaline$finishBackgroundSaveBeforeShutdown(CallbackInfo ci) {
+        BackgroundWorldSave.awaitCompletion();
     }
 
     @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;isReady()Z"), cancellable = true)
@@ -109,6 +125,9 @@ public class MixinMinecraft {
         String levelToDelete = WorldLoadCancellation.levelToDelete();
         IntegratedServer server = minecraft.getSingleplayerServer();
         this.singleplayerServer = null;
+        if (server != null) {
+            BackgroundWorldSave.detach(server);
+        }
         minecraft.setScreen(new TitleScreen());
         if (levelToDelete != null) {
             WorldDeletion.deleteAsync(minecraft, server, levelToDelete);
