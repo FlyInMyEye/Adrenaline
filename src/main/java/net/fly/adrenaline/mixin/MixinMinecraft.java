@@ -121,6 +121,10 @@ public class MixinMinecraft {
         if (!WorldLoadCancellation.isRequested()) {
             return;
         }
+        if (WorldLoadCancellation.isClientHandled()) {
+            ci.cancel();
+            return;
+        }
         Minecraft minecraft = (Minecraft) (Object) this;
         String levelToDelete = WorldLoadCancellation.levelToDelete();
         IntegratedServer server = minecraft.getSingleplayerServer();

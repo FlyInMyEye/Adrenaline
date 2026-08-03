@@ -7,6 +7,7 @@ public final class WorldLoadCancellation {
     private static final AtomicBoolean REQUESTED = new AtomicBoolean();
     private static volatile String levelId;
     private static volatile boolean deleteOnCancel;
+    private static volatile boolean clientHandled;
 
     private WorldLoadCancellation() {
     }
@@ -15,6 +16,7 @@ public final class WorldLoadCancellation {
         REQUESTED.set(false);
         levelId = activeLevelId;
         deleteOnCancel = newWorld;
+        clientHandled = false;
     }
 
     public static void request() {
@@ -23,6 +25,14 @@ public final class WorldLoadCancellation {
 
     public static boolean isRequested() {
         return REQUESTED.get();
+    }
+
+    public static void markClientHandled() {
+        clientHandled = true;
+    }
+
+    public static boolean isClientHandled() {
+        return clientHandled;
     }
 
     public static String levelToDelete() {
