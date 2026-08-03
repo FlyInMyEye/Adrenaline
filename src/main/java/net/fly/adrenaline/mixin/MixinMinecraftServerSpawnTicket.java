@@ -20,6 +20,10 @@ public class MixinMinecraftServerSpawnTicket {
             original.call(chunkSource, ticketType, chunkPos, BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1, identifier);
             return;
         }
+        if (!((InitialWorldCreationAccess) this).adrenaline$isInitialWorldCreation() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
+            original.call(chunkSource, ticketType, chunkPos, 0, identifier);
+            return;
+        }
         int configuredRadius = AdrenalineConfig.internalSpawnPreparationRadius();
         original.call(chunkSource, ticketType, chunkPos, configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius, identifier);
     }

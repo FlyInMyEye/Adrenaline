@@ -119,7 +119,7 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
         this.prepareWorldCreationContextButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prepare_world_creation_context"), this.config.prepareWorldCreationContext, value -> this.config.prepareWorldCreationContext = value, tooltip("tooltip.adrenaline.config.prepare_world_creation_context", PerformanceImpact.LOW));
         y += 24;
-        this.fastTerrainLoadingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_terrain_loading"), this.config.fastTerrainLoading, value -> this.config.fastTerrainLoading = value, tooltip("tooltip.adrenaline.config.fast_terrain_loading", PerformanceImpact.LOW));
+        this.fastTerrainLoadingButton = this.addFastTerrainLoadingRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.fast_terrain_loading", PerformanceImpact.LOW));
         y += 24;
         this.startBeforehandButton = this.addStartBeforehandRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.start_beforehand", PerformanceImpact.NONE));
         y += 24;
@@ -352,6 +352,21 @@ public class AdrenalineConfigScreen extends Screen {
         return this.addScrollableWidget(button, y, tooltip);
     }
 
+    private Button addFastTerrainLoadingRow(int labelX, int buttonX, int y, int buttonWidth, TooltipData tooltip) {
+        this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.fast_terrain_loading"), labelX, y, false, tooltip));
+        Button button = Button.builder(this.fastTerrainLoadingLabel(), pressed -> {
+            AdrenalineConfig.FastTerrainLoadingMode mode = switch (this.config.fastTerrainLoadingMode()) {
+                case OFF -> AdrenalineConfig.FastTerrainLoadingMode.ON;
+                case ON -> AdrenalineConfig.FastTerrainLoadingMode.EXTREME;
+                case EXTREME -> AdrenalineConfig.FastTerrainLoadingMode.OFF;
+            };
+            this.config.setFastTerrainLoadingMode(mode);
+            pressed.setMessage(this.fastTerrainLoadingLabel());
+            this.saveConfig();
+        }).bounds(buttonX, y, buttonWidth, 20).build();
+        return this.addScrollableWidget(button, y, tooltip);
+    }
+
     private int addSectionHeader(String title, int y) {
         this.scrollableLabels.add(new ScrollableLabel(Component.translatable(title), 0, y, true, null));
         return y + 16;
@@ -409,6 +424,21 @@ public class AdrenalineConfigScreen extends Screen {
             case ON -> 0x55FF55;
             case NON_BLOCK -> 0xFFFF55;
             case OFF -> 0xFF5555;
+        };
+        return Component.translatable(key).withStyle(style -> style.withColor(color));
+    }
+
+    private Component fastTerrainLoadingLabel() {
+        AdrenalineConfig.FastTerrainLoadingMode mode = this.config.fastTerrainLoadingMode();
+        String key = switch (mode) {
+            case OFF -> "gui.adrenaline.toggle.off";
+            case ON -> "gui.adrenaline.toggle.on";
+            case EXTREME -> "gui.adrenaline.toggle.extreme";
+        };
+        int color = switch (mode) {
+            case OFF -> 0xFF5555;
+            case ON -> 0x55FF55;
+            case EXTREME -> 0xFFFF55;
         };
         return Component.translatable(key).withStyle(style -> style.withColor(color));
     }

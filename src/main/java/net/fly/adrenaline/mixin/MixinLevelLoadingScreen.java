@@ -51,14 +51,15 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Override
     protected void init() {
+        boolean hideJoiningControls = !WorldLoadCancellation.isNewWorld() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF;
         AdrenalineConfig.StartBeforehandMode startMode = AdrenalineConfig.startBeforehandMode();
-        if (startMode != AdrenalineConfig.StartBeforehandMode.OFF) {
+        if (!hideJoiningControls && startMode != AdrenalineConfig.StartBeforehandMode.OFF) {
             Component message = Component.translatable(startMode == AdrenalineConfig.StartBeforehandMode.BORING ? "gui.adrenaline.enter_early_boring" : "gui.adrenaline.enter_early");
             this.adrenaline$earlyEntryButton = this.addRenderableWidget(Button.builder(message, this::adrenaline$requestEarlyEntry).bounds((this.width - 160) / 2, this.height - 52, 160, 20).build());
         } else {
             this.adrenaline$earlyEntryButton = null;
         }
-        if (AdrenalineConfig.showCancelButton()) {
+        if (!hideJoiningControls && AdrenalineConfig.showCancelButton()) {
             this.adrenaline$cancelButton = this.addRenderableWidget(Button.builder(Component.translatable("gui.adrenaline.cancel"), this::adrenaline$cancelWorldCreation).bounds((this.width - 100) / 2, this.height - 28, 100, 20).build());
         } else {
             this.adrenaline$cancelButton = null;
@@ -105,6 +106,9 @@ public abstract class MixinLevelLoadingScreen extends Screen {
             AprilFoolsEasterEgg.render(guiGraphics, centerX, centerY, mapSize);
             return;
         }
+        if (!WorldLoadCancellation.isNewWorld() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
+            return;
+        }
         if (AdrenalineConfig.resolvedSpawnZoneRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return;
         }
@@ -132,6 +136,9 @@ public abstract class MixinLevelLoadingScreen extends Screen {
 
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;getFormattedProgress()Ljava/lang/String;"))
     private String adrenaline$replaceInstantProgressText(LevelLoadingScreen screen) {
+        if (!WorldLoadCancellation.isNewWorld() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
+            return Component.translatable("gui.adrenaline.loading.getting_spawnpoint").getString();
+        }
         return AdrenalineConfig.resolvedSpawnZoneRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? Component.translatable("gui.adrenaline.loading.searching_spawnpoint").getString() : this.getFormattedProgress();
     }
 
