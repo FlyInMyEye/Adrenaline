@@ -1,0 +1,146 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+def workspaceProperties = new Properties()
+def workspaceGradleProperties = file('../../../gradle.properties')
+if (workspaceGradleProperties.exists()) {
+    workspaceGradleProperties.withInputStream { input -> workspaceProperties.load(input) }
+}
+def sharedProperty = { key, fallback = null ->
+    def value = workspaceProperties.getProperty(key)
+    if (value != null) {
+        return value
+    }
+    value = findProperty(key)
+    if (value != null) {
+        return value.toString()
+    }
+    fallback
+}
+def projectModId = sharedProperty('mod_id')
+def projectModName = sharedProperty('mod_name')
+def projectModGroupId = sharedProperty('mod_group_id')
+def projectModVersion = sharedProperty('mod_version')
+def projectModAuthors = sharedProperty('mod_authors')
+def projectModLicense = sharedProperty('mod_license')
+def projectModDescription = sharedProperty('mod_description')
+def projectPublishModrinth = sharedProperty('publish_modrinth', 'false').toString()
+def projectPublishCurseforge = sharedProperty('publish_curseforge', 'false').toString()
+def projectPublishChangelog = sharedProperty('publish_changelog', '')
+def projectPublishReleaseType = sharedProperty('publish_release_type', 'release')
+
+version = projectModVersion
+group = projectModGroupId
+
+base {
+    archivesName = 'adrenaline-forge'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+def minecraft_version = '1.21.1'
+def minecraft_version_range = '[1.21.1,1.22)'
+def forge_version = '52.1.0'
+def forge_version_range = '[52,)'
+def loader_version_range = '[52,)'
+def mapping_channel = 'official'
+def mapping_version = '1.21.1'
+
+sourceSets.main.java.srcDir('../../../common/src/main/java')
+sourceSets.main.java.srcDir('../common/src/main/java')
+sourceSets.main.resources.srcDir('../../../assets')
+sourceSets.main.resources.srcDir('../common/src/main/resources')
+sourceSets.main.resources.srcDir('src/generated/resources')
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+    copyIdeResources = true
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            property 'mixin.env.remapRefMap', 'true'
+            property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            mods {
+                "adrenaline" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', 'adrenaline'
+        }
+
+        server {
+            property 'forge.enabledGameTestNamespaces', 'adrenaline'
+            args '--nogui'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+jar {
+    manifest {
+        attributes(
+            'Specification-Title': 'Adrenaline',
+            'Specification-Vendor': 'Fly',
+            'Specification-Version': '1',
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version,
+            'Implementation-Vendor': 'Fly',
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+            'MixinConfigs': 'adrenaline.mixins.json'
+        )
+    }
+}
+def reobfJarTask = tasks.findByName('reobfJar')
+if (reobfJarTask != null) {
+    jar.finalizedBy(reobfJarTask)
+}
+jar {
+    def effectiveVersion = projectModVersion.toString()
+    def versionedName = "adrenaline-forge-1.21.1-${effectiveVersion}.jar"
+    if (delegate.hasProperty('archiveFileName')) {
+        archiveFileName.set(versionedName)
+    } else {
+        archiveName = versionedName
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    def replaceProperties = [
+        minecraft_version: '1.21.1',
+        minecraft_version_range: '[1.21.1,1.22)',
+        forge_version: '52.1.0',
+        forge_version_range: '[52,)',
+        loader_version_range: '[52,)',
+        mod_id: 'adrenaline',
+        mod_name: 'Adrenaline',
+        mod_license: 'GPL-3.0-only',
+        mod_version: '0.1.2.4',
+        mod_authors: 'Fly',
+        mod_description: 'Generation multithreading, but better'
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'mcmod.info', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}

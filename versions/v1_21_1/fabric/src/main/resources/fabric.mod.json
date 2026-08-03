@@ -1,0 +1,27 @@
+{
+  "authors": [
+    "Fly"
+  ],
+  "depends": {
+    "fabric-api": "*",
+    "fabricloader": ">=0.18.6",
+    "java": ">=21",
+    "minecraft": "1.21.1"
+  },
+  "description": "Generation multithreading, but better",
+  "entrypoints": {
+    "main": [
+      "net.fly.adrenaline.AdrenalineFabric"
+    ]
+  },
+  "environment": "*",
+  "icon": "logo.png",
+  "id": "adrenaline",
+  "license": "GPL-3.0-only",
+  "mixins": [
+    "adrenaline.mixins.json"
+  ],
+  "name": "Adrenaline",
+  "schemaVersion": 1,
+  "version": "0.1.2.4"
+}

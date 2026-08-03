@@ -1,0 +1,11 @@
+{
+  "java": "21",
+  "loaders": [
+    "fabric",
+    "forge",
+    "neoforge"
+  ],
+  "minecraft_target": "[1.21, 1.21.2)",
+  "notes": "Tricky Trials",
+  "slug": "tricky-trials"
+}

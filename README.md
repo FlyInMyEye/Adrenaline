@@ -1,7 +1,7 @@
 # Adrenaline
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/FlyInMyEye/Adrenaline/master/src/main/resources/adrenaline.png" alt="Adrenaline" width="300">
+  <img src="https://raw.githubusercontent.com/FlyInMyEye/Adrenaline/master/assets/adrenaline.png" alt="Adrenaline" width="300">
 </p>
 
 <p align="center">
@@ -13,7 +13,7 @@
 
 <p align="center"><i>Generation multithreading, but better.</i></p>
 
-Adrenaline is a Forge mod for Minecraft 1.20.1 focused on world generation performance. It adds parallel chunk generation, configurable worldgen optimizations, and compatibility handling for problematic mod combinations.
+Adrenaline is a Minecraft mod focused on world generation performance. The current implementation supports Fabric and Forge 1.20.1, with Minecraft 1.21.1 loader ports scaffolded in the multi-loader workspace.
 
 <p align="center">
   <img src="https://cdn.modrinth.com/data/cached_images/de76a6583c0ad529c4838a64d236679e2d8c10ac.gif" alt="Vanilla generation (slow)" width="300">
@@ -35,10 +35,11 @@ Adrenaline is a Forge mod for Minecraft 1.20.1 focused on world generation perfo
 
 ## Installation
 
-1. Install Forge for Minecraft 1.20.1
-2. Download the Adrenaline jar from the project pages below
-3. Place the jar in your `mods` folder
-4. Launch the game
+1. Install Fabric Loader with Fabric API, or Forge, for Minecraft 1.20.1
+2. Install Fly's Config Lib 1.2.0 or newer
+3. Download the Adrenaline jar from the project pages below
+4. Place the jar in your `mods` folder
+5. Launch the game
 
 Project pages:
 
@@ -51,6 +52,10 @@ Project pages:
 | Minecraft | Loader | Status |
 |-----------|--------|--------|
 | 1.20.1 | Forge 47.x | Active |
+| 1.20.1 | Fabric | Active |
+| 1.21.1 | Fabric | Scaffold |
+| 1.21.1 | Forge | Scaffold |
+| 1.21.1 | NeoForge | Scaffold |
 
 ---
 
@@ -74,6 +79,6 @@ Prod build:
 ./gradlew buildProd
 ```
 
-Built jars are in `build/libs/`.
+Built jars are in `versions/<version>/<loader>/build/libs/`.
 
 ---

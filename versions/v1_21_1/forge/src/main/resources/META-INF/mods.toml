@@ -1,0 +1,24 @@
+modLoader="javafml"
+loaderVersion="[52,)"
+license="GPL-3.0-only"
+[[mods]]
+modId="adrenaline"
+version="0.1.2.4"
+displayName="Adrenaline"
+authors="Fly"
+logoFile="logo.png"
+description='''Generation multithreading, but better'''
+[[dependencies.adrenaline]]
+modId="forge"
+mandatory=true
+versionRange="[52,)"
+ordering="NONE"
+side="BOTH"
+[[dependencies.adrenaline]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21.1,1.22)"
+ordering="NONE"
+side="BOTH"
+[[mixins]]
+config = "adrenaline.mixins.json"
