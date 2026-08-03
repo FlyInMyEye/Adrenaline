@@ -2,6 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.Adrenaline;
 import net.fly.adrenaline.client.AprilFoolsEasterEgg;
+import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.EarlyWorldEntry;
@@ -11,6 +12,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.progress.StoringChunkProgressListener;
@@ -177,6 +179,12 @@ public abstract class MixinLevelLoadingScreen extends Screen {
         button.active = false;
         button.setMessage(Component.translatable("gui.adrenaline.loading.cancelling_world_creation"));
         server.halt(false);
+        String levelToDelete = WorldLoadCancellation.levelToDelete();
+        WorldLoadCancellation.markClientHandled();
+        minecraft.clearLevel(new TitleScreen());
+        if (levelToDelete != null) {
+            WorldDeletion.deleteAsync(minecraft, server, levelToDelete);
+        }
     }
 
     @Unique
