@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.Adrenaline;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.client.AprilFoolsEasterEgg;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -96,7 +97,7 @@ public abstract class MixinLevelLoadingScreen extends Screen {
             this.adrenaline$earlyEntryButton.active = !EarlyWorldEntry.isRequested() && server != null && !server.isShutdown() && !WorldLoadCancellation.isRequested();
         }
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-        if (AdrenalineConfig.showThreadVisualizer()) {
+        if (BuildConfig.DEBUG && AdrenalineConfig.showThreadVisualizer()) {
             this.adrenaline$renderThreadVisualizer(guiGraphics);
         }
     }

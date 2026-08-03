@@ -105,8 +105,6 @@ public class AdrenalineConfigScreen extends Screen {
         y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
         this.showCancelButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_cancel_button"), this.config.showCancelButton, value -> this.config.showCancelButton = value, tooltip("tooltip.adrenaline.config.show_cancel_button", PerformanceImpact.NONE));
         y += 24;
-        this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
-        y += 24;
         this.warmupOnStartupButton = this.addWarmupModeRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.warmup_on_startup", PerformanceImpact.MEDIUM));
         y += 24;
         this.prepareWorldCreationContextButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.prepare_world_creation_context"), this.config.prepareWorldCreationContext, value -> this.config.prepareWorldCreationContext = value, tooltip("tooltip.adrenaline.config.prepare_world_creation_context", PerformanceImpact.LOW));
@@ -174,6 +172,8 @@ public class AdrenalineConfigScreen extends Screen {
 
         if (BuildConfig.DEBUG) {
             y = this.addSectionHeader("gui.adrenaline.config.section.diagnostics", y);
+            this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
+            y += 24;
             this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.debug_logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("tooltip.adrenaline.config.debug_logging", PerformanceImpact.NONE));
             y += 24;
             this.forceEasterEggButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.force_easter_egg"), this.config.forceEasterEgg, value -> this.config.forceEasterEgg = value, tooltip("tooltip.adrenaline.config.force_easter_egg", PerformanceImpact.NONE));
@@ -611,9 +611,9 @@ public class AdrenalineConfigScreen extends Screen {
         }
         this.fastLegacyRandomButton.active = true;
         this.showCancelButton.active = true;
-        this.showThreadVisualizerButton.active = true;
         this.startBeforehandButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
+            this.showThreadVisualizerButton.active = true;
             this.debugLoggingButton.active = true;
             this.forceEasterEggButton.active = true;
         }
