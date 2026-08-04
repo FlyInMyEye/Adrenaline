@@ -28,8 +28,7 @@ public final class SurfaceRulesContextFactory {
 
     static {
         try {
-            Class<?> contextType = Class.forName("net.minecraft.world.level.levelgen.SurfaceRules$Context");
-            CONSTRUCTOR = contextType.getDeclaredConstructor(SurfaceSystem.class, RandomState.class, ChunkAccess.class, NoiseChunk.class, Function.class, Registry.class, WorldGenerationContext.class);
+            CONSTRUCTOR = findContextConstructor();
             CONSTRUCTOR.setAccessible(true);
         } catch (ReflectiveOperationException exception) {
             throw new RuntimeException(exception);
@@ -94,6 +93,24 @@ public final class SurfaceRulesContextFactory {
         }
 
         throw new NoSuchMethodException("Could not find SurfaceRules.SurfaceRule tryApply method");
+    }
+
+    private static Constructor<?> findContextConstructor() throws NoSuchMethodException {
+        for (Class<?> nestedType : SurfaceRules.class.getDeclaredClasses()) {
+            try {
+                return nestedType.getDeclaredConstructor(
+                    SurfaceSystem.class,
+                    RandomState.class,
+                    ChunkAccess.class,
+                    NoiseChunk.class,
+                    Function.class,
+                    Registry.class,
+                    WorldGenerationContext.class
+                );
+            } catch (NoSuchMethodException ignored) {
+            }
+        }
+        throw new NoSuchMethodException("Could not find SurfaceRules context constructor");
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

@@ -7,12 +7,13 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-public class FastloadCompatScreen extends Screen {
-
+public class IncompatibleModsScreen extends Screen {
     private static final ResourceLocation PANEL_TEXTURE = new ResourceLocation("textures/gui/options_background.png");
+    private final List<String> incompatibleMods;
 
-    public FastloadCompatScreen() {
+    public IncompatibleModsScreen(List<String> incompatibleMods) {
         super(Component.translatable("gui.adrenaline.compat.title"));
+        this.incompatibleMods = List.copyOf(incompatibleMods);
     }
 
     @Override
@@ -30,13 +31,11 @@ public class FastloadCompatScreen extends Screen {
         this.renderBackground(guiGraphics);
         this.renderTiledPanel(guiGraphics, 0, 0, this.width, this.height);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 40, 16777215);
-
         int y = 72;
         for (FormattedLine line : this.bodyLines()) {
             guiGraphics.drawCenteredString(this.font, line.text(), this.width / 2, y, line.color());
             y += 12;
         }
-
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
@@ -51,9 +50,9 @@ public class FastloadCompatScreen extends Screen {
 
     private List<FormattedLine> bodyLines() {
         return List.of(
-            new FormattedLine(Component.translatable("gui.adrenaline.compat.fastload.line1"), 0xFFE0E0E0),
-            new FormattedLine(Component.translatable("gui.adrenaline.compat.fastload.line2"), 0xFFE0E0E0),
-            new FormattedLine(Component.translatable("gui.adrenaline.compat.fastload.line3"), 0xFFFFD060)
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.incompatible.line1", String.join(", ", this.incompatibleMods)), 0xFFE0E0E0),
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.incompatible.line2"), 0xFFE0E0E0),
+            new FormattedLine(Component.translatable("gui.adrenaline.compat.incompatible.line3"), 0xFFFFD060)
         );
     }
 
