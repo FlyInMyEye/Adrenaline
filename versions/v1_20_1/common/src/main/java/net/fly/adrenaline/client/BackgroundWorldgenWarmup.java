@@ -29,6 +29,9 @@ public final class BackgroundWorldgenWarmup {
     private static volatile IntegratedServer server;
 
     public void tick(Minecraft minecraft) {
+        if (!ClientResourceReloadState.isReady()) {
+            return;
+        }
         Screen screen = minecraft.screen;
         if (!AdrenalineConfig.prepareWorldCreationContext() && WorldCreationContextWaiter.get() != null) {
             WorldCreationContextWaiter.consume();
