@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.mojang.datafixers.util.Either;
 import java.util.Deque;
 import java.util.Map;
@@ -108,6 +110,7 @@ public class MixinChunkMap {
             target = "Lnet/minecraft/util/thread/ProcessorHandle;tell(Ljava/lang/Object;)V"
         )
     )
+    @ControlsOptimization(Optimization.PARALLEL_WORLDGEN)
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
         ChunkHolder holder = this.adrenaline$currentHolder.get();
         ChunkStatus nextStatus = null;

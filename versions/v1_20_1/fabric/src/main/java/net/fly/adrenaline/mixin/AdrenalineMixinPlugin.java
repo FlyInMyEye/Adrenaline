@@ -3,6 +3,9 @@ package net.fly.adrenaline.mixin;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
+import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
 import net.fly.adrenaline.compatdata.IncompatibilityRegistry;
 import net.fly.adrenaline.compatdata.IncompatibleData;
 import org.objectweb.asm.tree.ClassNode;
@@ -48,5 +51,21 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+        if (mixinClassName.contains("OptimizationTakeoverDetector")) {
+            OptimizationTakeoverDetector.captureClaims(targetClass, mixinInfo);
+            OptimizationTakeoverDetector.detectTakeovers(targetClass, AdrenalineMixinPlugin::displayName);
+        } else {
+            OptimizationTakeoverDetector.captureClaims(targetClass, mixinInfo);
+        }
+    }
+
+    private static String displayName(String mixinClassName) {
+        String resource = mixinClassName.replace('.', '/') + ".class";
+        for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
+            if (container.findPath(resource).isPresent()) {
+                return container.getMetadata().getName();
+            }
+        }
+        return mixinClassName;
     }
 }

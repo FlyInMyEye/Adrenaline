@@ -2,6 +2,10 @@ package net.fly.adrenaline.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import net.fly.adrenaline.AdrenalinePlatform;
+import net.fly.adrenaline.client.InitialWorldCreationAccess;
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
@@ -50,6 +54,7 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     }
 
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.INITIAL_SPAWN)
     private static void adrenaline$deferInitialSpawnSearch(ServerLevel level, ServerLevelData levelData, boolean generateBonusChest, boolean debugWorld, CallbackInfo ci) {
         if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return;
@@ -67,8 +72,12 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         ci.cancel();
     }
 
-    @ModifyConstant(method = "loadLevel", constant = @Constant(intValue = 11))
+    @ModifyConstant(method = "loadLevel", constant = @Constant(intValue = 11), require = 0)
+    @ControlsOptimization(Optimization.SPAWN_ZONE)
     private int adrenaline$useConfiguredSpawnZoneRadiusForProgress(int radius) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+            return radius;
+        }
         if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
             return BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS;
         }
@@ -79,8 +88,12 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         return configuredRadius == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS ? 0 : configuredRadius;
     }
 
-    @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "CONSTANT", args = "intValue=441"))
+    @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "CONSTANT", args = "intValue=441"), require = 0)
+    @ControlsOptimization(Optimization.SPAWN_ZONE)
     private int adrenaline$useConfiguredSpawnZoneChunkCount(int chunkCount) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+            return chunkCount;
+        }
         if (!this.adrenaline$initialWorldCreation && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
             return 0;
         }

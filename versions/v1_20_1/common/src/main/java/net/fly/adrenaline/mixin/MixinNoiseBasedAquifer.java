@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -81,6 +83,7 @@ public abstract class MixinNoiseBasedAquifer {
     private int adrenaline$lastSearchGridZ;
 
     @Inject(method = "<init>", at = @At("TAIL"))
+    @ControlsOptimization(Optimization.AQUIFER)
     private void adrenaline$prewarmCenterCache(CallbackInfo ci) {
         if (!AdrenalineConfig.aquiferOptimizationsEnabled() || aquiferLocationCache.length > 4096) {
             return;
@@ -112,6 +115,7 @@ public abstract class MixinNoiseBasedAquifer {
 
     @Overwrite
     @Nullable
+    @ControlsOptimization(Optimization.AQUIFER)
     public BlockState computeSubstance(DensityFunction.FunctionContext context, double density) {
         if (adrenaline$packedAquiferLocations != null) {
             return adrenaline$computeSubstanceFast(context, density);

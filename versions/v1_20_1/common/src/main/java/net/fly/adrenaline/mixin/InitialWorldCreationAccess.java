@@ -1,4 +1,4 @@
-package net.fly.adrenaline.mixin;
+package net.fly.adrenaline.client;
 
 public interface InitialWorldCreationAccess {
 

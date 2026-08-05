@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.SurfaceSystemOptimizer;
 import net.minecraft.core.BlockPos.MutableBlockPos;
@@ -40,6 +42,7 @@ public abstract class MixinSurfaceSystem {
     protected abstract void frozenOceanExtension(int minSurfaceLevel, Biome biome, net.minecraft.world.level.chunk.BlockColumn column, MutableBlockPos pos, int blockX, int blockZ, int topY);
 
     @Inject(method = "buildSurface", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.SURFACE)
     private void adrenaline$buildSurface(RandomState randomState, BiomeManager biomeManager, Registry<Biome> biomeRegistry, boolean useLegacyRandomSource, WorldGenerationContext context, ChunkAccess chunk, NoiseChunk noiseChunk, SurfaceRules.RuleSource ruleSource, CallbackInfo ci) {
         if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
             return;
@@ -50,6 +53,7 @@ public abstract class MixinSurfaceSystem {
     }
 
     @Inject(method = "getSurfaceDepth", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.SURFACE)
     private void adrenaline$getSurfaceDepth(int blockX, int blockZ, CallbackInfoReturnable<Integer> cir) {
         if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
             return;

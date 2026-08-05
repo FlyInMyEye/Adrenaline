@@ -115,6 +115,7 @@
   "tooltip.adrenaline.config.incremental_save_interval": "Saves completed spawn chunks after this many additional chunks are generated. Smaller intervals distribute saving more evenly.",
   "tooltip.adrenaline.config.skip_saving_screen_after_exit": "Returns to the menu while the integrated server finishes saving in the background.",
   "tooltip.adrenaline.config.terrain_fill_optimizations": "Speeds up block filling during noise terrain generation.",
+  "tooltip.adrenaline.config.optimization_controlled": "%s took control of this optimization.",
   "tooltip.adrenaline.config.surface_optimizations": "Speeds up surface rule evaluation and block placement.",
   "tooltip.adrenaline.config.noise_chunk_optimizations": "Optimizes hot paths inside noise chunk sampling.",
   "tooltip.adrenaline.config.material_rule_optimizations": "Reduces overhead in material rule dispatch.",

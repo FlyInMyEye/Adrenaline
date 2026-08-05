@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import java.util.List;
 
@@ -121,6 +123,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Inject(method = "fillSlice", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$fillSlice(boolean useFirstSlice, int cellX, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -131,6 +134,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Inject(method = "selectCellYZ", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$selectCellYZ(int cellY, int cellZ, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -146,6 +150,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Inject(method = "updateForY", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$updateForY(int blockY, double yLerp, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -157,6 +162,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Inject(method = "updateForX", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$updateForX(int blockX, double xLerp, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -168,6 +174,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Inject(method = "updateForZ", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$updateForZ(int blockZ, double zLerp, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -180,6 +187,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Inject(method = "swapSlices", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$swapSlices(CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -190,6 +198,7 @@ public abstract class MixinNoiseChunk {
     }
 
     @Overwrite
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
     public int preliminarySurfaceLevel(int blockX, int blockZ) {
         int x = QuartPos.toBlock(QuartPos.fromBlock(blockX));
         int z = QuartPos.toBlock(QuartPos.fromBlock(blockZ));
