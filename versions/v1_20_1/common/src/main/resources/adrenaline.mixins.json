@@ -42,6 +42,7 @@
     "MixinLevelSummary",
     "MixinMinecraft",
     "MixinReceivingLevelScreen",
+    "MixinScreen",
     "MixinOptionsScreen",
     "MixinWorldListEntry",
     "MixinWorldOpenFlows"

@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.client.AprilFoolsEasterEgg;
+import net.fly.adrenaline.client.LevelLoadingScreenExtension;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -28,7 +29,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LevelLoadingScreen.class)
-public abstract class MixinLevelLoadingScreen extends Screen {
+public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoadingScreenExtension {
 
     private static final int DEFAULT_SPAWN_ZONE_RADIUS = 11;
     private static final int DEFAULT_DIAMETER = (DEFAULT_SPAWN_ZONE_RADIUS + ChunkStatus.maxDistance()) * 2 + 1;
@@ -53,7 +54,7 @@ public abstract class MixinLevelLoadingScreen extends Screen {
     }
 
     @Override
-    protected void init() {
+    public void adrenaline$addJoiningControls() {
         boolean hideJoiningControls = !WorldLoadCancellation.isNewWorld() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF;
         AdrenalineConfig.StartBeforehandMode startMode = AdrenalineConfig.startBeforehandMode();
         if (!hideJoiningControls && startMode != AdrenalineConfig.StartBeforehandMode.OFF) {
