@@ -1,5 +1,7 @@
 package net.fly.adrenaline.config;
 
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import java.nio.file.Path;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.configlib.JsonConfigManager;
@@ -92,7 +94,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean skipSavingScreenAfterExit() {
-        return get().skipSavingScreenAfterExit;
+        return get().skipSavingScreenAfterExit && !OptimizationTakeoverRegistry.isControlled(Optimization.BACKGROUND_SAVE);
     }
 
     public static int resolvedSpawnZoneRadius() {
@@ -100,7 +102,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean parallelWorldgenEnabled() {
-        return get().parallelWorldgen;
+        return get().parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.PARALLEL_WORLDGEN);
     }
 
     public static StagePriority stagePriority() {
@@ -169,35 +171,39 @@ public class AdrenalineConfig {
     }
 
     public static boolean initialSpawnOptimizationEnabled() {
-        return get().worldgenOptimizations && get().initialSpawnOptimization;
+        return get().worldgenOptimizations && get().initialSpawnOptimization && !OptimizationTakeoverRegistry.isControlled(Optimization.INITIAL_SPAWN);
     }
 
     public static boolean terrainFillOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().terrainFillOptimizations;
+        return get().worldgenOptimizations && get().terrainFillOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
+    }
+
+    public static boolean inlineTerrainFillTasks() {
+        return terrainFillOptimizationsEnabled() || parallelWorldgenEnabled() && OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
     }
 
     public static boolean surfaceOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().surfaceOptimizations;
+        return get().worldgenOptimizations && get().surfaceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
     }
 
     public static boolean noiseChunkOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().noiseChunkOptimizations;
+        return get().worldgenOptimizations && get().noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
     }
 
     public static boolean materialRuleOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().materialRuleOptimizations;
+        return get().worldgenOptimizations && get().materialRuleOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
     }
 
     public static boolean aquiferOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().aquiferOptimizations;
+        return get().worldgenOptimizations && get().aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
     }
 
     public static boolean beardifierOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().beardifierOptimizations;
+        return get().worldgenOptimizations && get().beardifierOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BEARDIFIER);
     }
 
     public static boolean oreVeinOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().oreVeinOptimizations;
+        return get().worldgenOptimizations && get().oreVeinOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
     }
 
     public static boolean parallelChunkSerializationEnabled() {
@@ -205,7 +211,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean fastLegacyRandomEnabled() {
-        return get().fastLegacyRandom;
+        return get().fastLegacyRandom && !OptimizationTakeoverRegistry.isControlled(Optimization.FAST_LEGACY_RANDOM);
     }
 
     public static boolean showCancelButton() {

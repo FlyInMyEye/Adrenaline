@@ -1,6 +1,8 @@
 package net.fly.adrenaline.client;
 
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -93,11 +95,12 @@ public class AdrenalineConfigScreen extends Screen {
         y = this.addSectionHeader("gui.adrenaline.config.section.general", y);
         this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.generation_threads"), () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH)), y, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH));
         y += 30;
-        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, tooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW)), y, tooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW));
+        TooltipData spawnZoneTooltip = optimizationTooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW, Optimization.SPAWN_ZONE);
+        this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, spawnZoneTooltip), y, spawnZoneTooltip);
         y += 30;
         this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.worldgen_optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("tooltip.adrenaline.config.worldgen_optimization", PerformanceImpact.EXTREME));
         y += 24;
-        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, tooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH));
+        this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, optimizationTooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH, Optimization.PARALLEL_WORLDGEN));
         y += 24;
         this.stagePriorityButton = this.addStagePriorityRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.stage_priority", PerformanceImpact.MEDIUM));
         y += 24;
@@ -121,25 +124,25 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
         this.incrementalSaveIntervalButton = this.addIncrementalSaveIntervalRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.incremental_save_interval", PerformanceImpact.MEDIUM));
         y += 24;
-        this.skipSavingScreenAfterExitButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.skip_saving_screen_after_exit"), this.config.skipSavingScreenAfterExit, value -> this.config.skipSavingScreenAfterExit = value, tooltip("tooltip.adrenaline.config.skip_saving_screen_after_exit", PerformanceImpact.NONE));
+        this.skipSavingScreenAfterExitButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.skip_saving_screen_after_exit"), this.config.skipSavingScreenAfterExit, value -> this.config.skipSavingScreenAfterExit = value, optimizationTooltip("tooltip.adrenaline.config.skip_saving_screen_after_exit", PerformanceImpact.NONE, Optimization.BACKGROUND_SAVE));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.worldgen", y);
-        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.terrain_fill_optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value, tooltip("tooltip.adrenaline.config.terrain_fill_optimizations", PerformanceImpact.EXTREME));
+        this.terrainFillOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.terrain_fill_optimizations"), this.config.terrainFillOptimizations, value -> this.config.terrainFillOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.terrain_fill_optimizations", PerformanceImpact.EXTREME, Optimization.TERRAIN_FILL));
         y += 24;
-        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.surface_optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value, tooltip("tooltip.adrenaline.config.surface_optimizations", PerformanceImpact.HIGH));
+        this.surfaceOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.surface_optimizations"), this.config.surfaceOptimizations, value -> this.config.surfaceOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.surface_optimizations", PerformanceImpact.HIGH, Optimization.SURFACE));
         y += 24;
-        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.noise_chunk_optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value, tooltip("tooltip.adrenaline.config.noise_chunk_optimizations", PerformanceImpact.HIGH));
+        this.noiseChunkOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.noise_chunk_optimizations"), this.config.noiseChunkOptimizations, value -> this.config.noiseChunkOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.noise_chunk_optimizations", PerformanceImpact.HIGH, Optimization.NOISE_CHUNK));
         y += 24;
-        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.material_rule_optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value, tooltip("tooltip.adrenaline.config.material_rule_optimizations", PerformanceImpact.MEDIUM));
+        this.materialRuleOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.material_rule_optimizations"), this.config.materialRuleOptimizations, value -> this.config.materialRuleOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.material_rule_optimizations", PerformanceImpact.MEDIUM, Optimization.MATERIAL_RULE));
         y += 24;
-        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.aquifer_optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value, tooltip("tooltip.adrenaline.config.aquifer_optimizations", PerformanceImpact.MEDIUM));
+        this.aquiferOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.aquifer_optimizations"), this.config.aquiferOptimizations, value -> this.config.aquiferOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.aquifer_optimizations", PerformanceImpact.MEDIUM, Optimization.AQUIFER));
         y += 24;
-        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.beardifier_optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value, tooltip("tooltip.adrenaline.config.beardifier_optimizations", PerformanceImpact.LOW));
+        this.beardifierOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.beardifier_optimizations"), this.config.beardifierOptimizations, value -> this.config.beardifierOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.beardifier_optimizations", PerformanceImpact.LOW, Optimization.BEARDIFIER));
         y += 24;
-        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.ore_vein_optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, tooltip("tooltip.adrenaline.config.ore_vein_optimizations", PerformanceImpact.LOW));
+        this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.ore_vein_optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.ore_vein_optimizations", PerformanceImpact.LOW, Optimization.ORE_VEIN));
         y += 24;
-        this.initialSpawnOptimizationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.initial_spawn_optimization"), this.config.initialSpawnOptimization, value -> this.config.initialSpawnOptimization = value, tooltip("tooltip.adrenaline.config.initial_spawn_optimization", PerformanceImpact.HIGH));
+        this.initialSpawnOptimizationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.initial_spawn_optimization"), this.config.initialSpawnOptimization, value -> this.config.initialSpawnOptimization = value, optimizationTooltip("tooltip.adrenaline.config.initial_spawn_optimization", PerformanceImpact.HIGH, Optimization.INITIAL_SPAWN));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.compatibility", y);
@@ -167,7 +170,7 @@ public class AdrenalineConfigScreen extends Screen {
         y += 24;
         this.stageParallelButtons.add(this.addToggleRow(labelX, buttonX, y, buttonWidth, this.stageLabel("FULL", 16777215), this.config.parallelizeFull, value -> this.config.parallelizeFull = value, tooltip("tooltip.adrenaline.config.stage_parallel", PerformanceImpact.LOW, Component.translatable("gui.adrenaline.chunk_status.full"))));
         y += 24;
-        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_legacy_random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, tooltip("tooltip.adrenaline.config.fast_legacy_random", PerformanceImpact.LOW));
+        this.fastLegacyRandomButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.fast_legacy_random"), this.config.fastLegacyRandom, value -> this.config.fastLegacyRandom = value, optimizationTooltip("tooltip.adrenaline.config.fast_legacy_random", PerformanceImpact.LOW, Optimization.FAST_LEGACY_RANDOM));
         y += 24;
 
         if (BuildConfig.DEBUG) {
@@ -503,6 +506,12 @@ public class AdrenalineConfigScreen extends Screen {
         return new TooltipData(lines);
     }
 
+    private static TooltipData optimizationTooltip(String description, PerformanceImpact impact, Optimization optimization) {
+        TooltipData tooltip = tooltip(description, impact);
+        OptimizationTakeoverRegistry.controller(optimization).ifPresent(controller -> tooltip.lines().add(1, Component.translatableWithFallback("tooltip.adrenaline.config.optimization_controlled", "%s took control of this optimization.", controller).withStyle(style -> style.withColor(0xFFAA00))));
+        return tooltip;
+    }
+
     private void applyScroll() {
         for (ScrollableWidget scrollableWidget : this.scrollableWidgets) {
             int y = scrollableWidget.baseY() - this.scrollOffset;
@@ -592,24 +601,24 @@ public class AdrenalineConfigScreen extends Screen {
         boolean worldgenOptimizations = this.config.worldgenOptimizations;
 
         this.worldgenOptimizationsButton.active = true;
-        this.terrainFillOptimizationsButton.active = worldgenOptimizations;
-        this.surfaceOptimizationsButton.active = worldgenOptimizations;
-        this.noiseChunkOptimizationsButton.active = worldgenOptimizations;
-        this.materialRuleOptimizationsButton.active = worldgenOptimizations;
-        this.aquiferOptimizationsButton.active = worldgenOptimizations;
-        this.beardifierOptimizationsButton.active = worldgenOptimizations;
-        this.oreVeinOptimizationsButton.active = worldgenOptimizations;
-        this.initialSpawnOptimizationButton.active = worldgenOptimizations;
-        this.parallelWorldgenButton.active = true;
+        this.terrainFillOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
+        this.surfaceOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
+        this.noiseChunkOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
+        this.materialRuleOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
+        this.aquiferOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
+        this.beardifierOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BEARDIFIER);
+        this.oreVeinOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
+        this.initialSpawnOptimizationButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.INITIAL_SPAWN);
+        this.parallelWorldgenButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.PARALLEL_WORLDGEN);
         this.stagePriorityButton.active = this.config.parallelWorldgen;
         this.saveChunksAfterWorldCreationButton.active = true;
         this.incrementalSaveIntervalButton.active = true;
-        this.skipSavingScreenAfterExitButton.active = true;
+        this.skipSavingScreenAfterExitButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.BACKGROUND_SAVE);
         this.featureSafetyRadiusSlider.active = this.config.parallelWorldgen;
         for (Button button : this.stageParallelButtons) {
             button.active = this.config.parallelWorldgen;
         }
-        this.fastLegacyRandomButton.active = true;
+        this.fastLegacyRandomButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.FAST_LEGACY_RANDOM);
         this.showCancelButton.active = true;
         this.startBeforehandButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
@@ -619,7 +628,7 @@ public class AdrenalineConfigScreen extends Screen {
         }
         this.generationThreadsSlider.active = this.config.parallelWorldgen;
         this.serializationThreadsSlider.active = worldgenOptimizations;
-        this.spawnZoneRadiusSlider.active = true;
+        this.spawnZoneRadiusSlider.active = !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE);
     }
 
     private List<WarningLine> warningLines() {

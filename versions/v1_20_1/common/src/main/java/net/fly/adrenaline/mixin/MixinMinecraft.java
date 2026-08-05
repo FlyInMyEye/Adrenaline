@@ -47,15 +47,6 @@ public class MixinMinecraft {
         WorldLoadCancellation.reset(levelId, newWorld);
     }
 
-    @Redirect(method = "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;isShutdown()Z"))
-    private boolean adrenaline$saveWorldInBackground(IntegratedServer server) {
-        if (!AdrenalineConfig.skipSavingScreenAfterExit()) {
-            return server.isShutdown();
-        }
-        BackgroundWorldSave.detach(server);
-        return true;
-    }
-
     @Inject(method = "destroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;close()V"))
     private void adrenaline$finishBackgroundSaveBeforeShutdown(CallbackInfo ci) {
         BackgroundWorldSave.awaitCompletion();

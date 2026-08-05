@@ -20,6 +20,8 @@
     "MixinAquiferFluidStatusAccessor",
     "MixinNoiseBasedAquifer",
     "MixinNoiseBasedChunkGenerator",
+    "MixinOptimizationTakeoverDetector",
+    "MixinServerOptimizationTakeoverDetector",
     "MixinNoiseChunkAccessor",
     "MixinNoiseChunk",
     "MixinNoiseBasedChunkGeneratorRandom",
@@ -34,8 +36,10 @@
     "MixinNoiseChunkOreVeinifier"
   ],
   "client": [
+    "MixinBackgroundWorldSave",
     "MixinCreateWorldScreen",
     "MixinCreateWorldScreenInvoker",
+    "MixinClientOptimizationTakeoverDetector",
     "MixinLevelLoadingScreen",
     "MixinLevelStorageSource",
     "MixinDirectoryLock",

@@ -6,6 +6,8 @@ import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseProfile;
@@ -38,7 +40,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(NoiseBasedChunkGenerator.class)
+@Mixin(value = NoiseBasedChunkGenerator.class, priority = 1100)
 public class MixinNoiseBasedChunkGenerator {
 
     @Shadow @Final private Holder<NoiseGeneratorSettings> settings;
@@ -63,7 +65,7 @@ public class MixinNoiseBasedChunkGenerator {
         )
     )
     private <T> CompletableFuture<T> inlineCreateBiomes(Supplier<T> supplier, Executor executor) {
-        if (AdrenalineConfig.terrainFillOptimizationsEnabled() && executor == Util.backgroundExecutor()) {
+        if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
         return CompletableFuture.supplyAsync(supplier, executor);
@@ -77,7 +79,7 @@ public class MixinNoiseBasedChunkGenerator {
         )
     )
     private <T> CompletableFuture<T> inlineFillFromNoise(Supplier<T> supplier, Executor executor) {
-        if (AdrenalineConfig.terrainFillOptimizationsEnabled() && executor == Util.backgroundExecutor()) {
+        if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
         return CompletableFuture.supplyAsync(supplier, executor);
@@ -91,13 +93,14 @@ public class MixinNoiseBasedChunkGenerator {
         )
     )
     private <T> CompletableFuture<T> inlineFillFromNoiseCompletion(CompletableFuture<T> future, BiConsumer<? super T, ? super Throwable> action, Executor executor) {
-        if (AdrenalineConfig.terrainFillOptimizationsEnabled()) {
+        if (AdrenalineConfig.inlineTerrainFillTasks()) {
             return future.whenComplete(action);
         }
         return future.whenCompleteAsync(action, executor);
     }
 
     @Inject(method = "doFill", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.TERRAIN_FILL)
     private void adrenaline$fastFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY, CallbackInfoReturnable<ChunkAccess> cir) {
         if (!AdrenalineConfig.terrainFillOptimizationsEnabled()) {
             return;
