@@ -468,11 +468,8 @@ public class AdrenalineConfigScreen extends Screen {
     private TooltipData findTooltip(int mouseX, int mouseY) {
         for (ScrollableWidget scrollableWidget : this.scrollableWidgets) {
             AbstractWidget widget = scrollableWidget.widget();
-            if (!widget.visible) {
-                continue;
-            }
             TooltipData tooltip = this.widgetTooltips.get(widget);
-            if (tooltip != null && widget.isMouseOver(mouseX, mouseY)) {
+            if (tooltip != null && this.isWidgetHovered(widget, mouseX, mouseY)) {
                 return tooltip;
             }
         }
@@ -495,6 +492,12 @@ public class AdrenalineConfigScreen extends Screen {
         }
 
         return null;
+    }
+
+    private boolean isWidgetHovered(AbstractWidget widget, int mouseX, int mouseY) {
+        return widget.visible
+            && mouseX >= widget.getX() && mouseX < widget.getX() + widget.getWidth()
+            && mouseY >= widget.getY() && mouseY < widget.getY() + widget.getHeight();
     }
 
     private static TooltipData tooltip(String description, PerformanceImpact impact, Object... args) {
