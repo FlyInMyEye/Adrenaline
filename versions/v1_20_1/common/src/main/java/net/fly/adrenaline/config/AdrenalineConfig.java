@@ -218,6 +218,10 @@ public class AdrenalineConfig {
         return get().showCancelButton;
     }
 
+    public static boolean showChunkPreview() {
+        return get().showChunkPreview;
+    }
+
     public static boolean showThreadVisualizer() {
         return BuildConfig.DEBUG && get().showThreadVisualizer;
     }
@@ -280,6 +284,7 @@ public class AdrenalineConfig {
         public boolean parallelizeFull = true;
         public boolean fastLegacyRandom = true;
         public boolean showCancelButton = true;
+        public boolean showChunkPreview = true;
         public boolean showThreadVisualizer;
         public boolean warmupOnStartup = true;
         public boolean blockingWarmupOnStartup = true;
@@ -327,6 +332,7 @@ public class AdrenalineConfig {
             this.parallelizeFull = other.parallelizeFull;
             this.fastLegacyRandom = other.fastLegacyRandom;
             this.showCancelButton = other.showCancelButton;
+            this.showChunkPreview = other.showChunkPreview;
             this.showThreadVisualizer = other.showThreadVisualizer;
             this.warmupOnStartup = other.warmupOnStartup;
             this.blockingWarmupOnStartup = other.blockingWarmupOnStartup;

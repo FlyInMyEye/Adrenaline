@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.client.AprilFoolsEasterEgg;
@@ -9,6 +10,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.WorldLoadCancellation;
+import net.fly.adrenaline.util.WorldgenChunkPreview;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -16,8 +18,11 @@ import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.progress.StoringChunkProgressListener;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Final;
@@ -33,6 +38,8 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
 
     private static final int DEFAULT_SPAWN_ZONE_RADIUS = 11;
     private static final int DEFAULT_DIAMETER = (DEFAULT_SPAWN_ZONE_RADIUS + ChunkStatus.maxDistance()) * 2 + 1;
+    private static final int CHUNK_PREVIEW_HORIZONTAL_MARGIN = 32;
+    private static final int CHUNK_PREVIEW_VERTICAL_MARGIN = 112;
 
     @Shadow
     private String getFormattedProgress() {
@@ -48,6 +55,18 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
 
     @Unique
     private Button adrenaline$earlyEntryButton;
+
+    @Unique
+    private DynamicTexture adrenaline$chunkPreviewTexture;
+
+    @Unique
+    private ResourceLocation adrenaline$chunkPreviewTextureLocation;
+
+    @Unique
+    private int adrenaline$chunkPreviewTextureDiameter;
+
+    @Unique
+    private boolean[] adrenaline$uploadedChunkPreviews;
 
     protected MixinLevelLoadingScreen(Component title) {
         super(title);
@@ -106,6 +125,12 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         }
     }
 
+    @Inject(method = "removed", at = @At("TAIL"))
+    private void adrenaline$clearChunkPreviews(CallbackInfo ci) {
+        this.adrenaline$releaseChunkPreviewTexture();
+        WorldgenChunkPreview.end();
+    }
+
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;renderChunks(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/server/level/progress/StoringChunkProgressListener;IIII)V"))
     private void adrenaline$renderScaledChunkMap(GuiGraphics guiGraphics, StoringChunkProgressListener progressListener, int centerX, int centerY, int cellSize, int padding) {
         if (AprilFoolsEasterEgg.shouldRender()) {
@@ -120,25 +145,186 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
             return;
         }
 
-        int step = cellSize + padding;
+        boolean showChunkPreview = AdrenalineConfig.showChunkPreview();
+        int renderCellSize = showChunkPreview ? WorldgenChunkPreview.SIZE : cellSize;
+        int renderPadding = showChunkPreview ? 0 : padding;
+        int step = renderCellSize + renderPadding;
         int diameter = progressListener.getDiameter();
-        int pixels = diameter * step - padding;
+        int pixels = diameter * step - renderPadding;
         if (pixels <= 0) {
-            LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, cellSize, padding);
+            LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
+            this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
             return;
         }
 
-        float basePixels = (float) (DEFAULT_DIAMETER * step - padding);
-        float scale = basePixels / (float) pixels;
+        float scale;
+        if (showChunkPreview) {
+            int availableWidth = Math.max(1, this.width - CHUNK_PREVIEW_HORIZONTAL_MARGIN);
+            int availableHeight = Math.max(1, this.height - CHUNK_PREVIEW_VERTICAL_MARGIN);
+            scale = Math.min(
+                1.0F,
+                Math.min(
+                    (float) availableWidth / (float) pixels,
+                    (float) availableHeight / (float) pixels
+                )
+            );
+        } else {
+            float basePixels = (float) (DEFAULT_DIAMETER * step - renderPadding);
+            scale = basePixels / (float) pixels;
+        }
+
         guiGraphics.pose().pushPose();
         guiGraphics.pose().translate(centerX, centerY, 0.0F);
         guiGraphics.pose().scale(scale, scale, 1.0F);
         guiGraphics.pose().translate(-centerX, -centerY, 0.0F);
         try {
-            LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, cellSize, padding);
+            LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
+            this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
         } finally {
             guiGraphics.pose().popPose();
         }
+    }
+
+    @Unique
+    private void adrenaline$renderChunkPreviews(
+        GuiGraphics guiGraphics,
+        StoringChunkProgressListener progressListener,
+        int centerX,
+        int centerY,
+        int cellSize,
+        int padding
+    ) {
+        if (!AdrenalineConfig.showChunkPreview() || cellSize <= 0) {
+            return;
+        }
+
+        if (!this.adrenaline$ensureChunkPreviewTexture(progressListener.getDiameter())) {
+            return;
+        }
+
+        MixinStoringChunkProgressListenerAccessor accessor =
+            (MixinStoringChunkProgressListenerAccessor) (Object) progressListener;
+        ChunkPos spawnPos = accessor.adrenaline$getSpawnPos();
+        if (spawnPos == null) {
+            return;
+        }
+
+        DynamicTexture texture = this.adrenaline$chunkPreviewTexture;
+        NativeImage texturePixels = texture.getPixels();
+        if (texturePixels == null) {
+            return;
+        }
+
+        int diameter = this.adrenaline$chunkPreviewTextureDiameter;
+        boolean dirty = false;
+        int radius = accessor.adrenaline$getRadius();
+
+        for (int z = 0; z < diameter; z++) {
+            for (int x = 0; x < diameter; x++) {
+                if (progressListener.getStatus(x, z) != ChunkStatus.FULL) {
+                    continue;
+                }
+                int gridIndex = z * diameter + x;
+                if (this.adrenaline$uploadedChunkPreviews[gridIndex]) {
+                    continue;
+                }
+                ChunkPos chunkPos = new ChunkPos(
+                    spawnPos.x + x - radius,
+                    spawnPos.z + z - radius
+                );
+                int[] preview = WorldgenChunkPreview.get(chunkPos);
+                if (preview == null) {
+                    continue;
+                }
+
+                int textureX = x * WorldgenChunkPreview.SIZE;
+                int textureY = z * WorldgenChunkPreview.SIZE;
+                for (int previewZ = 0; previewZ < WorldgenChunkPreview.SIZE; previewZ++) {
+                    for (int previewX = 0; previewX < WorldgenChunkPreview.SIZE; previewX++) {
+                        texturePixels.setPixelRGBA(
+                            textureX + previewX,
+                            textureY + previewZ,
+                            adrenaline$argbToAbgr(
+                                preview[previewZ * WorldgenChunkPreview.SIZE + previewX]
+                            )
+                        );
+                    }
+                }
+                this.adrenaline$uploadedChunkPreviews[gridIndex] = true;
+                dirty = true;
+            }
+        }
+
+        if (dirty) {
+            texture.upload();
+        }
+
+        int textureSize = diameter * WorldgenChunkPreview.SIZE;
+        guiGraphics.blit(
+            this.adrenaline$chunkPreviewTextureLocation,
+            centerX - textureSize / 2,
+            centerY - textureSize / 2,
+            0.0F,
+            0.0F,
+            textureSize,
+            textureSize,
+            textureSize,
+            textureSize
+        );
+    }
+
+    @Unique
+    private boolean adrenaline$ensureChunkPreviewTexture(int diameter) {
+        if (
+            this.adrenaline$chunkPreviewTexture != null
+                && this.adrenaline$chunkPreviewTextureDiameter == diameter
+        ) {
+            return true;
+        }
+
+        this.adrenaline$releaseChunkPreviewTexture();
+
+        int textureSize = diameter * WorldgenChunkPreview.SIZE;
+        DynamicTexture texture = new DynamicTexture(textureSize, textureSize, true);
+        NativeImage pixels = texture.getPixels();
+        if (pixels == null) {
+            texture.close();
+            return false;
+        }
+        pixels.fillRect(0, 0, textureSize, textureSize, 0);
+
+        Minecraft minecraft = Minecraft.getInstance();
+        this.adrenaline$chunkPreviewTexture = texture;
+        this.adrenaline$chunkPreviewTextureLocation = minecraft.getTextureManager().register(
+            "adrenaline_worldgen_chunk_preview",
+            texture
+        );
+        this.adrenaline$chunkPreviewTextureDiameter = diameter;
+        this.adrenaline$uploadedChunkPreviews = new boolean[diameter * diameter];
+        texture.upload();
+        return true;
+    }
+
+    @Unique
+    private void adrenaline$releaseChunkPreviewTexture() {
+        if (this.adrenaline$chunkPreviewTextureLocation != null) {
+            Minecraft.getInstance().getTextureManager().release(
+                this.adrenaline$chunkPreviewTextureLocation
+            );
+        } else if (this.adrenaline$chunkPreviewTexture != null) {
+            this.adrenaline$chunkPreviewTexture.close();
+        }
+        this.adrenaline$chunkPreviewTexture = null;
+        this.adrenaline$chunkPreviewTextureLocation = null;
+        this.adrenaline$chunkPreviewTextureDiameter = 0;
+        this.adrenaline$uploadedChunkPreviews = null;
+    }
+
+    @Unique
+    private static int adrenaline$argbToAbgr(int color) {
+        return color & 0xFF00FF00
+            | (color & 0x00FF0000) >>> 16
+            | (color & 0x000000FF) << 16;
     }
 
     @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;getFormattedProgress()Ljava/lang/String;"))

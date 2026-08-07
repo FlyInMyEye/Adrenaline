@@ -7,6 +7,7 @@ import net.fly.adrenaline.client.WorldCreationContextWaiter;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.WorldLoadCancellation;
+import net.fly.adrenaline.util.WorldgenChunkPreview;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
@@ -38,6 +39,11 @@ public class MixinMinecraft {
     ) {
         BackgroundWorldSave.awaitCompletion();
         BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
+        if (newWorld && !BackgroundWorldgenWarmup.isWarmupLevel(levelId) && AdrenalineConfig.showChunkPreview()) {
+            WorldgenChunkPreview.begin();
+        } else {
+            WorldgenChunkPreview.end();
+        }
         if (AdrenalineConfig.prepareWorldCreationContext() && !BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
             WorldCreationContextWaiter.beginWorldLoad();
             WorldCreationContextWaiter.consume();
