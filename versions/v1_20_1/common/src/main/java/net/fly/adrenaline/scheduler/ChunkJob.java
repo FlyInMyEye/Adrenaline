@@ -112,7 +112,7 @@ public final class ChunkJob implements Runnable {
         for (long focusKey : foci) {
             long dx = this.priorityPos.x - ChunkPos.getX(focusKey);
             long dz = this.priorityPos.z - ChunkPos.getZ(focusKey);
-            nearest = Math.min(nearest, dx * dx + dz * dz);
+            nearest = Math.min(nearest, Math.max(Math.abs(dx), Math.abs(dz)));
         }
         this.cachedPriorityFoci = foci;
         this.cachedProximity = nearest;
