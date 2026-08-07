@@ -54,6 +54,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button skipSavingScreenAfterExitButton;
     private Button fastLegacyRandomButton;
     private Button showCancelButton;
+    private Button showChunkPreviewButton;
     private Button showThreadVisualizerButton;
     private Button warmupOnStartupButton;
     private Button prepareWorldCreationContextButton;
@@ -107,6 +108,8 @@ public class AdrenalineConfigScreen extends Screen {
 
         y = this.addSectionHeader("gui.adrenaline.config.section.features_plushies", y);
         this.showCancelButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_cancel_button"), this.config.showCancelButton, value -> this.config.showCancelButton = value, tooltip("tooltip.adrenaline.config.show_cancel_button", PerformanceImpact.NONE));
+        y += 24;
+        this.showChunkPreviewButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_chunk_preview"), this.config.showChunkPreview, value -> this.config.showChunkPreview = value, tooltip("tooltip.adrenaline.config.show_chunk_preview", PerformanceImpact.LOW));
         y += 24;
         this.warmupOnStartupButton = this.addWarmupModeRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.warmup_on_startup", PerformanceImpact.MEDIUM));
         y += 24;
@@ -623,6 +626,7 @@ public class AdrenalineConfigScreen extends Screen {
         }
         this.fastLegacyRandomButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.FAST_LEGACY_RANDOM);
         this.showCancelButton.active = true;
+        this.showChunkPreviewButton.active = true;
         this.startBeforehandButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
             this.showThreadVisualizerButton.active = true;

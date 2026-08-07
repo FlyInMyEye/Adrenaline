@@ -9,6 +9,7 @@
     "MixinChunkMap",
     "MixinChunkTaskPriorityQueueSorter",
     "MixinChunkStatus",
+    "MixinStoringChunkProgressListenerAccessor",
     "MixinStructureCheck",
     "MixinChunkSerializer",
     "MixinChunkAccessAccessor",

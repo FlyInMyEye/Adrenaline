@@ -19,6 +19,7 @@ import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.SchedulingWork;
+import net.fly.adrenaline.util.WorldgenChunkPreview;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ThreadedLevelLightEngine;
@@ -108,6 +109,11 @@ public class MixinChunkStatus {
         }
         long startedNanos = BuildConfig.DEBUG ? WorldgenStageStats.beginStage(centerChunk.getPos(), status) : 0L;
         CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = original.call(executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks);
+        if (status == ChunkStatus.FULL && WorldgenChunkPreview.isActive()) {
+            future.thenAccept(result ->
+                result.left().ifPresent(WorldgenChunkPreview::capture)
+            );
+        }
         if (BuildConfig.DEBUG) {
             return WorldgenStageStats.track(status, centerChunk.getPos(), startedNanos, future);
         }
