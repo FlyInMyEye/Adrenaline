@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -64,11 +63,6 @@ public final class OptimizationTakeoverDetector {
         Map<MethodKey, Set<OptimizationTakeoverRegistry.Optimization>> targetClaims =
                 CLAIMS.get(targetClass.name);
 
-        System.out.println(
-                "[Adrenaline takeover debug] class=" + targetClass.name
-                        + " claims=" + targetClaims
-        );
-
         if (targetClaims == null) {
             return;
         }
@@ -86,31 +80,11 @@ public final class OptimizationTakeoverDetector {
             MethodNode targetMethod =
                     methods.get(claimedMethod.name + claimedMethod.desc);
 
-            System.out.println(
-                    "[Adrenaline takeover debug] checking target="
-                            + claimedMethod.name
-                            + claimedMethod.desc
-                            + " found="
-                            + (targetMethod != null)
-                            + " optimizations="
-                            + claim.getValue()
-            );
-
             if (targetMethod == null) {
                 continue;
             }
 
             String controller = externalOwner(targetMethod);
-
-            System.out.println(
-                    "[Adrenaline takeover debug] direct owner target="
-                            + targetMethod.name
-                            + targetMethod.desc
-                            + " mergedBy="
-                            + mergedBy(targetMethod)
-                            + " externalOwner="
-                            + controller
-            );
 
             if (controller == null) {
                 for (AbstractInsnNode instruction : targetMethod.instructions) {
@@ -126,29 +100,8 @@ public final class OptimizationTakeoverDetector {
                     boolean destructive =
                             handler != null
                                     && isDestructiveHandler(handler.name);
-                    String mergedOwner =
-                            handler == null ? null : mergedBy(handler);
                     String externalHandlerOwner =
                             handler == null ? null : externalOwner(handler);
-
-                    System.out.println(
-                            "[Adrenaline takeover debug] target="
-                                    + targetMethod.name
-                                    + targetMethod.desc
-                                    + " call="
-                                    + call.owner
-                                    + "."
-                                    + call.name
-                                    + call.desc
-                                    + " handlerFound="
-                                    + (handler != null)
-                                    + " destructive="
-                                    + destructive
-                                    + " mergedBy="
-                                    + mergedOwner
-                                    + " externalOwner="
-                                    + externalHandlerOwner
-                    );
 
                     if (destructive) {
                         controller = externalHandlerOwner;
@@ -159,25 +112,8 @@ public final class OptimizationTakeoverDetector {
                 }
             }
 
-            System.out.println(
-                    "[Adrenaline takeover debug] result target="
-                            + targetMethod.name
-                            + targetMethod.desc
-                            + " controller="
-                            + controller
-            );
-
             if (controller != null) {
                 String displayName = displayNameResolver.apply(controller);
-
-                System.out.println(
-                        "[Adrenaline takeover debug] takeover controller="
-                                + controller
-                                + " displayName="
-                                + displayName
-                                + " optimizations="
-                                + claim.getValue()
-                );
 
                 for (OptimizationTakeoverRegistry.Optimization optimization
                         : claim.getValue()) {
