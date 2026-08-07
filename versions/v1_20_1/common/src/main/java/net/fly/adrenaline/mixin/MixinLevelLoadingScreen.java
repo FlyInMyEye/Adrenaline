@@ -73,7 +73,10 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
     @Override
     public void tick() {
         super.tick();
-        if (EarlyWorldEntry.isFullChunkReady()) {
+        if (
+            AdrenalineConfig.startBeforehandMode() == AdrenalineConfig.StartBeforehandMode.OFF
+                || EarlyWorldEntry.isFullChunkReady()
+        ) {
             return;
         }
         int diameter = this.progressListener.getDiameter();
