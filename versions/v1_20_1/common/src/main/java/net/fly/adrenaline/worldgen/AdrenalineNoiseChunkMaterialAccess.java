@@ -9,5 +9,9 @@ public interface AdrenalineNoiseChunkMaterialAccess {
 
     double[] adrenaline$finalDensityValues();
 
-    BlockState adrenaline$calculateOre(DensityFunction.FunctionContext context);
+    boolean adrenaline$hasPrecomputedMaterialPath();
+
+    void adrenaline$fillMaterialArrays(DensityFunction.ContextProvider contextProvider);
+
+    BlockState adrenaline$calculateOre(DensityFunction.FunctionContext context, int index);
 }
