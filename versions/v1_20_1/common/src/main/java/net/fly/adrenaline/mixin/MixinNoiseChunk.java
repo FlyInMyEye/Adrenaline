@@ -8,6 +8,9 @@ import java.util.List;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
+import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
+import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkCoordinateAccess;
+import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ColumnPos;
 import net.minecraft.world.level.levelgen.DensityFunction;
@@ -22,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
-public abstract class MixinNoiseChunk {
+public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess {
 
     @Shadow private int cellCountXZ;
     @Shadow private List<?> interpolators;
@@ -51,6 +54,22 @@ public abstract class MixinNoiseChunk {
     @Unique
     private AdrenalineMixinCacheAllInCellAccessor[] adrenaline$cellCacheArray;
 
+    @Unique private double[] adrenaline$noise000;
+    @Unique private double[] adrenaline$noise001;
+    @Unique private double[] adrenaline$noise100;
+    @Unique private double[] adrenaline$noise101;
+    @Unique private double[] adrenaline$noise010;
+    @Unique private double[] adrenaline$noise011;
+    @Unique private double[] adrenaline$noise110;
+    @Unique private double[] adrenaline$noise111;
+    @Unique private double[] adrenaline$valueXZ00;
+    @Unique private double[] adrenaline$valueXZ01;
+    @Unique private double[] adrenaline$valueXZ10;
+    @Unique private double[] adrenaline$valueXZ11;
+    @Unique private double[] adrenaline$valueZ0;
+    @Unique private double[] adrenaline$valueZ1;
+    @Unique private double[] adrenaline$values;
+
     @Unique
     private final AdrenalineMutableSinglePointContext adrenaline$singlePointContext = new AdrenalineMutableSinglePointContext();
 
@@ -64,8 +83,28 @@ public abstract class MixinNoiseChunk {
                 cached[i] = (AdrenalineMixinNoiseInterpolatorView) this.interpolators.get(i);
             }
             this.adrenaline$interpolatorArray = cached;
+            this.adrenaline$initializeInterpolationArrays(size);
         }
         return cached;
+    }
+
+    @Unique
+    private void adrenaline$initializeInterpolationArrays(int size) {
+        this.adrenaline$noise000 = new double[size];
+        this.adrenaline$noise001 = new double[size];
+        this.adrenaline$noise100 = new double[size];
+        this.adrenaline$noise101 = new double[size];
+        this.adrenaline$noise010 = new double[size];
+        this.adrenaline$noise011 = new double[size];
+        this.adrenaline$noise110 = new double[size];
+        this.adrenaline$noise111 = new double[size];
+        this.adrenaline$valueXZ00 = new double[size];
+        this.adrenaline$valueXZ01 = new double[size];
+        this.adrenaline$valueXZ10 = new double[size];
+        this.adrenaline$valueXZ11 = new double[size];
+        this.adrenaline$valueZ0 = new double[size];
+        this.adrenaline$valueZ1 = new double[size];
+        this.adrenaline$values = new double[size];
     }
 
     @Unique
@@ -110,8 +149,25 @@ public abstract class MixinNoiseChunk {
             AdrenalineMixinCacheAllInCellAccessor cache = cellCacheArray[i];
             cache.adrenaline$getNoiseFiller().fillArray(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
         }
+        ((AdrenalineNoiseChunkMaterialAccess) this).adrenaline$fillMaterialArrays((NoiseChunk) (Object) this);
 
         this.arrayInterpolationCounter++;
+    }
+
+    @Override
+    public void adrenaline$updateYCoordinate(int blockY) {
+        this.inCellY = blockY - this.cellStartBlockY;
+    }
+
+    @Override
+    public void adrenaline$updateXCoordinate(int blockX) {
+        this.inCellX = blockX - this.cellStartBlockX;
+    }
+
+    @Override
+    public void adrenaline$updateZCoordinate(int blockZ) {
+        this.inCellZ = blockZ - this.cellStartBlockZ;
+        this.interpolationCounter++;
     }
 
     @Unique
@@ -140,7 +196,21 @@ public abstract class MixinNoiseChunk {
             return;
         }
 
-        this.adrenaline$forEachInterpolator(interpolator -> interpolator.adrenaline$selectCellYZ(cellY, cellZ));
+        AdrenalineMixinNoiseInterpolatorView[] interpolators = this.adrenaline$interpolatorArray();
+        for (int index = 0; index < interpolators.length; index++) {
+            AdrenalineMixinNoiseInterpolatorView interpolator = interpolators[index];
+            interpolator.adrenaline$selectCellYZ(cellY, cellZ);
+            double[][] slice0 = interpolator.adrenaline$getSlice0();
+            double[][] slice1 = interpolator.adrenaline$getSlice1();
+            this.adrenaline$noise000[index] = slice0[cellZ][cellY];
+            this.adrenaline$noise001[index] = slice0[cellZ + 1][cellY];
+            this.adrenaline$noise100[index] = slice1[cellZ][cellY];
+            this.adrenaline$noise101[index] = slice1[cellZ + 1][cellY];
+            this.adrenaline$noise010[index] = slice0[cellZ][cellY + 1];
+            this.adrenaline$noise011[index] = slice0[cellZ + 1][cellY + 1];
+            this.adrenaline$noise110[index] = slice1[cellZ][cellY + 1];
+            this.adrenaline$noise111[index] = slice1[cellZ + 1][cellY + 1];
+        }
         this.fillingCell = true;
         this.cellStartBlockY = (cellY + this.cellNoiseMinY) * this.cellHeight;
         this.cellStartBlockZ = (this.firstCellZ + cellZ) * this.cellWidth;
@@ -157,7 +227,8 @@ public abstract class MixinNoiseChunk {
         }
 
         this.inCellY = blockY - this.cellStartBlockY;
-        this.adrenaline$forEachInterpolator(interpolator -> interpolator.adrenaline$updateForY(yLerp));
+        this.adrenaline$interpolatorArray();
+        NoiseInterpolationKernel.interpolateY(yLerp, this.adrenaline$noise000, this.adrenaline$noise001, this.adrenaline$noise100, this.adrenaline$noise101, this.adrenaline$noise010, this.adrenaline$noise011, this.adrenaline$noise110, this.adrenaline$noise111, this.adrenaline$valueXZ00, this.adrenaline$valueXZ01, this.adrenaline$valueXZ10, this.adrenaline$valueXZ11);
         ci.cancel();
     }
 
@@ -169,7 +240,8 @@ public abstract class MixinNoiseChunk {
         }
 
         this.inCellX = blockX - this.cellStartBlockX;
-        this.adrenaline$forEachInterpolator(interpolator -> interpolator.adrenaline$updateForX(xLerp));
+        this.adrenaline$interpolatorArray();
+        NoiseInterpolationKernel.interpolateX(xLerp, this.adrenaline$valueXZ00, this.adrenaline$valueXZ01, this.adrenaline$valueXZ10, this.adrenaline$valueXZ11, this.adrenaline$valueZ0, this.adrenaline$valueZ1);
         ci.cancel();
     }
 
@@ -182,7 +254,11 @@ public abstract class MixinNoiseChunk {
 
         this.inCellZ = blockZ - this.cellStartBlockZ;
         this.interpolationCounter++;
-        this.adrenaline$forEachInterpolator(interpolator -> interpolator.adrenaline$updateForZ(zLerp));
+        AdrenalineMixinNoiseInterpolatorView[] interpolators = this.adrenaline$interpolatorArray();
+        NoiseInterpolationKernel.interpolateZ(zLerp, this.adrenaline$valueZ0, this.adrenaline$valueZ1, this.adrenaline$values);
+        for (int index = 0; index < interpolators.length; index++) {
+            interpolators[index].adrenaline$setValue(this.adrenaline$values[index]);
+        }
         ci.cancel();
     }
 

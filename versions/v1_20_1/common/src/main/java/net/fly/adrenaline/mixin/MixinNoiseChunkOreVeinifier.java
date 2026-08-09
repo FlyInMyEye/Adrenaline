@@ -46,6 +46,14 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
     @Unique
     private boolean adrenaline$hasDirectMaterialPath;
 
+    @Unique private DensityFunction adrenaline$veinToggle;
+    @Unique private DensityFunction adrenaline$veinRidged;
+    @Unique private DensityFunction adrenaline$veinGap;
+    @Unique private PositionalRandomFactory adrenaline$oreRandomFactory;
+    @Unique private double[] adrenaline$veinToggleValues;
+    @Unique private double[] adrenaline$veinRidgedValues;
+    @Unique private double[] adrenaline$veinGapValues;
+
     @Redirect(
         method = "<init>",
         at = @At(
@@ -59,6 +67,10 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
         if (!AdrenalineConfig.oreVeinOptimizationsEnabled()) {
             filler = MixinOreVeinifierInvoker.adrenaline$create(veinToggle, veinRidged, veinGap, randomFactory);
         } else {
+            this.adrenaline$veinToggle = veinToggle;
+            this.adrenaline$veinRidged = veinRidged;
+            this.adrenaline$veinGap = veinGap;
+            this.adrenaline$oreRandomFactory = randomFactory;
             filler = context -> {
                 double veininess = veinToggle.compute(context);
                 int blockY = context.blockY();
@@ -117,6 +129,12 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
         Object finalDensityCache = this.cellCaches.get(this.cellCaches.size() - 1);
         if (finalDensityCache instanceof AdrenalineMixinCacheAllInCellAccessor cache) {
             this.adrenaline$finalDensityValues = cache.adrenaline$getValues();
+            if (this.adrenaline$veinToggle != null) {
+                int size = this.adrenaline$finalDensityValues.length;
+                this.adrenaline$veinToggleValues = new double[size];
+                this.adrenaline$veinRidgedValues = new double[size];
+                this.adrenaline$veinGapValues = new double[size];
+            }
             this.adrenaline$hasDirectMaterialPath = true;
         }
     }
@@ -132,7 +150,56 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
     }
 
     @Override
-    public BlockState adrenaline$calculateOre(DensityFunction.FunctionContext context) {
-        return this.adrenaline$oreVeinFiller == null ? null : this.adrenaline$oreVeinFiller.calculate(context);
+    public boolean adrenaline$hasPrecomputedMaterialPath() {
+        return this.adrenaline$hasDirectMaterialPath && (this.adrenaline$oreVeinFiller == null || this.adrenaline$veinToggleValues != null);
+    }
+
+    @Override
+    public void adrenaline$fillMaterialArrays(DensityFunction.ContextProvider contextProvider) {
+        if (this.adrenaline$veinToggleValues == null) {
+            return;
+        }
+        this.adrenaline$veinToggle.fillArray(this.adrenaline$veinToggleValues, contextProvider);
+        this.adrenaline$veinRidged.fillArray(this.adrenaline$veinRidgedValues, contextProvider);
+        this.adrenaline$veinGap.fillArray(this.adrenaline$veinGapValues, contextProvider);
+    }
+
+    @Override
+    public BlockState adrenaline$calculateOre(DensityFunction.FunctionContext context, int index) {
+        if (this.adrenaline$oreVeinFiller == null) {
+            return null;
+        }
+        if (this.adrenaline$veinToggleValues == null) {
+            return this.adrenaline$oreVeinFiller.calculate(context);
+        }
+
+        double veininess = this.adrenaline$veinToggleValues[index];
+        int blockY = context.blockY();
+        boolean copper = veininess > 0.0D;
+        int maxY = copper ? 50 : -8;
+        int minY = copper ? 0 : -60;
+        int maxDelta = maxY - blockY;
+        int minDelta = blockY - minY;
+        if (minDelta < 0 || maxDelta < 0) {
+            return null;
+        }
+        double absVeininess = Math.abs(veininess);
+        int edge = Math.min(maxDelta, minDelta);
+        double edgeRoundoff = Mth.clampedMap(edge, 0.0D, 20.0D, -0.2D, 0.0D);
+        if (absVeininess + edgeRoundoff < 0.4000000059604645D) {
+            return null;
+        }
+        RandomSource random = this.adrenaline$oreRandomFactory.at(context.blockX(), blockY, context.blockZ());
+        if (random.nextFloat() > 0.7F || this.adrenaline$veinRidgedValues[index] >= 0.0D) {
+            return null;
+        }
+        double richness = Mth.clampedMap(absVeininess, 0.4000000059604645D, 0.6000000238418579D, 0.10000000149011612D, 0.30000001192092896D);
+        if (random.nextFloat() < richness && this.adrenaline$veinGapValues[index] > -0.30000001192092896D) {
+            if (copper) {
+                return random.nextFloat() < 0.02F ? RAW_COPPER_BLOCK : COPPER_ORE;
+            }
+            return random.nextFloat() < 0.02F ? RAW_IRON_BLOCK : DEEPSLATE_IRON_ORE;
+        }
+        return copper ? GRANITE : TUFF;
     }
 }

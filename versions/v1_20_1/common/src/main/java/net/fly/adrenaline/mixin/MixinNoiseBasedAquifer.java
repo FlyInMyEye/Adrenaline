@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.OverworldBiomeBuilder;
@@ -25,7 +26,7 @@ import org.apache.commons.lang3.mutable.MutableDouble;
 import javax.annotation.Nullable;
 
 @Mixin(Aquifer.NoiseBasedAquifer.class)
-public abstract class MixinNoiseBasedAquifer {
+public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAccess {
 
     @Shadow @Final private static int[][] SURFACE_SAMPLING_OFFSETS_IN_CHUNKS;
     @Shadow @Final private long[] aquiferLocationCache;
@@ -121,6 +122,11 @@ public abstract class MixinNoiseBasedAquifer {
             return adrenaline$computeSubstanceFast(context, density);
         }
         return adrenaline$computeSubstanceVanilla(context, density);
+    }
+
+    @Override
+    public boolean adrenaline$supportsPrecomputedMaterials() {
+        return adrenaline$packedAquiferLocations != null;
     }
 
     @Unique

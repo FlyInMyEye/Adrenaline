@@ -30,6 +30,9 @@ public interface AdrenalineMixinNoiseInterpolatorView {
     @Invoker("updateForZ")
     void adrenaline$updateForZ(double zLerp);
 
+    @Accessor("value")
+    void adrenaline$setValue(double value);
+
     @Invoker("swapSlices")
     void adrenaline$swapSlices();
 }
