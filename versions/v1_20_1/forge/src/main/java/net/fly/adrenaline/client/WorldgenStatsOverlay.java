@@ -81,16 +81,16 @@ public final class WorldgenStatsOverlay {
 
         List<String> lines = new ArrayList<>(timings.size());
         for (StageTiming timing : timings) {
-            long milliseconds = Math.round(timing.averageNanos() / 1_000_000.0D);
+            double milliseconds = timing.averageNanos() / 1_000_000.0D;
             String name = displayName(timing.name());
             if (isWaitingTiming(timing.name())) {
-                lines.add(String.format(Locale.ROOT, "%-20s %dms", name, milliseconds));
+                lines.add(String.format(Locale.ROOT, "%-20s %.3fms", name, milliseconds));
                 continue;
             }
             int bars = timing.averageNanos() == 0L || maxNanos == 0L
                 ? 0
                 : Math.max(1, (int) Math.round((double) timing.averageNanos() * MAX_BARS / maxNanos));
-            lines.add(String.format(Locale.ROOT, "%-20s %s %dms", name, "|".repeat(bars), milliseconds));
+            lines.add(String.format(Locale.ROOT, "%-20s %s %.3fms", name, "|".repeat(bars), milliseconds));
         }
         return lines;
     }
