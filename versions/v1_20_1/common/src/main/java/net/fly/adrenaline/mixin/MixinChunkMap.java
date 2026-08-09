@@ -3,17 +3,14 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.mojang.datafixers.util.Either;
-import java.util.Deque;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Function;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.scheduler.PendingChunkStatusAccess;
 import net.fly.adrenaline.util.WorldgenPreparation;
 import net.fly.adrenaline.util.WorldgenWarmup;
 import net.fly.adrenaline.util.WorldgenStageStats;
@@ -52,13 +49,9 @@ public class MixinChunkMap {
     @Unique
     private ThreadLocal<ChunkHolder> adrenaline$currentHolder;
 
-    @Unique
-    private Map<ChunkHolder, Deque<ChunkStatus>> adrenaline$pendingStatus;
-
     @Inject(method = "<init>", at = @At("RETURN"))
     private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
         this.adrenaline$currentHolder = new ThreadLocal<>();
-        this.adrenaline$pendingStatus = new ConcurrentHashMap<>();
     }
 
     @Redirect(
@@ -78,7 +71,7 @@ public class MixinChunkMap {
         at = @At("HEAD")
     )
     private void captureStatus(ChunkHolder holder, ChunkStatus status, CallbackInfoReturnable<CompletableFuture<?>> cir) {
-        this.adrenaline$pendingStatus.computeIfAbsent(holder, ignored -> new ConcurrentLinkedDeque<>()).addLast(status);
+        ((PendingChunkStatusAccess) holder).adrenaline$enqueuePendingStatus(status);
         ChunkJobScheduler.get().dependencyScheduled();
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.beginScheduling(holder.getPos(), status);
@@ -113,18 +106,9 @@ public class MixinChunkMap {
     @ControlsOptimization(Optimization.PARALLEL_WORLDGEN)
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
         ChunkHolder holder = this.adrenaline$currentHolder.get();
-        ChunkStatus nextStatus = null;
-        if (holder != null) {
-            Deque<ChunkStatus> pending = this.adrenaline$pendingStatus.get(holder);
-            if (pending != null) {
-                nextStatus = pending.pollFirst();
-                if (nextStatus != null) {
-                    ChunkJobScheduler.get().dependencyReady();
-                }
-                if (pending.isEmpty()) {
-                    this.adrenaline$pendingStatus.remove(holder, pending);
-                }
-            }
+        ChunkStatus nextStatus = holder == null ? null : ((PendingChunkStatusAccess) holder).adrenaline$pollPendingStatus();
+        if (nextStatus != null) {
+            ChunkJobScheduler.get().dependencyReady();
         }
 
         MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;

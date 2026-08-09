@@ -68,6 +68,7 @@ public final class SurfaceRulesContextFactory {
             Object surfaceContext = create(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context);
             Object surfaceRule = apply(ruleSource, surfaceContext);
             pipeline = new SurfaceRulePipeline(surfaceRule, surfaceContext);
+            cache.clear();
             cache.put(key, pipeline);
         } else {
             pipeline.rebind(chunk, noiseChunk, biomeGetter);
@@ -123,14 +124,16 @@ public final class SurfaceRulesContextFactory {
         private final SurfaceSystem system;
         private final RandomState randomState;
         private final Registry<Biome> biomeRegistry;
-        private final WorldGenerationContext context;
+        private final int minGenY;
+        private final int genDepth;
         private final SurfaceRules.RuleSource ruleSource;
 
         private PipelineKey(SurfaceSystem system, RandomState randomState, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
             this.system = system;
             this.randomState = randomState;
             this.biomeRegistry = biomeRegistry;
-            this.context = context;
+            this.minGenY = context.getMinGenY();
+            this.genDepth = context.getGenDepth();
             this.ruleSource = ruleSource;
         }
 
@@ -145,7 +148,8 @@ public final class SurfaceRulesContextFactory {
             return this.system == key.system
                 && this.randomState == key.randomState
                 && this.biomeRegistry == key.biomeRegistry
-                && this.context == key.context
+                && this.minGenY == key.minGenY
+                && this.genDepth == key.genDepth
                 && this.ruleSource == key.ruleSource;
         }
 
@@ -154,7 +158,8 @@ public final class SurfaceRulesContextFactory {
             int result = System.identityHashCode(this.system);
             result = 31 * result + System.identityHashCode(this.randomState);
             result = 31 * result + System.identityHashCode(this.biomeRegistry);
-            result = 31 * result + System.identityHashCode(this.context);
+            result = 31 * result + this.minGenY;
+            result = 31 * result + this.genDepth;
             result = 31 * result + System.identityHashCode(this.ruleSource);
             return result;
         }
