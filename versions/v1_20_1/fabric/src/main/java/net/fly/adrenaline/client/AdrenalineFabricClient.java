@@ -2,6 +2,7 @@ package net.fly.adrenaline.client;
 
 import java.util.Collection;
 import java.util.List;
+import net.fly.adrenaline.BuildConfig;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.resource.ResourceManagerHelper;
@@ -33,6 +34,9 @@ public final class AdrenalineFabricClient implements ClientModInitializer {
         });
         ModernFixCompatController modernFixController = new ModernFixCompatController();
         BackgroundWorldgenWarmup worldgenWarmup = new BackgroundWorldgenWarmup();
+        if (BuildConfig.DEBUG) {
+            WorldgenStatsOverlay.initialize();
+        }
         ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
             modernFixController.tick(minecraft);
             worldgenWarmup.tick(minecraft);
