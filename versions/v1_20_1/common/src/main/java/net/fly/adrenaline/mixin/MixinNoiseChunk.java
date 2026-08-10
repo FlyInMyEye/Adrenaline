@@ -8,6 +8,8 @@ import java.util.List;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
+import net.fly.adrenaline.worldgen.CellDensityCompiler;
+import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkCoordinateAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
@@ -53,6 +55,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
 
     @Unique
     private AdrenalineMixinCacheAllInCellAccessor[] adrenaline$cellCacheArray;
+
+    @Unique
+    private CellDensityEvaluator[] adrenaline$cellDensityEvaluators;
 
     @Unique private double[] adrenaline$noise000;
     @Unique private double[] adrenaline$noise001;
@@ -122,6 +127,19 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Unique
+    private CellDensityEvaluator[] adrenaline$cellDensityEvaluators(AdrenalineMixinCacheAllInCellAccessor[] cellCaches) {
+        CellDensityEvaluator[] cached = this.adrenaline$cellDensityEvaluators;
+        if (cached == null || cached.length != cellCaches.length) {
+            cached = new CellDensityEvaluator[cellCaches.length];
+            for (int i = 0; i < cellCaches.length; i++) {
+                cached[i] = CellDensityCompiler.compile(cellCaches[i].adrenaline$getNoiseFiller());
+            }
+            this.adrenaline$cellDensityEvaluators = cached;
+        }
+        return cached;
+    }
+
+    @Unique
     private void adrenaline$fillSlice(boolean useFirstSlice, int cellX) {
         this.cellStartBlockX = cellX * this.cellWidth;
         this.inCellX = 0;
@@ -145,9 +163,15 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.arrayInterpolationCounter++;
 
         AdrenalineMixinCacheAllInCellAccessor[] cellCacheArray = this.adrenaline$cellCacheArray();
+        CellDensityEvaluator[] evaluators = this.adrenaline$cellDensityEvaluators(cellCacheArray);
         for (int i = 0; i < cellCacheArray.length; i++) {
             AdrenalineMixinCacheAllInCellAccessor cache = cellCacheArray[i];
-            cache.adrenaline$getNoiseFiller().fillArray(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
+            CellDensityEvaluator evaluator = evaluators[i];
+            if (evaluator == null) {
+                cache.adrenaline$getNoiseFiller().fillArray(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
+            } else {
+                evaluator.fill(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
+            }
         }
         ((AdrenalineNoiseChunkMaterialAccess) this).adrenaline$fillMaterialArrays((NoiseChunk) (Object) this);
 

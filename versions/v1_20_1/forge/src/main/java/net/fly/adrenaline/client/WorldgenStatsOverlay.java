@@ -110,6 +110,7 @@ public final class WorldgenStatsOverlay {
             case "SETUP" -> "gui.adrenaline.worldgen_stats.setup";
             case "SLICE SAMPLING" -> "gui.adrenaline.worldgen_stats.slice_sampling";
             case "CELL CACHE" -> "gui.adrenaline.worldgen_stats.cell_cache";
+            case "ORE CACHE" -> "gui.adrenaline.worldgen_stats.ore_cache";
             case "INTERPOLATION" -> "gui.adrenaline.worldgen_stats.interpolation";
             case "BLOCK STATE" -> "gui.adrenaline.worldgen_stats.block_state";
             case "BLOCK WRITE" -> "gui.adrenaline.worldgen_stats.block_write";

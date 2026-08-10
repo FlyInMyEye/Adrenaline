@@ -89,6 +89,7 @@
   "gui.adrenaline.worldgen_stats.setup": "Setup",
   "gui.adrenaline.worldgen_stats.slice_sampling": "Slice Sampling",
   "gui.adrenaline.worldgen_stats.cell_cache": "Cell Cache",
+  "gui.adrenaline.worldgen_stats.ore_cache": "Ore Cache",
   "gui.adrenaline.worldgen_stats.interpolation": "Interpolation",
   "gui.adrenaline.worldgen_stats.block_state": "Block State",
   "gui.adrenaline.worldgen_stats.block_write": "Block Write",

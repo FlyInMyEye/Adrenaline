@@ -262,6 +262,7 @@ public final class WorldgenStageStats {
         SETUP("SETUP"),
         SLICE_SAMPLING("SLICE SAMPLING"),
         CELL_CACHE("CELL CACHE"),
+        ORE_CACHE("ORE CACHE"),
         INTERPOLATION("INTERPOLATION"),
         BLOCK_STATE("BLOCK STATE"),
         BLOCK_WRITE("BLOCK WRITE"),
