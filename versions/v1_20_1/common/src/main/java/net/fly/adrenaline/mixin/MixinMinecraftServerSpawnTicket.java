@@ -26,7 +26,7 @@ public class MixinMinecraftServerSpawnTicket {
             return;
         }
         if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
-            original.call(chunkSource, ticketType, chunkPos, BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1, identifier);
+            original.call(chunkSource, ticketType, chunkPos, BackgroundWorldgenWarmupState.spawnZoneRadius() + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1, identifier);
             return;
         }
         if (!((InitialWorldCreationAccess) this).adrenaline$isInitialWorldCreation() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {

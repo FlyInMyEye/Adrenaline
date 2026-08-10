@@ -3,6 +3,7 @@ package net.fly.adrenaline.client;
 import net.fly.adrenaline.BuildConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.client.ConfigScreenHandler;
+import net.minecraftforge.client.event.RenderGuiEvent;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.fml.ModLoadingContext;
@@ -23,6 +24,7 @@ public final class AdrenalineClient {
 
         MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onClientTick);
         if (BuildConfig.DEBUG) {
+            MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onRenderGui);
             MinecraftForge.EVENT_BUS.register(new BuildWarningOverlay());
             MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());
         }
@@ -36,5 +38,9 @@ public final class AdrenalineClient {
         Minecraft minecraft = Minecraft.getInstance();
         MODERN_FIX_CONTROLLER.tick(minecraft);
         WORLDGEN_WARMUP.tick(minecraft);
+    }
+
+    private static void onRenderGui(RenderGuiEvent.Post event) {
+        WorldgenDifferenceHud.render(event.getGuiGraphics());
     }
 }

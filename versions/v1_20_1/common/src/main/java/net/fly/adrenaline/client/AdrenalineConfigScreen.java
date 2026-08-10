@@ -60,6 +60,7 @@ public class AdrenalineConfigScreen extends Screen {
     private Button prepareWorldCreationContextButton;
     private Button fastTerrainLoadingButton;
     private Button startBeforehandButton;
+    private Button worldgenBenchmarkButton;
     private Button debugLoggingButton;
     private Button forceEasterEggButton;
     private Button doneButton;
@@ -178,6 +179,15 @@ public class AdrenalineConfigScreen extends Screen {
 
         if (BuildConfig.DEBUG) {
             y = this.addSectionHeader("gui.adrenaline.config.section.diagnostics", y);
+            TooltipData benchmarkTooltip = tooltip("tooltip.adrenaline.config.worldgen_benchmark", PerformanceImpact.NONE);
+            this.scrollableLabels.add(new ScrollableLabel(Component.translatable("gui.adrenaline.config.worldgen_benchmark"), labelX, y, false, benchmarkTooltip));
+            this.worldgenBenchmarkButton = this.addScrollableWidget(Button.builder(Component.translatable("gui.adrenaline.benchmark.run"), button -> {
+                this.saveConfig();
+                if (WorldgenBenchmark.start(this.minecraft, this.config)) {
+                    this.minecraft.setScreen(new WorldgenBenchmarkScreen(this));
+                }
+            }).bounds(buttonX, y, buttonWidth, 20).build(), y, benchmarkTooltip);
+            y += 24;
             this.showThreadVisualizerButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.show_thread_visualizer"), this.config.showThreadVisualizer, value -> this.config.showThreadVisualizer = value, tooltip("tooltip.adrenaline.config.show_thread_visualizer", PerformanceImpact.NONE));
             y += 24;
             this.debugLoggingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.debug_logging"), this.config.debugLogging, value -> this.config.debugLogging = value, tooltip("tooltip.adrenaline.config.debug_logging", PerformanceImpact.NONE));
@@ -629,6 +639,11 @@ public class AdrenalineConfigScreen extends Screen {
         this.showChunkPreviewButton.active = true;
         this.startBeforehandButton.active = true;
         if (BuildConfig.DEBUG && this.debugLoggingButton != null) {
+            this.worldgenBenchmarkButton.active = this.minecraft.level == null
+                && this.minecraft.getSingleplayerServer() == null
+                && !WorldgenBenchmark.isRunning()
+                && !BackgroundWorldgenWarmup.isRunning()
+                && !BackgroundWorldSave.isRunning();
             this.showThreadVisualizerButton.active = true;
             this.debugLoggingButton.active = true;
             this.forceEasterEggButton.active = true;

@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Set;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
 import net.fly.adrenaline.compatdata.IncompatibilityRegistry;
 import net.fly.adrenaline.compatdata.IncompatibleData;
@@ -13,6 +14,14 @@ import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 public class AdrenalineMixinPlugin implements IMixinConfigPlugin {
+
+    private static final Set<String> DEBUG_MIXINS = Set.of(
+        "net.fly.adrenaline.mixin.MixinGui",
+        "net.fly.adrenaline.mixin.MixinLoggerChunkProgressListener",
+        "net.fly.adrenaline.mixin.MixinMinecraftServerWorldgenDebug",
+        "net.fly.adrenaline.mixin.MixinPlayerList",
+        "net.fly.adrenaline.mixin.MixinWorldgenDifferenceInput"
+    );
 
     private static Set<String> disabledMixins = Set.of();
 
@@ -43,7 +52,7 @@ public class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return !disabledMixins.contains(mixinClassName);
+        return (BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName)) && !disabledMixins.contains(mixinClassName);
     }
 
     @Override
