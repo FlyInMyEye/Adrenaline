@@ -74,6 +74,12 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
 
     @Override
     public void adrenaline$addJoiningControls() {
+        if (this.adrenaline$earlyEntryButton != null) {
+            this.removeWidget(this.adrenaline$earlyEntryButton);
+        }
+        if (this.adrenaline$cancelButton != null) {
+            this.removeWidget(this.adrenaline$cancelButton);
+        }
         boolean hideJoiningControls = !WorldLoadCancellation.isNewWorld() && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF;
         AdrenalineConfig.StartBeforehandMode startMode = AdrenalineConfig.startBeforehandMode();
         if (!hideJoiningControls && startMode != AdrenalineConfig.StartBeforehandMode.OFF) {
@@ -161,11 +167,15 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         if (showChunkPreview) {
             int availableWidth = Math.max(1, this.width - CHUNK_PREVIEW_HORIZONTAL_MARGIN);
             int availableHeight = Math.max(1, this.height - CHUNK_PREVIEW_VERTICAL_MARGIN);
+            int vanillaPixels = DEFAULT_DIAMETER * (cellSize + padding) - padding;
             scale = Math.min(
                 1.0F,
                 Math.min(
-                    (float) availableWidth / (float) pixels,
-                    (float) availableHeight / (float) pixels
+                    (float) vanillaPixels / (float) pixels,
+                    Math.min(
+                        (float) availableWidth / (float) pixels,
+                        (float) availableHeight / (float) pixels
+                    )
                 )
             );
         } else {

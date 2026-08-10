@@ -17,4 +17,11 @@ public abstract class MixinScreen {
             extension.adrenaline$addJoiningControls();
         }
     }
+
+    @Inject(method = "repositionElements", at = @At("TAIL"))
+    private void adrenaline$repositionLevelLoadingScreen(CallbackInfo ci) {
+        if ((Object) this instanceof LevelLoadingScreenExtension extension) {
+            extension.adrenaline$addJoiningControls();
+        }
+    }
 }
