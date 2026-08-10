@@ -178,7 +178,10 @@ public class MixinNoiseBasedChunkGenerator {
                     double[] finalDensityValues = directMaterialPath ? materialAccess.adrenaline$finalDensityValues() : null;
                     int materialIndex = 0;
                     if (BuildConfig.DEBUG && profile != null) {
-                        profile.add(NoiseSubstage.CELL_CACHE, System.nanoTime() - phaseStart);
+                        long elapsedNanos = System.nanoTime() - phaseStart;
+                        long oreCacheNanos = materialAccess.adrenaline$consumeMaterialArrayFillNanos();
+                        profile.add(NoiseSubstage.CELL_CACHE, Math.max(0L, elapsedNanos - oreCacheNanos));
+                        profile.add(NoiseSubstage.ORE_CACHE, oreCacheNanos);
                     }
 
                     for (int yInCell = cellHeight - 1; yInCell >= 0; yInCell--) {

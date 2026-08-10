@@ -13,5 +13,7 @@ public interface AdrenalineNoiseChunkMaterialAccess {
 
     void adrenaline$fillMaterialArrays(DensityFunction.ContextProvider contextProvider);
 
+    long adrenaline$consumeMaterialArrayFillNanos();
+
     BlockState adrenaline$calculateOre(DensityFunction.FunctionContext context, int index);
 }

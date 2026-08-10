@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.objects.ObjectListIterator;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.worldgen.AdrenalineCompiledBeardifierAccess;
 import net.minecraft.world.level.levelgen.Beardifier;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
@@ -18,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Beardifier.class)
-public abstract class MixinBeardifier {
+public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAccess {
 
     @Shadow private ObjectListIterator<?> pieceIterator;
     @Shadow private ObjectListIterator<JigsawJunction> junctionIterator;
@@ -58,6 +59,11 @@ public abstract class MixinBeardifier {
             return;
         }
 
+        cir.setReturnValue(this.adrenaline$computeDirect(context));
+    }
+
+    @Override
+    public double adrenaline$computeDirect(DensityFunction.FunctionContext context) {
         this.adrenaline$initCaches();
         int blockX = context.blockX();
         int blockY = context.blockY();
@@ -99,6 +105,6 @@ public abstract class MixinBeardifier {
             value += getBeardContribution(xDistance, yDistance, zDistance, yDistance) * 0.4D;
         }
 
-        cir.setReturnValue(value);
+        return value;
     }
 }

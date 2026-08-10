@@ -3,11 +3,14 @@ package net.fly.adrenaline.mixin;
 import java.util.List;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.worldgen.AdrenalineMaterialRuleListAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
+import net.fly.adrenaline.worldgen.CellDensityCompiler;
+import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
@@ -53,6 +56,11 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
     @Unique private double[] adrenaline$veinToggleValues;
     @Unique private double[] adrenaline$veinRidgedValues;
     @Unique private double[] adrenaline$veinGapValues;
+    @Unique private long adrenaline$materialArrayFillNanos;
+    @Unique private boolean adrenaline$materialEvaluatorsInitialized;
+    @Unique private CellDensityEvaluator adrenaline$veinToggleEvaluator;
+    @Unique private CellDensityEvaluator adrenaline$veinRidgedEvaluator;
+    @Unique private CellDensityEvaluator adrenaline$veinGapEvaluator;
 
     @Redirect(
         method = "<init>",
@@ -157,11 +165,36 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
     @Override
     public void adrenaline$fillMaterialArrays(DensityFunction.ContextProvider contextProvider) {
         if (this.adrenaline$veinToggleValues == null) {
+            this.adrenaline$materialArrayFillNanos = 0L;
             return;
         }
-        this.adrenaline$veinToggle.fillArray(this.adrenaline$veinToggleValues, contextProvider);
-        this.adrenaline$veinRidged.fillArray(this.adrenaline$veinRidgedValues, contextProvider);
-        this.adrenaline$veinGap.fillArray(this.adrenaline$veinGapValues, contextProvider);
+        long startedNanos = BuildConfig.DEBUG ? System.nanoTime() : 0L;
+        if (!this.adrenaline$materialEvaluatorsInitialized) {
+            this.adrenaline$veinToggleEvaluator = CellDensityCompiler.compile(this.adrenaline$veinToggle);
+            this.adrenaline$veinRidgedEvaluator = CellDensityCompiler.compile(this.adrenaline$veinRidged);
+            this.adrenaline$veinGapEvaluator = CellDensityCompiler.compile(this.adrenaline$veinGap);
+            this.adrenaline$materialEvaluatorsInitialized = true;
+        }
+        this.adrenaline$fillMaterialArray(this.adrenaline$veinToggleEvaluator, this.adrenaline$veinToggle, this.adrenaline$veinToggleValues, contextProvider);
+        this.adrenaline$fillMaterialArray(this.adrenaline$veinRidgedEvaluator, this.adrenaline$veinRidged, this.adrenaline$veinRidgedValues, contextProvider);
+        this.adrenaline$fillMaterialArray(this.adrenaline$veinGapEvaluator, this.adrenaline$veinGap, this.adrenaline$veinGapValues, contextProvider);
+        this.adrenaline$materialArrayFillNanos = BuildConfig.DEBUG ? System.nanoTime() - startedNanos : 0L;
+    }
+
+    @Unique
+    private void adrenaline$fillMaterialArray(CellDensityEvaluator evaluator, DensityFunction function, double[] values, DensityFunction.ContextProvider contextProvider) {
+        if (evaluator == null) {
+            function.fillArray(values, contextProvider);
+        } else {
+            evaluator.fill(values, contextProvider);
+        }
+    }
+
+    @Override
+    public long adrenaline$consumeMaterialArrayFillNanos() {
+        long elapsedNanos = this.adrenaline$materialArrayFillNanos;
+        this.adrenaline$materialArrayFillNanos = 0L;
+        return elapsedNanos;
     }
 
     @Override
