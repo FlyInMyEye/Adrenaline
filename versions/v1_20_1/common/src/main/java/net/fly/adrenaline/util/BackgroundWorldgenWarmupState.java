@@ -8,12 +8,18 @@ public final class BackgroundWorldgenWarmupState {
 
     private static volatile boolean active;
     private static volatile MinecraftServer server;
+    private static volatile int spawnZoneRadius = SPAWN_ZONE_RADIUS;
 
     private BackgroundWorldgenWarmupState() {
     }
 
     public static void begin() {
+        begin(SPAWN_ZONE_RADIUS);
+    }
+
+    public static void begin(int radius) {
         server = null;
+        spawnZoneRadius = radius;
         active = true;
     }
 
@@ -28,8 +34,13 @@ public final class BackgroundWorldgenWarmupState {
         return active && server == candidate;
     }
 
+    public static int spawnZoneRadius() {
+        return spawnZoneRadius;
+    }
+
     public static void end() {
         active = false;
         server = null;
+        spawnZoneRadius = SPAWN_ZONE_RADIUS;
     }
 }

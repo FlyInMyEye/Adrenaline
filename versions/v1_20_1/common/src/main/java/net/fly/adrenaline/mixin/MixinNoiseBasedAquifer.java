@@ -6,7 +6,6 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.biome.OverworldBiomeBuilder;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Aquifer;
@@ -19,7 +18,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.apache.commons.lang3.mutable.MutableDouble;
 
@@ -28,7 +26,6 @@ import javax.annotation.Nullable;
 @Mixin(Aquifer.NoiseBasedAquifer.class)
 public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAccess {
 
-    @Shadow @Final private static int[][] SURFACE_SAMPLING_OFFSETS_IN_CHUNKS;
     @Shadow @Final private long[] aquiferLocationCache;
     @Shadow @Final private Aquifer.FluidStatus[] aquiferCache;
     @Shadow @Final private Aquifer.FluidPicker globalFluidPicker;
@@ -49,9 +46,6 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     @Shadow
     protected abstract double calculatePressure(DensityFunction.FunctionContext context, MutableDouble barrierNoise,
                                                 Aquifer.FluidStatus first, Aquifer.FluidStatus second);
-
-    @Unique
-    private static final int[][] adrenaline$surfaceOffsets = new int[][]{{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
     @Unique
     private short[] adrenaline$packedAquiferLocations;
@@ -231,8 +225,9 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
             return result;
         }
 
+        MutableDouble barrierNoise = new MutableDouble(Double.NaN);
         Aquifer.FluidStatus secondStatus = adrenaline$getAquiferStatus(secondNearest & 4095);
-        double pressure = nearestSimilarity * adrenaline$calculatePressure(y, nearestStatus, secondStatus);
+        double pressure = nearestSimilarity * calculatePressure(context, barrierNoise, nearestStatus, secondStatus);
         if (density + pressure > 0.0D) {
             shouldScheduleFluidUpdate = false;
             return null;
@@ -241,14 +236,14 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         Aquifer.FluidStatus thirdStatus = adrenaline$getAquiferStatus(thirdNearest & 4095);
         double nearestThirdSimilarity = adrenaline$similarity(nearestDistance, thirdDistance);
         if (nearestThirdSimilarity > 0.0D
-            && density + nearestSimilarity * nearestThirdSimilarity * adrenaline$calculatePressure(y, nearestStatus, thirdStatus) > 0.0D) {
+            && density + nearestSimilarity * nearestThirdSimilarity * calculatePressure(context, barrierNoise, nearestStatus, thirdStatus) > 0.0D) {
             shouldScheduleFluidUpdate = false;
             return null;
         }
 
         double secondThirdSimilarity = adrenaline$similarity(secondDistance, thirdDistance);
         if (secondThirdSimilarity > 0.0D
-            && density + nearestSimilarity * secondThirdSimilarity * adrenaline$calculatePressure(y, secondStatus, thirdStatus) > 0.0D) {
+            && density + nearestSimilarity * secondThirdSimilarity * calculatePressure(context, barrierNoise, secondStatus, thirdStatus) > 0.0D) {
             shouldScheduleFluidUpdate = false;
             return null;
         }
@@ -385,79 +380,5 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     @Unique
     private static double adrenaline$similarity(int firstDistance, int secondDistance) {
         return 1.0D - (double) Math.abs(secondDistance - firstDistance) / 25.0D;
-    }
-
-    @Unique
-    private static double adrenaline$calculatePressure(int y, Aquifer.FluidStatus first, Aquifer.FluidStatus second) {
-        BlockState firstState = first.at(y);
-        BlockState secondState = second.at(y);
-        if (firstState.is(Blocks.LAVA) && secondState.is(Blocks.WATER)
-            || firstState.is(Blocks.WATER) && secondState.is(Blocks.LAVA)) {
-            return 2.0D;
-        }
-
-        int firstLevel = ((MixinAquiferFluidStatusAccessor) (Object) first).adrenaline$fluidLevel();
-        int secondLevel = ((MixinAquiferFluidStatusAccessor) (Object) second).adrenaline$fluidLevel();
-        int levelDifference = Math.abs(firstLevel - secondLevel);
-        if (levelDifference == 0) {
-            return 0.0D;
-        }
-
-        double midpoint = 0.5D * (firstLevel + secondLevel);
-        double offsetFromMidpoint = y + 0.5D - midpoint;
-        double distanceInsideLevels = levelDifference / 2.0D - Math.abs(offsetFromMidpoint);
-        double pressure;
-        if (offsetFromMidpoint > 0.0D) {
-            pressure = distanceInsideLevels > 0.0D ? distanceInsideLevels / 1.5D : distanceInsideLevels / 2.5D;
-        } else {
-            double shifted = 3.0D + distanceInsideLevels;
-            pressure = shifted > 0.0D ? shifted / 3.0D : shifted / 10.0D;
-        }
-        return 2.0D * pressure;
-    }
-
-    @Redirect(
-        method = "computeFluid",
-        at = @At(
-            value = "FIELD",
-            target = "Lnet/minecraft/world/level/levelgen/Aquifer$NoiseBasedAquifer;SURFACE_SAMPLING_OFFSETS_IN_CHUNKS:[[I"
-        )
-    )
-    private int[][] adrenaline$useReducedSurfaceSampling() {
-        if (!AdrenalineConfig.aquiferOptimizationsEnabled()) {
-            return SURFACE_SAMPLING_OFFSETS_IN_CHUNKS;
-        }
-
-        return adrenaline$surfaceOffsets;
-    }
-
-    @Redirect(
-        method = "computeSurfaceLevel",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/level/biome/OverworldBiomeBuilder;isDeepDarkRegion(Lnet/minecraft/world/level/levelgen/DensityFunction;Lnet/minecraft/world/level/levelgen/DensityFunction;Lnet/minecraft/world/level/levelgen/DensityFunction$FunctionContext;)Z"
-        )
-    )
-    private boolean adrenaline$skipDeepDarkSpecialCase(DensityFunction erosion, DensityFunction depth, DensityFunction.FunctionContext context) {
-        if (!AdrenalineConfig.aquiferOptimizationsEnabled()) {
-            return OverworldBiomeBuilder.isDeepDarkRegion(erosion, depth, context);
-        }
-
-        return false;
-    }
-
-    @Redirect(
-        method = "calculatePressure",
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/world/level/levelgen/DensityFunction;compute(Lnet/minecraft/world/level/levelgen/DensityFunction$FunctionContext;)D"
-        )
-    )
-    private double adrenaline$skipBarrierNoise(DensityFunction barrierNoise, DensityFunction.FunctionContext context) {
-        if (!AdrenalineConfig.aquiferOptimizationsEnabled()) {
-            return barrierNoise.compute(context);
-        }
-
-        return 0.0D;
     }
 }

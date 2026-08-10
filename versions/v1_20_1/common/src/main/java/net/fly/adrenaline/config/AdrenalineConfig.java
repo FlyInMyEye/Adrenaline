@@ -20,6 +20,7 @@ public class AdrenalineConfig {
     private static final Data DEFAULTS = new Data();
     private static JsonConfigManager<Data> manager;
     private static volatile Data data = DEFAULTS;
+    private static volatile Data runtimeOverride;
 
     public static synchronized void init(Path configDirectory) {
         manager = new JsonConfigManager<>(
@@ -50,7 +51,11 @@ public class AdrenalineConfig {
     }
 
     public static Data get() {
-        return data;
+        if (!BuildConfig.DEBUG) {
+            return data;
+        }
+        Data override = runtimeOverride;
+        return override == null ? data : override;
     }
 
     public static Data copy() {
@@ -71,6 +76,18 @@ public class AdrenalineConfig {
         Data loaded = manager.get();
         if (loaded != null) {
             data = loaded;
+        }
+    }
+
+    public static void setRuntimeOverride(Data value) {
+        if (BuildConfig.DEBUG) {
+            runtimeOverride = value;
+        }
+    }
+
+    public static void clearRuntimeOverride() {
+        if (BuildConfig.DEBUG) {
+            runtimeOverride = null;
         }
     }
 

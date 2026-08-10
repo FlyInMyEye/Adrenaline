@@ -79,7 +79,7 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
             return radius;
         }
         if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
-            return BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS;
+            return BackgroundWorldgenWarmupState.spawnZoneRadius();
         }
         if (!this.adrenaline$initialWorldCreation && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
             return 0;
@@ -102,7 +102,7 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         }
         int radius;
         if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
-            radius = BackgroundWorldgenWarmupState.SPAWN_ZONE_RADIUS + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
+            radius = BackgroundWorldgenWarmupState.spawnZoneRadius() + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
         } else {
             radius = AdrenalineConfig.internalSpawnPreparationRadius();
         }

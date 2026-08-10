@@ -1,4 +1,4 @@
-package net.fly.adrenaline.compat.blueprint;
+package net.fly.adrenaline.compat.mixin.blueprint;
 
 import com.teamabnormals.blueprint.common.levelgen.feature.BlueprintTreeFeature;
 import net.minecraft.world.level.levelgen.feature.Feature;
