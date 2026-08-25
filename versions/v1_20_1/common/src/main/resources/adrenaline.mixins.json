@@ -28,7 +28,6 @@
     "MixinServerOptimizationTakeoverDetector",
     "MixinNoiseChunkAccessor",
     "MixinNoiseChunk",
-    "MixinImprovedNoise",
     "MixinNoiseInterpolator",
     "MixinDensityFunctionsAp2",
     "MixinDensityFunctionsClamp",
