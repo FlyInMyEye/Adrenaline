@@ -26,6 +26,9 @@ import javax.annotation.Nullable;
 @Mixin(Aquifer.NoiseBasedAquifer.class)
 public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAccess {
 
+    @Unique
+    private static final ThreadLocal<MutableDouble> adrenaline$barrierNoise = ThreadLocal.withInitial(() -> new MutableDouble(Double.NaN));
+
     @Shadow @Final private long[] aquiferLocationCache;
     @Shadow @Final private Aquifer.FluidStatus[] aquiferCache;
     @Shadow @Final private Aquifer.FluidPicker globalFluidPicker;
@@ -225,7 +228,8 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
             return result;
         }
 
-        MutableDouble barrierNoise = new MutableDouble(Double.NaN);
+        MutableDouble barrierNoise = adrenaline$barrierNoise.get();
+        barrierNoise.setValue(Double.NaN);
         Aquifer.FluidStatus secondStatus = adrenaline$getAquiferStatus(secondNearest & 4095);
         double pressure = nearestSimilarity * calculatePressure(context, barrierNoise, nearestStatus, secondStatus);
         if (density + pressure > 0.0D) {
