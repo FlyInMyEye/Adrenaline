@@ -167,6 +167,17 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
                 }
                 adrenaline$searchDeltaZ[order] = newDeltaZ;
                 adrenaline$searchDistances[order] = distance;
+                int packedCandidate = distance << 16 | (11 - order) << 12 | adrenaline$searchCacheIndices[order];
+                if (packedCandidate <= nearest) {
+                    thirdNearest = secondNearest;
+                    secondNearest = nearest;
+                    nearest = packedCandidate;
+                } else if (packedCandidate <= secondNearest) {
+                    thirdNearest = secondNearest;
+                    secondNearest = packedCandidate;
+                } else if (packedCandidate <= thirdNearest) {
+                    thirdNearest = packedCandidate;
+                }
             }
         } else {
             int order = 0;
@@ -187,23 +198,20 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
                         adrenaline$searchCacheIndices[order] = cacheIndex;
                         adrenaline$searchDistances[order] = distance;
                         adrenaline$searchDeltaZ[order] = deltaZ;
+                        int packedCandidate = distance << 16 | (11 - order) << 12 | cacheIndex;
+                        if (packedCandidate <= nearest) {
+                            thirdNearest = secondNearest;
+                            secondNearest = nearest;
+                            nearest = packedCandidate;
+                        } else if (packedCandidate <= secondNearest) {
+                            thirdNearest = secondNearest;
+                            secondNearest = packedCandidate;
+                        } else if (packedCandidate <= thirdNearest) {
+                            thirdNearest = packedCandidate;
+                        }
                         order++;
                     }
                 }
-            }
-        }
-        for (int order = 0; order < 12; order++) {
-            int packedCandidate = adrenaline$searchDistances[order] << 16 | (11 - order) << 12
-                | adrenaline$searchCacheIndices[order];
-            if (packedCandidate <= nearest) {
-                thirdNearest = secondNearest;
-                secondNearest = nearest;
-                nearest = packedCandidate;
-            } else if (packedCandidate <= secondNearest) {
-                thirdNearest = secondNearest;
-                secondNearest = packedCandidate;
-            } else if (packedCandidate <= thirdNearest) {
-                thirdNearest = packedCandidate;
             }
         }
         adrenaline$lastSearchX = x;
