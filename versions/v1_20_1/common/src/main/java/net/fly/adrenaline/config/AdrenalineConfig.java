@@ -93,12 +93,17 @@ public class AdrenalineConfig {
 
     public static int resolvedGenerationWorkerThreads() {
         int v = get().generationWorkerThreads;
-        return v == 0 ? Runtime.getRuntime().availableProcessors() : Math.max(1, v);
+        return v == 0 ? recommendedWorkerThreads() : Math.max(1, v);
     }
 
     public static int resolvedSerializationWorkerThreads() {
         int v = get().serializationWorkerThreads;
-        return v == 0 ? Runtime.getRuntime().availableProcessors() : Math.max(1, v);
+        return v == 0 ? recommendedWorkerThreads() : Math.max(1, v);
+    }
+
+    public static int recommendedWorkerThreads() {
+        int threads = Math.max(1, Runtime.getRuntime().availableProcessors());
+        return Math.max(1, threads - (threads + 6) / 6);
     }
 
     public static boolean saveChunksAfterWorldCreation() {
