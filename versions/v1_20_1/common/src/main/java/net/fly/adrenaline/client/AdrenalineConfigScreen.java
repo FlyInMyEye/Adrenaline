@@ -690,7 +690,11 @@ public class AdrenalineConfigScreen extends Screen {
         @Override
         protected void updateMessage() {
             int value = AdrenalineConfigScreen.this.snapSliderValue(this.value);
-            this.setMessage(Component.translatable("gui.adrenaline.slider.threads", this.label, value == 0 ? Component.translatable("gui.adrenaline.value.auto") : Integer.toString(value)));
+            Component displayValue = value == 0 ? Component.translatable("gui.adrenaline.value.auto") : Component.literal(Integer.toString(value));
+            if (value > AdrenalineConfig.recommendedWorkerThreads()) {
+                displayValue = displayValue.copy().append(Component.literal(" (Not recommended)"));
+            }
+            this.setMessage(Component.translatable("gui.adrenaline.slider.threads", this.label, displayValue));
         }
 
         @Override
