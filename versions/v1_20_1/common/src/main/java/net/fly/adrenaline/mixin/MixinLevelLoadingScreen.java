@@ -40,6 +40,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
     private static final int DEFAULT_DIAMETER = (DEFAULT_SPAWN_ZONE_RADIUS + ChunkStatus.maxDistance()) * 2 + 1;
     private static final int CHUNK_PREVIEW_HORIZONTAL_MARGIN = 32;
     private static final int CHUNK_PREVIEW_VERTICAL_MARGIN = 112;
+    private static final int PROCESSING_CHUNK_COLOR = 0xFFFF59BD;
 
     @Shadow
     private String getFormattedProgress() {
@@ -160,6 +161,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         if (pixels <= 0) {
             LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
             this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
+            this.adrenaline$renderProcessingChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
             return;
         }
 
@@ -190,6 +192,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         try {
             LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
             this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
+            this.adrenaline$renderProcessingChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
         } finally {
             guiGraphics.pose().popPose();
         }
@@ -281,6 +284,40 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
             textureSize,
             textureSize
         );
+    }
+
+    @Unique
+    private void adrenaline$renderProcessingChunks(
+        GuiGraphics guiGraphics,
+        StoringChunkProgressListener progressListener,
+        int centerX,
+        int centerY,
+        int cellSize,
+        int padding
+    ) {
+        MixinStoringChunkProgressListenerAccessor accessor =
+            (MixinStoringChunkProgressListenerAccessor) (Object) progressListener;
+        ChunkPos spawnPos = accessor.adrenaline$getSpawnPos();
+        if (spawnPos == null) {
+            return;
+        }
+
+        int diameter = progressListener.getDiameter();
+        int step = cellSize + padding;
+        int mapSize = diameter * step - padding;
+        int mapStartX = centerX - mapSize / 2;
+        int mapStartY = centerY - mapSize / 2;
+        int radius = accessor.adrenaline$getRadius();
+
+        for (long position : ChunkJobScheduler.get().activeChunkSnapshot()) {
+            int gridX = ChunkPos.getX(position) - spawnPos.x + radius;
+            int gridZ = ChunkPos.getZ(position) - spawnPos.z + radius;
+            if (gridX >= 0 && gridX < diameter && gridZ >= 0 && gridZ < diameter) {
+                int cellX = mapStartX + gridX * step;
+                int cellY = mapStartY + gridZ * step;
+                guiGraphics.fill(cellX, cellY, cellX + cellSize, cellY + cellSize, PROCESSING_CHUNK_COLOR);
+            }
+        }
     }
 
     @Unique

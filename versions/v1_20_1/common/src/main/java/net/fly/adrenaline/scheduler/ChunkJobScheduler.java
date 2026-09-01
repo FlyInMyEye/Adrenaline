@@ -90,6 +90,23 @@ public final class ChunkJobScheduler {
         return snapshot;
     }
 
+    public synchronized long[] activeChunkSnapshot() {
+        long[] snapshot = new long[this.activeJobs.size()];
+        int count = 0;
+        for (ChunkJob job : this.activeJobs) {
+            long position = job.trackedPosition();
+            if (position != Long.MIN_VALUE) {
+                snapshot[count++] = position;
+            }
+        }
+        if (count == snapshot.length) {
+            return snapshot;
+        }
+        long[] trimmed = new long[count];
+        System.arraycopy(snapshot, 0, trimmed, 0, count);
+        return trimmed;
+    }
+
     public void markCurrentWorkerActive() {
         this.markCurrentWorker(WORKER_ACTIVE);
     }
