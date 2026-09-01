@@ -83,6 +83,11 @@ public final class ChunkJob implements Runnable {
         return debugLabel;
     }
 
+    long trackedPosition() {
+        ChunkPos pos = this.waitingPos;
+        return pos == null ? Long.MIN_VALUE : pos.toLong();
+    }
+
     public ChunkJob trackWaiting(ChunkPos pos, ChunkStatus status) {
         this.waitingPos = pos;
         this.waitingStatus = status;
