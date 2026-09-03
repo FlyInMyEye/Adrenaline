@@ -126,6 +126,10 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('processResources', ProcessResources).configure {
+    from('../../../native/build') {
+        into 'adrenaline/natives'
+        include '**/*.so', '**/*.dll', '**/*.dylib'
+    }
     def replaceProperties = [
         minecraft_version: '1.21.1',
         minecraft_version_range: '[1.21.1,1.22)',

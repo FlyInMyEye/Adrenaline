@@ -49,6 +49,13 @@ sourceSets.main.resources.srcDir('../../../assets')
 sourceSets.main.resources.srcDir('../common/src/main/resources')
 sourceSets.main.resources.srcDir('src/generated/resources')
 
+tasks.named('processResources') {
+    from('../../../native/build') {
+        into 'adrenaline/natives'
+        include '**/*.so', '**/*.dll', '**/*.dylib'
+    }
+}
+
 neoForge {
     version = neo_version
     runs {

@@ -6,6 +6,7 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.AdrenalineCompiledBeardifierAccess;
+import net.fly.adrenaline.worldgen.AdrenalineEmptyBeardifierAccess;
 import net.minecraft.world.level.levelgen.Beardifier;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
@@ -19,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Beardifier.class)
-public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAccess {
+public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAccess, AdrenalineEmptyBeardifierAccess {
 
     @Shadow private ObjectListIterator<?> pieceIterator;
     @Shadow private ObjectListIterator<JigsawJunction> junctionIterator;
@@ -106,5 +107,11 @@ public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAcc
         }
 
         return value;
+    }
+
+    @Override
+    public boolean adrenaline$isEmpty() {
+        this.adrenaline$initCaches();
+        return this.adrenaline$pieces.length == 0 && this.adrenaline$junctions.length == 0;
     }
 }

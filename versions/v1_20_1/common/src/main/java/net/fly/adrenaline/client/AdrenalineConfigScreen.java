@@ -4,6 +4,7 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.natives.AdrenalineNatives;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
@@ -53,6 +54,10 @@ public class AdrenalineConfigScreen extends Screen {
     private Button incrementalSaveIntervalButton;
     private Button skipSavingScreenAfterExitButton;
     private Button fastLegacyRandomButton;
+    private Button nativePerlinBatchingButton;
+    private Button approximateNativePerlinButton;
+    private Button nativeDensityEvaluationButton;
+    private Button nativeAquiferBatchingButton;
     private Button showCancelButton;
     private Button showChunkPreviewButton;
     private Button showThreadVisualizerButton;
@@ -147,6 +152,16 @@ public class AdrenalineConfigScreen extends Screen {
         this.oreVeinOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.ore_vein_optimizations"), this.config.oreVeinOptimizations, value -> this.config.oreVeinOptimizations = value, optimizationTooltip("tooltip.adrenaline.config.ore_vein_optimizations", PerformanceImpact.LOW, Optimization.ORE_VEIN));
         y += 24;
         this.initialSpawnOptimizationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.initial_spawn_optimization"), this.config.initialSpawnOptimization, value -> this.config.initialSpawnOptimization = value, optimizationTooltip("tooltip.adrenaline.config.initial_spawn_optimization", PerformanceImpact.HIGH, Optimization.INITIAL_SPAWN));
+        y += 24;
+
+        y = this.addSectionHeader("gui.adrenaline.config.section.natives", y);
+        this.nativePerlinBatchingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.native_perlin_batching"), this.config.nativePerlinBatching, value -> this.config.nativePerlinBatching = value, tooltip("tooltip.adrenaline.config.native_perlin_batching", PerformanceImpact.HIGH));
+        y += 24;
+        this.approximateNativePerlinButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.approximate_native_perlin"), this.config.approximateNativePerlin, value -> this.config.approximateNativePerlin = value, tooltip("tooltip.adrenaline.config.approximate_native_perlin", PerformanceImpact.EXTREME));
+        y += 24;
+        this.nativeDensityEvaluationButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.native_density_evaluation"), this.config.nativeDensityEvaluation, value -> this.config.nativeDensityEvaluation = value, tooltip("tooltip.adrenaline.config.native_density_evaluation", PerformanceImpact.EXTREME));
+        y += 24;
+        this.nativeAquiferBatchingButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.native_aquifer_batching"), this.config.nativeAquiferBatching, value -> this.config.nativeAquiferBatching = value, tooltip("tooltip.adrenaline.config.native_aquifer_batching", PerformanceImpact.EXTREME));
         y += 24;
 
         y = this.addSectionHeader("gui.adrenaline.config.section.compatibility", y);
@@ -635,6 +650,10 @@ public class AdrenalineConfigScreen extends Screen {
             button.active = this.config.parallelWorldgen;
         }
         this.fastLegacyRandomButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.FAST_LEGACY_RANDOM);
+        this.nativePerlinBatchingButton.active = AdrenalineNatives.isAvailable();
+        this.approximateNativePerlinButton.active = AdrenalineNatives.isAvailable() && this.config.nativePerlinBatching;
+        this.nativeDensityEvaluationButton.active = AdrenalineNatives.isAvailable();
+        this.nativeAquiferBatchingButton.active = AdrenalineNatives.isAvailable() && worldgenOptimizations && this.config.aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
         this.showCancelButton.active = true;
         this.showChunkPreviewButton.active = true;
         this.startBeforehandButton.active = true;

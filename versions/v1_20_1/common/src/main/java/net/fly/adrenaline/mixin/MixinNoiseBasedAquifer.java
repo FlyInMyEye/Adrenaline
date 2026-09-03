@@ -3,7 +3,13 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.natives.NativeAquiferSampler;
 import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
+import net.fly.adrenaline.worldgen.AdrenalineFluidStatusAccess;
+import net.fly.adrenaline.worldgen.AdrenalineNativeAquiferAccess;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
@@ -24,7 +30,13 @@ import org.apache.commons.lang3.mutable.MutableDouble;
 import javax.annotation.Nullable;
 
 @Mixin(Aquifer.NoiseBasedAquifer.class)
-public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAccess {
+public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAccess, AdrenalineNativeAquiferAccess {
+
+    @Unique
+    private static final Map<PositionalRandomFactory, AdrenalineSharedFluidStatuses> adrenaline$sharedFluidStatuses = new IdentityHashMap<>();
+
+    @Unique
+    private static final Object adrenaline$sharedFluidStatusesLock = new Object();
 
     @Unique
     private final MutableDouble adrenaline$barrierNoise = new MutableDouble(Double.NaN);
@@ -38,6 +50,7 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     @Shadow @Final private int gridSizeX;
     @Shadow @Final private int gridSizeZ;
     @Shadow @Final private PositionalRandomFactory positionalRandomFactory;
+    @Shadow @Final protected DensityFunction barrierNoise;
     @Shadow protected boolean shouldScheduleFluidUpdate;
 
     @Shadow
@@ -80,6 +93,49 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     @Unique
     private int adrenaline$lastSearchGridZ;
 
+    @Unique
+    private int[] adrenaline$nativeFluidLevels;
+
+    @Unique
+    private byte[] adrenaline$nativeFluidTypes;
+
+    @Unique
+    private boolean adrenaline$nativeFluidTableReady;
+
+    @Unique
+    private boolean adrenaline$nativeFluidTableUnsupported;
+
+    @Unique
+    private double[] adrenaline$nativeBarrierValues;
+
+    @Unique
+    private byte[] adrenaline$nativeMaterials;
+
+    @Unique
+    private int[] adrenaline$nativeDeferredIndices;
+
+    @Unique
+    private final int[] adrenaline$nativeDeferredCount = new int[1];
+
+    @Unique
+    private long[] adrenaline$nativeCandidates;
+
+    @Unique
+    private int adrenaline$nativeGlobalFluidLevel;
+
+    @Unique
+    private byte adrenaline$nativeGlobalFluidType;
+
+    @Unique
+    private boolean adrenaline$nativeGlobalFluidReady;
+
+    @Unique
+    private boolean adrenaline$nativeGlobalFluidUnsupported;
+
+    @Unique
+    private AdrenalineSharedFluidStatuses adrenaline$sharedFluidStatusCache;
+
+    @Unique
     @Inject(method = "<init>", at = @At("TAIL"))
     @ControlsOptimization(Optimization.AQUIFER)
     private void adrenaline$prewarmCenterCache(CallbackInfo ci) {
@@ -93,6 +149,11 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         adrenaline$searchCacheIndices = new int[12];
         adrenaline$searchDistances = new int[12];
         adrenaline$searchDeltaZ = new int[12];
+        adrenaline$nativeFluidLevels = new int[aquiferLocationCache.length];
+        adrenaline$nativeFluidTypes = new byte[aquiferLocationCache.length];
+        if (AdrenalineConfig.nativeAquiferBatchingEnabled()) {
+            this.adrenaline$sharedFluidStatusCache = adrenaline$sharedFluidStatusCache(this.positionalRandomFactory);
+        }
         for (int dy = 0; dy < sizeY; dy++) {
             for (int dz = 0; dz < gridSizeZ; dz++) {
                 for (int dx = 0; dx < gridSizeX; dx++) {
@@ -124,6 +185,106 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     @Override
     public boolean adrenaline$supportsPrecomputedMaterials() {
         return adrenaline$packedAquiferLocations != null;
+    }
+
+    @Override
+    public boolean adrenaline$prepareNativeMaterials(DensityFunction.ContextProvider contextProvider, double[] densityValues, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight) {
+        if (!AdrenalineConfig.nativeAquiferBatchingEnabled() || adrenaline$packedAquiferLocations == null
+            || densityValues.length != cellWidth * cellWidth * cellHeight || !adrenaline$prepareNativeFluidTable() || !adrenaline$prepareNativeGlobalFluid()) {
+            return false;
+        }
+
+        int count = densityValues.length;
+        if (adrenaline$nativeBarrierValues == null || adrenaline$nativeBarrierValues.length < count) {
+            adrenaline$nativeBarrierValues = new double[count];
+            adrenaline$nativeMaterials = new byte[count];
+            adrenaline$nativeDeferredIndices = new int[count];
+            adrenaline$nativeCandidates = new long[count * 2];
+        }
+
+        boolean prepared = NativeAquiferSampler.prepare(densityValues, adrenaline$nativeCandidates, adrenaline$packedAquiferLocations,
+            adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ,
+            baseX, baseY, baseZ, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials);
+        if (!prepared) {
+            return false;
+        }
+        int deferredCount = adrenaline$nativeDeferredCount[0];
+        if (deferredCount < 0 || deferredCount > count) {
+            return false;
+        }
+        for (int deferredIndex = 0; deferredIndex < deferredCount; deferredIndex++) {
+            int index = adrenaline$nativeDeferredIndices[deferredIndex];
+            if (index < 0 || index >= count) {
+                return false;
+            }
+            adrenaline$nativeBarrierValues[index] = this.barrierNoise.compute(contextProvider.forIndex(index));
+        }
+        contextProvider.forIndex(count - 1);
+        return deferredCount == 0 || NativeAquiferSampler.evaluate(densityValues, adrenaline$nativeBarrierValues, adrenaline$nativeCandidates,
+            adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, baseY, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, deferredCount, adrenaline$nativeMaterials);
+    }
+
+    @Override
+    public byte adrenaline$nativeMaterialAt(int index) {
+        return adrenaline$nativeMaterials[index];
+    }
+
+    @Unique
+    private boolean adrenaline$prepareNativeFluidTable() {
+        if (adrenaline$nativeFluidTableReady) {
+            return true;
+        }
+        if (adrenaline$nativeFluidTableUnsupported) {
+            return false;
+        }
+        for (int index = 0; index < aquiferCache.length; index++) {
+            Aquifer.FluidStatus status = adrenaline$getAquiferStatus(index);
+            AdrenalineFluidStatusAccess access = (AdrenalineFluidStatusAccess) (Object) status;
+            int material = adrenaline$materialCode(access.adrenaline$fluidType());
+            if (material != 2 && material != 3) {
+                adrenaline$nativeFluidTableUnsupported = true;
+                return false;
+            }
+            adrenaline$nativeFluidLevels[index] = access.adrenaline$fluidLevel();
+            adrenaline$nativeFluidTypes[index] = (byte) material;
+        }
+        adrenaline$nativeFluidTableReady = true;
+        return true;
+    }
+
+    @Unique
+    private boolean adrenaline$prepareNativeGlobalFluid() {
+        if (adrenaline$nativeGlobalFluidReady) {
+            return true;
+        }
+        if (adrenaline$nativeGlobalFluidUnsupported) {
+            return false;
+        }
+        Aquifer.FluidStatus status = this.globalFluidPicker.computeFluid(0, 320, 0);
+        AdrenalineFluidStatusAccess access = (AdrenalineFluidStatusAccess) (Object) status;
+        int material = adrenaline$materialCode(access.adrenaline$fluidType());
+        if (material != 2 && material != 3) {
+            adrenaline$nativeGlobalFluidUnsupported = true;
+            return false;
+        }
+        adrenaline$nativeGlobalFluidLevel = access.adrenaline$fluidLevel();
+        adrenaline$nativeGlobalFluidType = (byte) material;
+        adrenaline$nativeGlobalFluidReady = true;
+        return true;
+    }
+
+    @Unique
+    private static int adrenaline$materialCode(BlockState state) {
+        if (state.is(Blocks.AIR)) {
+            return 1;
+        }
+        if (state.is(Blocks.WATER)) {
+            return 2;
+        }
+        if (state.is(Blocks.LAVA)) {
+            return 3;
+        }
+        return -1;
     }
 
     @Unique
@@ -384,9 +545,75 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         int x = (minGridX + localX) * 16 + (packedLocation >> 8);
         int y = (minGridY + localY) * 12 + (packedLocation >> 4 & 15);
         int z = (minGridZ + localZ) * 16 + (packedLocation & 15);
-        status = computeFluid(x, y, z);
+        AdrenalineSharedFluidStatuses sharedCache = this.adrenaline$sharedFluidStatusCache;
+        long location = aquiferLocationCache[index];
+        if (sharedCache != null) {
+            status = sharedCache.adrenaline$get(location);
+            if (status == null) {
+                status = sharedCache.adrenaline$put(location, computeFluid(x, y, z));
+            }
+        } else {
+            status = computeFluid(x, y, z);
+        }
         aquiferCache[index] = status;
         return status;
+    }
+
+    @Unique
+    private static AdrenalineSharedFluidStatuses adrenaline$sharedFluidStatusCache(PositionalRandomFactory randomFactory) {
+        synchronized (adrenaline$sharedFluidStatusesLock) {
+            return adrenaline$sharedFluidStatuses.computeIfAbsent(randomFactory, ignored -> new AdrenalineSharedFluidStatuses());
+        }
+    }
+
+    @Unique
+    private static final class AdrenalineSharedFluidStatuses {
+
+        private static final int SHARD_COUNT = 32;
+        private static final int ENTRIES_PER_SHARD = 4096;
+        private final AdrenalineSharedFluidStatusShard[] shards = new AdrenalineSharedFluidStatusShard[SHARD_COUNT];
+
+        private AdrenalineSharedFluidStatuses() {
+            for (int index = 0; index < SHARD_COUNT; index++) {
+                this.shards[index] = new AdrenalineSharedFluidStatusShard();
+            }
+        }
+
+        private Aquifer.FluidStatus adrenaline$get(long location) {
+            return this.adrenaline$shard(location).adrenaline$get(location);
+        }
+
+        private Aquifer.FluidStatus adrenaline$put(long location, Aquifer.FluidStatus status) {
+            return this.adrenaline$shard(location).adrenaline$put(location, status);
+        }
+
+        private AdrenalineSharedFluidStatusShard adrenaline$shard(long location) {
+            int hash = (int) (location ^ location >>> 32);
+            hash ^= hash >>> 16;
+            return this.shards[hash & (SHARD_COUNT - 1)];
+        }
+    }
+
+    @Unique
+    private static final class AdrenalineSharedFluidStatusShard {
+
+        private final Long2ObjectLinkedOpenHashMap<Aquifer.FluidStatus> statuses = new Long2ObjectLinkedOpenHashMap<>();
+
+        private synchronized Aquifer.FluidStatus adrenaline$get(long location) {
+            return this.statuses.getAndMoveToLast(location);
+        }
+
+        private synchronized Aquifer.FluidStatus adrenaline$put(long location, Aquifer.FluidStatus status) {
+            Aquifer.FluidStatus existing = this.statuses.getAndMoveToLast(location);
+            if (existing != null) {
+                return existing;
+            }
+            this.statuses.putAndMoveToLast(location, status);
+            if (this.statuses.size() > AdrenalineSharedFluidStatuses.ENTRIES_PER_SHARD) {
+                this.statuses.removeFirst();
+            }
+            return status;
+        }
     }
 
     @Unique

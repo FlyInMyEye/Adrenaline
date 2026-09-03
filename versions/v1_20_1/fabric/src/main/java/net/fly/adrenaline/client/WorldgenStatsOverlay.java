@@ -7,6 +7,8 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.fly.adrenaline.natives.NativeHardwareInfo;
+import net.fly.adrenaline.natives.NativeRuntimeStats;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.StageTiming;
 import net.minecraft.client.Minecraft;
@@ -29,6 +31,9 @@ public final class WorldgenStatsOverlay {
                 .then(ClientCommandManager.literal("stats")
                     .then(ClientCommandManager.literal("on").executes(context -> setEnabled(context.getSource(), true)))
                     .then(ClientCommandManager.literal("off").executes(context -> setEnabled(context.getSource(), false))))
+                .then(ClientCommandManager.literal("natives")
+                    .then(ClientCommandManager.literal("stats").executes(context -> sendNativeStats(context.getSource())))
+                    .then(ClientCommandManager.literal("hardware").executes(context -> sendNativeHardware(context.getSource()))))
         ));
         HudRenderCallback.EVENT.register(WorldgenStatsOverlay::render);
     }
@@ -54,6 +59,18 @@ public final class WorldgenStatsOverlay {
     private static int setEnabled(FabricClientCommandSource source, boolean enabled) {
         WorldgenStageStats.setEnabled(enabled);
         source.sendFeedback(Component.translatable(enabled ? "message.adrenaline.stats.enabled" : "message.adrenaline.stats.disabled"));
+        return 1;
+    }
+
+    private static int sendNativeStats(FabricClientCommandSource source) {
+        source.sendFeedback(Component.literal(NativeRuntimeStats.summary()));
+        return 1;
+    }
+
+    private static int sendNativeHardware(FabricClientCommandSource source) {
+        for (String line : NativeHardwareInfo.lines()) {
+            source.sendFeedback(Component.literal(line));
+        }
         return 1;
     }
 

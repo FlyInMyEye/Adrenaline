@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_17",
   "mixins": [
     "AdrenalineMixinCacheAllInCellAccessor",
+    "AdrenalineMixinImprovedNoiseAccess",
     "AdrenalineMixinNoiseInterpolatorView",
     "AdrenalineMixinSurfaceRulesContext",
     "AdrenalineMixinSurfaceRulesContextApi",
