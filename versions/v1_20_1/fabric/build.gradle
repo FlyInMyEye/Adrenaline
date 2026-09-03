@@ -53,6 +53,13 @@ sourceSets.main.java.srcDir(generatedBuildConfigDir)
 sourceSets.main.resources.srcDir('../../../assets')
 sourceSets.main.resources.srcDir('../common/src/main/resources')
 
+tasks.named('processResources') {
+    from('../../../native/build') {
+        into 'adrenaline/natives'
+        include '**/*.so', '**/*.dll', '**/*.dylib'
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:1.20.1"
     mappings loom.officialMojangMappings()

@@ -4,17 +4,20 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.AdrenalineCompiledInterpolatorAccess;
+import net.fly.adrenaline.worldgen.AdrenalineNativeInterpolatorAccess;
+import net.fly.adrenaline.worldgen.PerlinBatching;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.NoiseInterpolator.class)
-public class MixinNoiseInterpolator implements AdrenalineCompiledInterpolatorAccess {
+public class MixinNoiseInterpolator implements AdrenalineCompiledInterpolatorAccess, AdrenalineNativeInterpolatorAccess {
 
     @Shadow private double noise000;
     @Shadow private double noise001;
@@ -24,6 +27,25 @@ public class MixinNoiseInterpolator implements AdrenalineCompiledInterpolatorAcc
     @Shadow private double noise011;
     @Shadow private double noise110;
     @Shadow private double noise111;
+
+    @Inject(method = "fillArray", at = @At("HEAD"))
+    private void adrenaline$beginNativePerlinBatch(double[] values, DensityFunction.ContextProvider contextProvider, CallbackInfo ci) {
+        if (AdrenalineConfig.nativePerlinBatchingEnabled() && !this.adrenaline$isFillingCell(contextProvider)) {
+            PerlinBatching.begin(values.length);
+        }
+    }
+
+    @Inject(method = "fillArray", at = @At("RETURN"))
+    private void adrenaline$endNativePerlinBatch(double[] values, DensityFunction.ContextProvider contextProvider, CallbackInfo ci) {
+        if (!this.adrenaline$isFillingCell(contextProvider)) {
+            PerlinBatching.end();
+        }
+    }
+
+    @Unique
+    private boolean adrenaline$isFillingCell(DensityFunction.ContextProvider contextProvider) {
+        return contextProvider instanceof MixinNoiseChunkAccessor noiseChunk && noiseChunk.adrenaline$isFillingCell();
+    }
 
     @Override
     public double adrenaline$computeCellValue(DensityFunction.FunctionContext context) {
@@ -36,6 +58,46 @@ public class MixinNoiseInterpolator implements AdrenalineCompiledInterpolatorAcc
             (double) noiseChunk.adrenaline$inCellZ() / (double) cellWidth,
             this.noise000, this.noise100, this.noise010, this.noise110,
             this.noise001, this.noise101, this.noise011, this.noise111);
+    }
+
+    @Override
+    public double adrenaline$getNoise000() {
+        return this.noise000;
+    }
+
+    @Override
+    public double adrenaline$getNoise001() {
+        return this.noise001;
+    }
+
+    @Override
+    public double adrenaline$getNoise100() {
+        return this.noise100;
+    }
+
+    @Override
+    public double adrenaline$getNoise101() {
+        return this.noise101;
+    }
+
+    @Override
+    public double adrenaline$getNoise010() {
+        return this.noise010;
+    }
+
+    @Override
+    public double adrenaline$getNoise011() {
+        return this.noise011;
+    }
+
+    @Override
+    public double adrenaline$getNoise110() {
+        return this.noise110;
+    }
+
+    @Override
+    public double adrenaline$getNoise111() {
+        return this.noise111;
     }
 
     @Inject(method = "fillArray", at = @At("HEAD"), cancellable = true)

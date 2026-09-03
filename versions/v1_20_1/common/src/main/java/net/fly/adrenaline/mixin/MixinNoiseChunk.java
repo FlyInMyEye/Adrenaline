@@ -12,7 +12,10 @@ import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkCoordinateAccess;
+import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
+import net.fly.adrenaline.worldgen.PerlinBatching;
+import net.fly.adrenaline.worldgen.PerlinSectionCache;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ColumnPos;
 import net.minecraft.world.level.levelgen.DensityFunction;
@@ -27,9 +30,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
-public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess {
+public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess, AdrenalineCellGridAccess {
 
     @Shadow private int cellCountXZ;
+    @Shadow private int cellCountY;
     @Shadow private List<?> interpolators;
     @Shadow private List<?> cellCaches;
     @Shadow private int cellNoiseMinY;
@@ -74,6 +78,8 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique private double[] adrenaline$valueZ0;
     @Unique private double[] adrenaline$valueZ1;
     @Unique private double[] adrenaline$values;
+    @Unique private PerlinSectionCache adrenaline$perlinSections;
+    @Unique private int adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
 
     @Unique
     private final AdrenalineMutableSinglePointContext adrenaline$singlePointContext = new AdrenalineMutableSinglePointContext();
@@ -110,6 +116,8 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.adrenaline$valueZ0 = new double[size];
         this.adrenaline$valueZ1 = new double[size];
         this.adrenaline$values = new double[size];
+        this.adrenaline$perlinSections = null;
+        this.adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
     }
 
     @Unique
@@ -144,6 +152,20 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.cellStartBlockX = cellX * this.cellWidth;
         this.inCellX = 0;
         AdrenalineMixinNoiseInterpolatorView[] interpolatorArray = this.adrenaline$interpolatorArray();
+        if (this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
+            this.adrenaline$perlinSectionBaseCellX = cellX;
+            this.adrenaline$perlinSections = new PerlinSectionCache(
+                cellX * this.cellWidth,
+                this.cellNoiseMinY * this.cellHeight,
+                this.firstCellZ * this.cellWidth,
+                this.cellWidth,
+                this.cellHeight,
+                this.cellCountXZ + 1,
+                this.cellCountY + 1,
+                this.cellCountXZ + 1
+            );
+        }
+        int perlinXIndex = cellX - this.adrenaline$perlinSectionBaseCellX;
         for (int cellZ = 0; cellZ < this.cellCountXZ + 1; cellZ++) {
             int currentCellZ = this.firstCellZ + cellZ;
             this.cellStartBlockZ = currentCellZ * this.cellWidth;
@@ -152,7 +174,12 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             for (int i = 0; i < interpolatorArray.length; i++) {
                 AdrenalineMixinNoiseInterpolatorView interpolator = interpolatorArray[i];
                 double[] slice = (useFirstSlice ? interpolator.adrenaline$getSlice0() : interpolator.adrenaline$getSlice1())[cellZ];
-                interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
+                PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
+                try {
+                    interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
+                } finally {
+                    PerlinBatching.exitSection();
+                }
             }
         }
         this.arrayInterpolationCounter++;
@@ -181,6 +208,31 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Override
     public void adrenaline$updateYCoordinate(int blockY) {
         this.inCellY = blockY - this.cellStartBlockY;
+    }
+
+    @Override
+    public int adrenaline$getCellStartBlockX() {
+        return this.cellStartBlockX;
+    }
+
+    @Override
+    public int adrenaline$getCellStartBlockY() {
+        return this.cellStartBlockY;
+    }
+
+    @Override
+    public int adrenaline$getCellStartBlockZ() {
+        return this.cellStartBlockZ;
+    }
+
+    @Override
+    public int adrenaline$getCellWidth() {
+        return this.cellWidth;
+    }
+
+    @Override
+    public int adrenaline$getCellHeight() {
+        return this.cellHeight;
     }
 
     @Override
@@ -309,17 +361,17 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         }
 
         int minY = this.noiseSettings.minY();
+        int maxY = minY + this.noiseSettings.height();
         AdrenalineMutableSinglePointContext context = this.adrenaline$singlePointContext;
         context.adrenaline$setX(x);
         context.adrenaline$setZ(z);
-        for (int y = minY + this.noiseSettings.height(); y >= minY; y -= this.cellHeight) {
+        for (int y = maxY; y >= minY; y -= this.cellHeight) {
             context.adrenaline$setY(y);
             if (this.initialDensityNoJaggedness.compute(context) > 0.390625D) {
                 this.preliminarySurfaceLevel.put(key, y);
                 return y;
             }
         }
-
         this.preliminarySurfaceLevel.put(key, Integer.MAX_VALUE);
         return Integer.MAX_VALUE;
     }

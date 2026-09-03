@@ -53,7 +53,16 @@ public final class CellDensityCompiler implements Opcodes {
                     return null;
                 }
             }
-            return (CellDensityEvaluator) constructor.newInstance((Object) generator.leaves());
+            CellDensityEvaluator evaluator = (CellDensityEvaluator) constructor.newInstance((Object) generator.leaves());
+            if (!AdrenalineConfig.nativeDensityEvaluationEnabled()) {
+                return evaluator;
+            }
+            NativeDensityProgramCompiler.Result result = NativeDensityProgramCompiler.compile(root);
+            NativeDensityProgram program = result.program();
+            if (program == null) {
+                return evaluator;
+            }
+            return new NativeCellDensityEvaluator(program, evaluator);
         } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
             return null;
         }

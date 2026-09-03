@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.natives.NativeHardwareInfo;
+import net.fly.adrenaline.natives.NativeRuntimeStats;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.StageTiming;
 import net.minecraft.client.Minecraft;
@@ -33,6 +35,9 @@ public final class WorldgenStatsOverlay {
                 .then(Commands.literal("stats")
                     .then(Commands.literal("on").executes(context -> setEnabled(context.getSource(), true)))
                     .then(Commands.literal("off").executes(context -> setEnabled(context.getSource(), false))))
+                .then(Commands.literal("natives")
+                    .then(Commands.literal("stats").executes(context -> sendNativeStats(context.getSource())))
+                    .then(Commands.literal("hardware").executes(context -> sendNativeHardware(context.getSource()))))
         );
     }
 
@@ -67,6 +72,18 @@ public final class WorldgenStatsOverlay {
     private static int setEnabled(CommandSourceStack source, boolean enabled) {
         WorldgenStageStats.setEnabled(enabled);
         source.sendSuccess(() -> Component.translatable(enabled ? "message.adrenaline.stats.enabled" : "message.adrenaline.stats.disabled"), false);
+        return 1;
+    }
+
+    private static int sendNativeStats(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal(NativeRuntimeStats.summary()), false);
+        return 1;
+    }
+
+    private static int sendNativeHardware(CommandSourceStack source) {
+        for (String line : NativeHardwareInfo.lines()) {
+            source.sendSuccess(() -> Component.literal(line), false);
+        }
         return 1;
     }
 

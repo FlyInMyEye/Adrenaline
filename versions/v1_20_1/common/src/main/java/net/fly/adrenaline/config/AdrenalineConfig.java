@@ -4,6 +4,7 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import java.nio.file.Path;
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.natives.AdrenalineNatives;
 import net.fly.configlib.JsonConfigManager;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,9 @@ public class AdrenalineConfig {
             loaded.fastTerrainLoadingMode = loaded.fastTerrainLoading ? FastTerrainLoadingMode.ON : FastTerrainLoadingMode.OFF;
             changed = true;
         }
+        if (normalizeNativeSettings(loaded)) {
+            changed = true;
+        }
         data = loaded;
         if (changed) {
             manager.save(loaded);
@@ -63,6 +67,7 @@ public class AdrenalineConfig {
     }
 
     public static synchronized void save(Data value) {
+        normalizeNativeSettings(value);
         data = value;
         if (manager != null) {
             manager.save(value);
@@ -75,6 +80,9 @@ public class AdrenalineConfig {
         }
         Data loaded = manager.get();
         if (loaded != null) {
+            if (normalizeNativeSettings(loaded)) {
+                manager.save(loaded);
+            }
             data = loaded;
         }
     }
@@ -228,6 +236,22 @@ public class AdrenalineConfig {
         return get().worldgenOptimizations && get().oreVeinOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
     }
 
+    public static boolean nativePerlinBatchingEnabled() {
+        return AdrenalineNatives.isAvailable() && get().nativePerlinBatching;
+    }
+
+    public static boolean approximateNativePerlinEnabled() {
+        return nativePerlinBatchingEnabled() && get().approximateNativePerlin;
+    }
+
+    public static boolean nativeDensityEvaluationEnabled() {
+        return AdrenalineNatives.isAvailable() && get().nativeDensityEvaluation;
+    }
+
+    public static boolean nativeAquiferBatchingEnabled() {
+        return aquiferOptimizationsEnabled() && AdrenalineNatives.isAvailable() && get().nativeAquiferBatching;
+    }
+
     public static boolean parallelChunkSerializationEnabled() {
         return get().worldgenOptimizations;
     }
@@ -272,6 +296,26 @@ public class AdrenalineConfig {
         return BuildConfig.DEBUG && get().forceEasterEgg;
     }
 
+    private static boolean normalizeNativeSettings(Data value) {
+        boolean changed = false;
+        if (value.nativeSettingsVersion == 0) {
+            value.nativePerlinBatching = true;
+            value.approximateNativePerlin = false;
+            value.nativeDensityEvaluation = true;
+            value.nativeAquiferBatching = true;
+            value.nativeSettingsVersion = 1;
+            changed = true;
+        }
+        if (!AdrenalineNatives.isAvailable()) {
+            changed |= value.nativePerlinBatching || value.approximateNativePerlin || value.nativeDensityEvaluation || value.nativeAquiferBatching;
+            value.nativePerlinBatching = false;
+            value.approximateNativePerlin = false;
+            value.nativeDensityEvaluation = false;
+            value.nativeAquiferBatching = false;
+        }
+        return changed;
+    }
+
     public static class Data {
         public boolean worldgenOptimizations = true;
         public boolean terrainFillOptimizations = true;
@@ -305,6 +349,11 @@ public class AdrenalineConfig {
         public boolean parallelizeSpawn = true;
         public boolean parallelizeFull = true;
         public boolean fastLegacyRandom = true;
+        public boolean nativePerlinBatching = true;
+        public boolean approximateNativePerlin = false;
+        public boolean nativeDensityEvaluation = true;
+        public boolean nativeAquiferBatching = true;
+        public int nativeSettingsVersion = 1;
         public boolean showCancelButton = true;
         public boolean showChunkPreview = true;
         public boolean showThreadVisualizer;
@@ -353,6 +402,11 @@ public class AdrenalineConfig {
             this.parallelizeSpawn = other.parallelizeSpawn;
             this.parallelizeFull = other.parallelizeFull;
             this.fastLegacyRandom = other.fastLegacyRandom;
+            this.nativePerlinBatching = other.nativePerlinBatching;
+            this.approximateNativePerlin = other.approximateNativePerlin;
+            this.nativeDensityEvaluation = other.nativeDensityEvaluation;
+            this.nativeAquiferBatching = other.nativeAquiferBatching;
+            this.nativeSettingsVersion = other.nativeSettingsVersion;
             this.showCancelButton = other.showCancelButton;
             this.showChunkPreview = other.showChunkPreview;
             this.showThreadVisualizer = other.showThreadVisualizer;
