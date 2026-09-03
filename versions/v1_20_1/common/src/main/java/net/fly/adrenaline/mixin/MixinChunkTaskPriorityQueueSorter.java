@@ -2,6 +2,9 @@ package net.fly.adrenaline.mixin;
 
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.util.Unit;
 import net.minecraft.util.thread.ProcessorHandle;
@@ -20,7 +23,11 @@ public abstract class MixinChunkTaskPriorityQueueSorter {
     }
 
     @Inject(method = "getProcessor", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.PARALLEL_WORLDGEN)
     private <T> void adrenaline$createProcessorImmediately(ProcessorHandle<T> processor, boolean addBlocker, CallbackInfoReturnable<ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<T>>> cir) {
+        if (!AdrenalineConfig.parallelWorldgenEnabled()) {
+            return;
+        }
         cir.setReturnValue(ProcessorHandle.of("chunk priority sorter around " + processor.name(), message -> {
             MixinMessageAccessor accessor = (MixinMessageAccessor) (Object) message;
             @SuppressWarnings("unchecked")
