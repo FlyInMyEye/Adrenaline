@@ -4,6 +4,8 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
@@ -53,6 +55,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Shadow private Long2IntMap preliminarySurfaceLevel;
     @Shadow private DensityFunction initialDensityNoJaggedness;
     @Shadow private NoiseSettings noiseSettings;
+    @Shadow private Map<DensityFunction, DensityFunction> wrapped;
 
     @Unique
     private AdrenalineMixinNoiseInterpolatorView[] adrenaline$interpolatorArray;
@@ -80,6 +83,8 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique private double[] adrenaline$values;
     @Unique private PerlinSectionCache adrenaline$perlinSections;
     @Unique private int adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
+    @Unique
+    private final Function<DensityFunction, DensityFunction> adrenaline$wrapNewFunction = this::adrenaline$wrapNew;
 
     @Unique
     private final AdrenalineMutableSinglePointContext adrenaline$singlePointContext = new AdrenalineMutableSinglePointContext();
@@ -244,6 +249,16 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     public void adrenaline$updateZCoordinate(int blockZ) {
         this.inCellZ = blockZ - this.cellStartBlockZ;
         this.interpolationCounter++;
+    }
+
+    @Overwrite
+    protected DensityFunction wrap(DensityFunction densityFunction) {
+        return this.wrapped.computeIfAbsent(densityFunction, this.adrenaline$wrapNewFunction);
+    }
+
+    @Unique
+    private DensityFunction adrenaline$wrapNew(DensityFunction densityFunction) {
+        return ((MixinNoiseChunkWrapNewInvoker) this).adrenaline$invokeWrapNew(densityFunction);
     }
 
     @Unique
