@@ -576,6 +576,8 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
         while (z_index < width) : (z_index += 1) {
             const z: i32 = base_z + @as(i32, @intCast(z_index));
             var search: ?AquiferSearch = null;
+            var fluid_bound_grid_y: i32 = std.math.minInt(i32);
+            var maximum_fluid_level: i32 = std.math.minInt(i32);
             var y_index: usize = 0;
             while (y_index < height) : (y_index += 1) {
                 const y: i32 = base_y + @as(i32, @intCast(height - 1 - y_index));
@@ -593,8 +595,17 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
                     return null;
                 }
 
+                const grid_y = @divFloor(y + 1, 12);
+                if (fluid_bound_grid_y != grid_y) {
+                    maximum_fluid_level = aquifer_maximum_fluid_level(fluid_levels, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, x, grid_y, z) orelse return null;
+                    fluid_bound_grid_y = grid_y;
+                }
+                if (@as(i64, y) >= @as(i64, maximum_fluid_level) + 5) {
+                    materials[index] = 1;
+                    continue;
+                }
+
                 const candidates = if (search) |*cached| block: {
-                    const grid_y = @divFloor(y + 1, 12);
                     if (cached.grid_y == grid_y and advance_y_down(avx2, neon, cached, y)) {
                         break :block cached.candidates();
                     }
@@ -938,6 +949,37 @@ fn aquifer_search(packed_locations: []const c.jshort, min_grid_x: c.jint, min_gr
         }
     }
     return result;
+}
+
+fn aquifer_maximum_fluid_level(fluid_levels: []const c.jint, min_grid_x: c.jint, min_grid_y: c.jint, min_grid_z: c.jint, grid_size_x: c.jint, grid_size_z: c.jint, x: i32, grid_y: i32, z: i32) ?i32 {
+    const grid_x = @divFloor(x - 5, 16);
+    const grid_z = @divFloor(z - 5, 16);
+    const local_grid_x = grid_x - min_grid_x;
+    const local_grid_y = grid_y - min_grid_y;
+    const local_grid_z = grid_z - min_grid_z;
+    if (local_grid_x < 0 or local_grid_y < 1 or local_grid_z < 0
+        or local_grid_x + 1 >= grid_size_x or local_grid_z + 1 >= grid_size_z) {
+        return null;
+    }
+    const size_x: usize = @intCast(grid_size_x);
+    const size_z: usize = @intCast(grid_size_z);
+    var maximum: i32 = std.math.minInt(i32);
+    var offset_x: i32 = 0;
+    while (offset_x <= 1) : (offset_x += 1) {
+        var offset_y: i32 = -1;
+        while (offset_y <= 1) : (offset_y += 1) {
+            const local_y = local_grid_y + offset_y;
+            if (local_y < 0) return null;
+            const row: usize = (@as(usize, @intCast(local_y)) * size_z + @as(usize, @intCast(local_grid_z))) * size_x + @as(usize, @intCast(local_grid_x + offset_x));
+            var offset_z: i32 = 0;
+            while (offset_z <= 1) : (offset_z += 1) {
+                const cache_index = row + @as(usize, @intCast(offset_z)) * size_x;
+                if (cache_index >= fluid_levels.len) return null;
+                maximum = @max(maximum, fluid_levels[cache_index]);
+            }
+        }
+    }
+    return maximum;
 }
 
 fn aquifer_type_at(level: c.jint, fluid_type: c.jbyte, y: i32) ?u8 {
