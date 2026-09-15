@@ -58,6 +58,7 @@
     "MixinLevelSummary",
     "MixinMinecraft",
     "MixinReceivingLevelScreen",
+    "MixinPauseScreen",
     "MixinScreen",
     "MixinOptionsScreen",
     "MixinWorldListEntry",
