@@ -814,6 +814,9 @@ const AquiferSearch = struct {
         for (self.distances, self.indices, 0..) |distance, index, order_value| {
             const order: i32 = @intCast(order_value);
             if (distance < nearest_distance or (distance == nearest_distance and order > nearest_order)) {
+                third_distance = second_distance;
+                third_order = second_order;
+                third_index = second_index;
                 second_distance = nearest_distance;
                 second_order = nearest_order;
                 second_index = nearest_index;
