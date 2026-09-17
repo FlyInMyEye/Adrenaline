@@ -37,6 +37,7 @@
     "MixinCubicSplineMultipoint",
     "MixinPerlinNoise",
     "MixinDensityFunctionsAp2",
+    "MixinDensityFunctionsBlendDensity",
     "MixinDensityFunctionsNoise",
     "MixinDensityFunctionsConstant",
     "MixinDensityFunctionsBeardifierMarker",

@@ -98,12 +98,20 @@ public final class CellDensityCompiler implements Opcodes {
 
         private final List<DensityFunction> leaves = new ArrayList<>();
         private final Map<DensityFunction, Integer> leafIndices = new IdentityHashMap<>();
+        private final Map<DensityFunction, MemoBinding> memoBindings = new IdentityHashMap<>();
         private final StringBuilder key = new StringBuilder();
         private MethodVisitor method;
         private int nextLocal = 5;
         private int operators;
 
         private byte[] generate(DensityFunction root) throws ReflectiveOperationException {
+            IdentityHashMap<DensityFunction, Integer> leafCounts = new IdentityHashMap<>();
+            this.countLeaves(root, leafCounts, 0);
+            for (Map.Entry<DensityFunction, Integer> entry : leafCounts.entrySet()) {
+                if (entry.getValue() > 1) {
+                    this.memoBindings.put(entry.getKey(), new MemoBinding(this.allocateIntLocal(), this.allocateDoubleLocal()));
+                }
+            }
             ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
             writer.visit(V17, ACC_FINAL | ACC_SUPER, GENERATED_NAME, null, "java/lang/Object", new String[]{EVALUATOR_NAME});
             writer.visitField(ACC_PRIVATE | ACC_FINAL, "leaves", LEAVES_DESCRIPTOR, null, null).visitEnd();
@@ -140,6 +148,12 @@ public final class CellDensityCompiler implements Opcodes {
         private void writeFillMethod(ClassWriter writer, DensityFunction root) throws ReflectiveOperationException {
             this.method = writer.visitMethod(ACC_PUBLIC, "fill", "([DL" + PROVIDER_NAME + ";)V", null, null);
             this.method.visitCode();
+            for (MemoBinding binding : this.memoBindings.values()) {
+                this.method.visitInsn(ICONST_0);
+                this.method.visitVarInsn(ISTORE, binding.stampLocal);
+                this.method.visitInsn(DCONST_0);
+                this.method.visitVarInsn(DSTORE, binding.valueLocal);
+            }
             this.method.visitInsn(ICONST_0);
             this.method.visitVarInsn(ISTORE, 3);
             Label loop = new Label();
@@ -180,6 +194,18 @@ public final class CellDensityCompiler implements Opcodes {
                 this.push(clamp.adrenaline$clampMin());
                 this.push(clamp.adrenaline$clampMax());
                 this.method.visitMethodInsn(INVOKESTATIC, BRIDGE_NAME, "clamp", "(DDD)D", false);
+                return;
+            }
+            if (function instanceof AdrenalineBlendDensityAccess blendDensity) {
+                this.operators++;
+                this.key.append("D{");
+                this.emit(blendDensity.adrenaline$getBlendDensityInput(), depth + 1);
+                this.key.append('}');
+                int value = this.allocateDoubleLocal();
+                this.method.visitVarInsn(DSTORE, value);
+                this.method.visitVarInsn(ALOAD, 4);
+                this.method.visitVarInsn(DLOAD, value);
+                this.method.visitMethodInsn(INVOKESTATIC, BRIDGE_NAME, "blend", "(L" + CONTEXT_NAME + ";D)D", false);
                 return;
             }
             if (function instanceof AdrenalineMappedFunctionAccess mapped) {
@@ -368,6 +394,32 @@ public final class CellDensityCompiler implements Opcodes {
         }
 
         private void emitLeaf(DensityFunction function) {
+            MemoBinding binding = this.memoBindings.get(function);
+            if (binding != null) {
+                Label compute = new Label();
+                Label complete = new Label();
+                this.method.visitVarInsn(ILOAD, binding.stampLocal);
+                this.method.visitVarInsn(ILOAD, 3);
+                this.method.visitInsn(ICONST_1);
+                this.method.visitInsn(IADD);
+                this.method.visitJumpInsn(IF_ICMPNE, compute);
+                this.method.visitVarInsn(DLOAD, binding.valueLocal);
+                this.method.visitJumpInsn(GOTO, complete);
+                this.method.visitLabel(compute);
+                this.emitLeafValue(function);
+                this.method.visitInsn(DUP2);
+                this.method.visitVarInsn(DSTORE, binding.valueLocal);
+                this.method.visitVarInsn(ILOAD, 3);
+                this.method.visitInsn(ICONST_1);
+                this.method.visitInsn(IADD);
+                this.method.visitVarInsn(ISTORE, binding.stampLocal);
+                this.method.visitLabel(complete);
+                return;
+            }
+            this.emitLeafValue(function);
+        }
+
+        private void emitLeafValue(DensityFunction function) {
             int index = this.leafIndices.computeIfAbsent(function, key -> {
                 int next = this.leaves.size();
                 this.leaves.add(key);
@@ -397,6 +449,44 @@ public final class CellDensityCompiler implements Opcodes {
             this.method.visitMethodInsn(INVOKESTATIC, BRIDGE_NAME, "compute", "(L" + DENSITY_FUNCTION_NAME + ";L" + CONTEXT_NAME + ";)D", false);
         }
 
+        private void countLeaves(DensityFunction function, IdentityHashMap<DensityFunction, Integer> counts, int depth) throws ReflectiveOperationException {
+            if (depth > MAX_OPERATORS) {
+                throw new IllegalArgumentException();
+            }
+            if (function instanceof AdrenalineClampFunctionAccess clamp) {
+                this.countLeaves(clamp.adrenaline$clampInput(), counts, depth + 1);
+                return;
+            }
+            if (function instanceof AdrenalineBlendDensityAccess blendDensity) {
+                this.countLeaves(blendDensity.adrenaline$getBlendDensityInput(), counts, depth + 1);
+                return;
+            }
+            if (function instanceof AdrenalineMappedFunctionAccess mapped) {
+                this.countLeaves(mapped.adrenaline$mappedInput(), counts, depth + 1);
+                return;
+            }
+            if (function instanceof AdrenalineMulOrAddAccess transform) {
+                this.countLeaves(transform.adrenaline$transformInput(), counts, depth + 1);
+                return;
+            }
+            if (function instanceof AdrenalineBinaryFunctionAccess binary) {
+                this.countLeaves(binary.adrenaline$firstArgument(), counts, depth + 1);
+                this.countLeaves(binary.adrenaline$secondArgument(), counts, depth + 1);
+                return;
+            }
+            if (function instanceof AdrenalineRangeChoiceAccess range) {
+                this.countLeaves(range.adrenaline$rangeInput(), counts, depth + 1);
+                this.countLeaves(range.adrenaline$whenInRange(), counts, depth + 1);
+                this.countLeaves(range.adrenaline$whenOutOfRange(), counts, depth + 1);
+                return;
+            }
+            counts.merge(function, 1, Integer::sum);
+        }
+
+        private int allocateIntLocal() {
+            return this.nextLocal++;
+        }
+
         private int allocateDoubleLocal() {
             int local = this.nextLocal;
             this.nextLocal += 2;
@@ -413,6 +503,9 @@ public final class CellDensityCompiler implements Opcodes {
 
         private void append(double value) {
             this.key.append(':').append(Long.toHexString(Double.doubleToRawLongBits(value)));
+        }
+
+        private record MemoBinding(int stampLocal, int valueLocal) {
         }
     }
 }
