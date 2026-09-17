@@ -9,6 +9,9 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 @Mixin(NoiseChunk.NoiseInterpolator.class)
 public interface AdrenalineMixinNoiseInterpolatorView {
 
+    @Accessor("noiseFiller")
+    DensityFunction adrenaline$getNoiseFiller();
+
     @Accessor("slice0")
     double[][] adrenaline$getSlice0();
 

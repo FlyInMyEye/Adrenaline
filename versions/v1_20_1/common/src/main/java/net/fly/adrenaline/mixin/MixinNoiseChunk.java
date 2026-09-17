@@ -66,6 +66,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique
     private CellDensityEvaluator[] adrenaline$cellDensityEvaluators;
 
+    @Unique
+    private CellDensityEvaluator[] adrenaline$sliceDensityEvaluators;
+
     @Unique private double[] adrenaline$noise000;
     @Unique private double[] adrenaline$noise001;
     @Unique private double[] adrenaline$noise100;
@@ -121,6 +124,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.adrenaline$valueZ0 = new double[size];
         this.adrenaline$valueZ1 = new double[size];
         this.adrenaline$values = new double[size];
+        this.adrenaline$sliceDensityEvaluators = null;
         this.adrenaline$perlinSections = null;
         this.adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
     }
@@ -153,10 +157,24 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Unique
+    private CellDensityEvaluator[] adrenaline$sliceDensityEvaluators(AdrenalineMixinNoiseInterpolatorView[] interpolators) {
+        CellDensityEvaluator[] cached = this.adrenaline$sliceDensityEvaluators;
+        if (cached == null || cached.length != interpolators.length) {
+            cached = new CellDensityEvaluator[interpolators.length];
+            for (int i = 0; i < interpolators.length; i++) {
+                cached[i] = CellDensityCompiler.compile(interpolators[i].adrenaline$getNoiseFiller());
+            }
+            this.adrenaline$sliceDensityEvaluators = cached;
+        }
+        return cached;
+    }
+
+    @Unique
     private void adrenaline$fillSlice(boolean useFirstSlice, int cellX) {
         this.cellStartBlockX = cellX * this.cellWidth;
         this.inCellX = 0;
         AdrenalineMixinNoiseInterpolatorView[] interpolatorArray = this.adrenaline$interpolatorArray();
+        CellDensityEvaluator[] sliceEvaluators = this.adrenaline$sliceDensityEvaluators(interpolatorArray);
         if (this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
             this.adrenaline$perlinSectionBaseCellX = cellX;
             this.adrenaline$perlinSections = new PerlinSectionCache(
@@ -181,7 +199,17 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
                 double[] slice = (useFirstSlice ? interpolator.adrenaline$getSlice0() : interpolator.adrenaline$getSlice1())[cellZ];
                 PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
                 try {
-                    interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
+                    CellDensityEvaluator evaluator = sliceEvaluators[i];
+                    if (evaluator == null) {
+                        interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
+                    } else {
+                        PerlinBatching.begin(slice.length);
+                        try {
+                            evaluator.fill(slice, this.sliceFillingContextProvider);
+                        } finally {
+                            PerlinBatching.end();
+                        }
+                    }
                 } finally {
                     PerlinBatching.exitSection();
                 }

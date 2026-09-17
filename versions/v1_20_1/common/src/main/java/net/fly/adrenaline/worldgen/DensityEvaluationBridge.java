@@ -16,6 +16,10 @@ public final class DensityEvaluationBridge {
         return function.compute(context);
     }
 
+    public static double blend(DensityFunction.FunctionContext context, double value) {
+        return context.getBlender().blendDensity(context, value);
+    }
+
     public static double clamp(double value, double min, double max) {
         return Mth.clamp(value, min, max);
     }
