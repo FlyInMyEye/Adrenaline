@@ -8,6 +8,7 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.worldgen.AdrenalineMaterialRuleListAccess;
+import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
@@ -161,6 +162,14 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
         if (this.adrenaline$veinToggleValues == null) {
             this.adrenaline$materialArrayFillNanos = 0L;
             return;
+        }
+        if (contextProvider instanceof AdrenalineCellGridAccess grid) {
+            int minY = grid.adrenaline$getCellStartBlockY();
+            int maxY = minY + grid.adrenaline$getCellHeight() - 1;
+            if (maxY < -60 || minY > 50) {
+                this.adrenaline$materialArrayFillNanos = 0L;
+                return;
+            }
         }
         long startedNanos = BuildConfig.DEBUG ? System.nanoTime() : 0L;
         if (!this.adrenaline$materialEvaluatorsInitialized) {
