@@ -4,6 +4,7 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.SurfaceSystemOptimizer;
+import net.fly.adrenaline.worldgen.SurfaceNoiseBatch;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.util.Mth;
@@ -48,7 +49,9 @@ public abstract class MixinSurfaceSystem {
             return;
         }
 
-        SurfaceSystemOptimizer.buildSurface((SurfaceSystem) (Object) this, this.defaultBlock, this::isStone, this::erodedBadlandsExtension, this::frozenOceanExtension, randomState, biomeManager, biomeRegistry, useLegacyRandomSource, context, chunk, noiseChunk, ruleSource);
+        try (SurfaceNoiseBatch batch = new SurfaceNoiseBatch(this.surfaceNoise, chunk.getPos().getMinBlockX(), chunk.getPos().getMinBlockZ())) {
+            SurfaceSystemOptimizer.buildSurface((SurfaceSystem) (Object) this, this.defaultBlock, this::isStone, this::erodedBadlandsExtension, this::frozenOceanExtension, randomState, biomeManager, biomeRegistry, useLegacyRandomSource, context, chunk, noiseChunk, ruleSource);
+        }
         ci.cancel();
     }
 
@@ -59,7 +62,7 @@ public abstract class MixinSurfaceSystem {
             return;
         }
 
-        double value = this.surfaceNoise.getValue(blockX, 0.0D, blockZ) * 2.75D + 3.0D;
+        double value = SurfaceNoiseBatch.sample(this.surfaceNoise, blockX, blockZ) * 2.75D + 3.0D;
         long hash = ((long) blockX * 341873128712L) ^ ((long) blockZ * 132897987541L) ^ 0x9E3779B97F4A7C15L;
         hash ^= hash >>> 33;
         hash *= 0xff51afd7ed558ccdL;
@@ -67,6 +70,10 @@ public abstract class MixinSurfaceSystem {
         hash *= 0xc4ceb9fe1a85ec53L;
         hash ^= hash >>> 33;
         double jitter = (double) (hash >>> 11) * 1.1102230246251565E-16D * 0.25D;
-        cir.setReturnValue(Mth.floor(value + jitter));
+        double depth = value + jitter;
+        if (Math.abs(depth - Math.rint(depth)) < 1.0E-9D) {
+            depth = this.surfaceNoise.getValue(blockX, 0.0D, blockZ) * 2.75D + 3.0D + jitter;
+        }
+        cir.setReturnValue(Mth.floor(depth));
     }
 }
