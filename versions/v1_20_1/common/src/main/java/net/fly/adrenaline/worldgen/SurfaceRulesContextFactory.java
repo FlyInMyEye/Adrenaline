@@ -67,7 +67,7 @@ public final class SurfaceRulesContextFactory {
         if (pipeline == null) {
             Object surfaceContext = create(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context);
             Object surfaceRule = apply(ruleSource, surfaceContext);
-            pipeline = new SurfaceRulePipeline(surfaceRule, surfaceContext);
+            pipeline = new SurfaceRulePipeline(surfaceRule, surfaceContext, ruleSource, context);
             cache.clear();
             cache.put(key, pipeline);
         } else {

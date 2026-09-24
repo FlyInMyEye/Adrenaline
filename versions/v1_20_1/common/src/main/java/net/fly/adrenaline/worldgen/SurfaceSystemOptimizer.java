@@ -61,6 +61,7 @@ public final class SurfaceSystemOptimizer {
                 int stoneDepthAbove = 0;
                 int waterHeight = Integer.MIN_VALUE;
                 int minStoneY = Integer.MAX_VALUE;
+                int defaultRunBottom = Integer.MAX_VALUE;
 
                 for (int y = scanTopY - 1; y >= minBuildHeight; y--) {
                     BlockState state = column.getBlock(y);
@@ -94,10 +95,21 @@ public final class SurfaceSystemOptimizer {
                         continue;
                     }
 
-                    BlockState surfaceState = surfaceRulePipeline.tryApply(blockX, y, blockZ);
-                    if (surfaceState != null) {
-                        column.setBlock(y, surfaceState);
+                    if (defaultRunBottom > y) {
+                        defaultRunBottom = y;
+                        while (defaultRunBottom > minBuildHeight && column.getBlock(defaultRunBottom - 1) == defaultBlock) {
+                            defaultRunBottom--;
+                        }
                     }
+                    BlockState surfaceState = surfaceRulePipeline.tryApplySpan(blockX, y, blockZ, stoneDepthAbove, stoneDepthBelow, waterHeight, defaultRunBottom);
+                    int spanBottom = surfaceRulePipeline.spanBottom();
+                    if (surfaceState != null) {
+                        for (int writeY = y; writeY >= spanBottom; writeY--) {
+                            column.setBlock(writeY, surfaceState);
+                        }
+                    }
+                    stoneDepthAbove += y - spanBottom;
+                    y = spanBottom;
                 }
 
                 if (biomeHolder.is(Biomes.FROZEN_OCEAN) || biomeHolder.is(Biomes.DEEP_FROZEN_OCEAN)) {
