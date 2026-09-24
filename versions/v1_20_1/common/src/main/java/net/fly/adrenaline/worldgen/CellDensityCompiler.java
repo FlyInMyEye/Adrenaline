@@ -38,8 +38,7 @@ public final class CellDensityCompiler implements Opcodes {
     public static CellDensityEvaluator compile(DensityFunction root) {
         try {
             Generator generator = new Generator();
-            byte[] bytecode = generator.generate(root);
-            if (bytecode == null) {
+            if (!generator.inspect(root)) {
                 return null;
             }
             String key = generator.key();
@@ -48,7 +47,7 @@ public final class CellDensityCompiler implements Opcodes {
                 if (CONSTRUCTORS.size() >= MAX_GRAPH_SHAPES) {
                     return null;
                 }
-                constructor = CONSTRUCTORS.computeIfAbsent(key, ignored -> defineConstructor(bytecode));
+                constructor = CONSTRUCTORS.computeIfAbsent(key, ignored -> compileConstructor(root));
                 if (constructor == null) {
                     return null;
                 }
@@ -64,6 +63,15 @@ public final class CellDensityCompiler implements Opcodes {
             }
             return new NativeCellDensityEvaluator(program, evaluator);
         } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static Constructor<?> compileConstructor(DensityFunction root) {
+        try {
+            byte[] bytecode = new Generator().generate(root);
+            return bytecode == null ? null : defineConstructor(bytecode);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
             return null;
         }
     }
@@ -103,6 +111,13 @@ public final class CellDensityCompiler implements Opcodes {
         private MethodVisitor method;
         private int nextLocal = 5;
         private int operators;
+
+        private boolean inspect(DensityFunction root) throws ReflectiveOperationException {
+            this.method = new MethodVisitor(ASM9) {
+            };
+            this.emit(root, 0);
+            return this.operators > 0 && this.operators <= MAX_OPERATORS;
+        }
 
         private byte[] generate(DensityFunction root) throws ReflectiveOperationException {
             IdentityHashMap<DensityFunction, Integer> leafCounts = new IdentityHashMap<>();
