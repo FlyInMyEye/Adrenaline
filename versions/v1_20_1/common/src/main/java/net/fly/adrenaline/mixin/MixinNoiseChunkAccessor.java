@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import java.util.List;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import org.spongepowered.asm.mixin.Mixin;
@@ -8,6 +9,9 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(NoiseChunk.class)
 public interface MixinNoiseChunkAccessor {
+
+    @Accessor("interpolators")
+    List<?> adrenaline$interpolators();
 
     @Invoker("cellWidth")
     int adrenaline$cellWidth();
