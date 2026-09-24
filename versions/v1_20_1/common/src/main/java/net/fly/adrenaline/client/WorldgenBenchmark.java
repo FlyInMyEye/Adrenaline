@@ -47,8 +47,6 @@ import net.minecraft.world.level.levelgen.presets.WorldPresets;
 public final class WorldgenBenchmark {
 
     private static final String LEVEL_PREFIX = "adrenaline_debug_";
-    private static final int BENCHMARK_DIAMETER = 11;
-    private static final int BENCHMARK_CHUNKS = BENCHMARK_DIAMETER * BENCHMARK_DIAMETER;
     private static final ThreadLocal<Boolean> BENCHMARK_CALL = ThreadLocal.withInitial(() -> false);
     private static final AtomicInteger COMPLETED_CHUNKS = new AtomicInteger();
 
@@ -199,9 +197,10 @@ public final class WorldgenBenchmark {
         WorldgenDifferenceState.activate(minecraftServer, differences);
         int baseX = baseX(report.seed());
         int baseZ = baseZ(report.seed());
-        generateRegion(minecraftServer, level, baseX, baseZ, BENCHMARK_DIAMETER, ChunkStatus.FULL);
-        int centerX = (baseX + BENCHMARK_DIAMETER / 2) * 16 + 8;
-        int centerZ = (baseZ + BENCHMARK_DIAMETER / 2) * 16 + 8;
+        int diameter = comparisonDiameter(report.spawnZoneRadius());
+        generateRegion(minecraftServer, level, baseX, baseZ, diameter, ChunkStatus.FULL);
+        int centerX = (baseX + diameter / 2) * 16 + 8;
+        int centerZ = (baseZ + diameter / 2) * 16 + 8;
         int centerY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ) + 1;
         level.setDefaultSpawnPos(new BlockPos(centerX, centerY, centerZ), 0.0F);
         BlockState marker = Blocks.PURPLE_GLAZED_TERRACOTTA.defaultBlockState();
@@ -249,14 +248,20 @@ public final class WorldgenBenchmark {
         ServerLevel level = minecraftServer.overworld();
         int baseX = baseX(seed);
         int baseZ = baseZ(seed);
+        int diameter = comparisonDiameter(spawnZoneRadius);
+        int chunks = diameter * diameter;
 
         COMPLETED_CHUNKS.set(0);
-        status = new Status(Phase.COMPARING_NOISE, 0, BENCHMARK_CHUNKS, null, null);
-        BlockSnapshot noiseSnapshot = capture(generateRegion(minecraftServer, level, baseX, baseZ, BENCHMARK_DIAMETER, ChunkStatus.NOISE));
+        status = new Status(Phase.COMPARING_NOISE, 0, chunks, null, null);
+        BlockSnapshot noiseSnapshot = capture(generateRegion(minecraftServer, level, baseX, baseZ, diameter, ChunkStatus.NOISE));
         COMPLETED_CHUNKS.set(0);
-        status = new Status(Phase.COMPARING_FULL, 0, BENCHMARK_CHUNKS, null, null);
-        BlockSnapshot fullSnapshot = capture(generateRegion(minecraftServer, level, baseX, baseZ, BENCHMARK_DIAMETER, ChunkStatus.FULL));
+        status = new Status(Phase.COMPARING_FULL, 0, chunks, null, null);
+        BlockSnapshot fullSnapshot = capture(generateRegion(minecraftServer, level, baseX, baseZ, diameter, ChunkStatus.FULL));
         return new PassResult(totalNanos, generationNanos, noiseSnapshot, fullSnapshot);
+    }
+
+    static int comparisonDiameter(int radius) {
+        return radius * 2 - 1;
     }
 
     private static int baseX(long worldSeed) {
@@ -371,7 +376,7 @@ public final class WorldgenBenchmark {
         AdrenalineConfig.clearRuntimeOverride();
         WorldgenBenchmarkHooks.clearPreparedHandler();
         running = false;
-        status = new Status(Phase.COMPLETE, BENCHMARK_CHUNKS, BENCHMARK_CHUNKS, report, null);
+        status = new Status(Phase.COMPLETE, report.chunks(), report.chunks(), report, null);
     }
 
     private static Report compare(PassResult vanilla, PassResult adrenaline) {
@@ -382,7 +387,7 @@ public final class WorldgenBenchmark {
         return new Report(
             seed,
             spawnZoneRadius,
-            BENCHMARK_CHUNKS,
+            vanilla.noiseSnapshot().chunkXs().length,
             noise.totalBlocks(),
             noise.matchingBlocks(),
             noise.exactChunks(),
@@ -408,6 +413,8 @@ public final class WorldgenBenchmark {
                 writer.write("Seed: " + report.seed());
                 writer.newLine();
                 writer.write("Spawn zone radius: " + report.spawnZoneRadius());
+                writer.newLine();
+                writer.write("Sample chunks: " + report.chunks());
                 writer.newLine();
                 writer.write("NOISE differences: " + report.noiseDifferences().size());
                 writer.newLine();
@@ -470,7 +477,8 @@ public final class WorldgenBenchmark {
 
         int statesPerChunk = Math.max(vanilla.statesPerChunk(), adrenaline.statesPerChunk());
         int exactChunks = 0;
-        for (int chunk = 0; chunk < BENCHMARK_CHUNKS; chunk++) {
+        int chunks = Math.max(vanilla.chunkXs().length, adrenaline.chunkXs().length);
+        for (int chunk = 0; chunk < chunks; chunk++) {
             int start = chunk * statesPerChunk;
             int end = Math.min(start + statesPerChunk, totalBlocks);
             boolean exact = end - start == statesPerChunk && end <= expected.length && end <= actual.length;
