@@ -11,6 +11,8 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.NoiseChunk;
+import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.WorldGenerationContext;
 
 public final class SurfaceRulePipeline {
 
@@ -20,12 +22,15 @@ public final class SurfaceRulePipeline {
     private final MethodHandle tryApplyHandle;
     private final AdrenalineMixinSurfaceRulesContextApi contextApi;
     private final AdrenalineMixinSurfaceRulesContextMutable contextMutable;
+    private final SurfaceRulePlan plan;
+    private int spanBottom;
 
-    public SurfaceRulePipeline(Object surfaceRule, Object context) {
+    public SurfaceRulePipeline(Object surfaceRule, Object context, SurfaceRules.RuleSource source, WorldGenerationContext generation) {
         this.context = context;
         this.tryApplyHandle = SurfaceRulesContextFactory.createTryApplyHandle(surfaceRule);
         this.contextApi = (AdrenalineMixinSurfaceRulesContextApi) context;
         this.contextMutable = (AdrenalineMixinSurfaceRulesContextMutable) context;
+        this.plan = SurfaceRulePlan.compile(source, context, generation);
     }
 
     public void rebind(ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter) {
@@ -58,5 +63,21 @@ public final class SurfaceRulePipeline {
         } catch (Throwable throwable) {
             throw new RuntimeException(throwable);
         }
+    }
+
+    public BlockState tryApplySpan(int x, int y, int z, int above, int below, int water, int runBottom) {
+        this.spanBottom = y;
+        if (this.plan != null && runBottom < y) {
+            BlockState result = this.plan.evaluate(x, y, z, above, below, water, runBottom);
+            if (!this.plan.uncertain()) {
+                this.spanBottom = this.plan.bottom();
+                return result;
+            }
+        }
+        return this.tryApply(x, y, z);
+    }
+
+    public int spanBottom() {
+        return this.spanBottom;
     }
 }

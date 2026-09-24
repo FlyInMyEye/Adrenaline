@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin.levelgen;
 
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(targets = "net.minecraft.world.level.levelgen.SurfaceRules$Context")
@@ -14,4 +15,10 @@ public interface AdrenalineMixinSurfaceRulesContextApi {
 
     @Invoker("getMinSurfaceLevel")
     int adrenaline$getMinSurfaceLevel();
+
+    @Accessor("surfaceDepth")
+    int adrenaline$getSurfaceDepth();
+
+    @Invoker("getSurfaceSecondary")
+    double adrenaline$getSurfaceSecondary();
 }
