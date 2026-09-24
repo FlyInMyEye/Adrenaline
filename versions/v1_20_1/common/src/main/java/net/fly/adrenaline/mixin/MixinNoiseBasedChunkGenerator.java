@@ -12,6 +12,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseProfile;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseSubstage;
+import net.fly.adrenaline.worldgen.SectionTerrainGenerator;
 import net.fly.adrenaline.worldgen.FastHeightmap;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
 import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
@@ -114,6 +115,19 @@ public class MixinNoiseBasedChunkGenerator {
         NoiseProfile profile = BuildConfig.DEBUG ? WorldgenStageStats.beginNoiseProfile() : null;
         long phaseStart = profile == null ? 0L : System.nanoTime();
         NoiseChunk noiseChunk = chunk.getOrCreateNoiseChunk(access -> this.createNoiseChunk(access, structureManager, blender, randomState));
+        if (BuildConfig.DEBUG && SectionTerrainGenerator.enabled()) {
+            BlockState sectionDefaultBlock = this.settings.value().defaultBlock();
+            if (SectionTerrainGenerator.supports(chunk, noiseChunk, sectionDefaultBlock, minCellY, cellCountY)) {
+                if (profile != null) {
+                    profile.add(NoiseSubstage.SETUP, System.nanoTime() - phaseStart);
+                }
+                SectionTerrainGenerator.fill(chunk, noiseChunk, sectionDefaultBlock, minCellY, cellCountY,
+                    () -> this.createNoiseChunk(chunk, structureManager, blender, randomState), profile);
+                WorldgenStageStats.finishNoiseProfile(profile);
+                cir.setReturnValue(chunk);
+                return;
+            }
+        }
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);
         Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
         ChunkPos chunkPos = chunk.getPos();

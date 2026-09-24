@@ -12,6 +12,8 @@ import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
+import net.fly.adrenaline.worldgen.NativeCellDensityEvaluator;
+import net.fly.adrenaline.worldgen.AdrenalineSectionNoiseAccess;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkCoordinateAccess;
 import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
@@ -32,7 +34,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
-public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess, AdrenalineCellGridAccess {
+public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess, AdrenalineCellGridAccess, AdrenalineSectionNoiseAccess {
 
     @Shadow private int cellCountXZ;
     @Shadow private int cellCountY;
@@ -40,6 +42,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Shadow private List<?> cellCaches;
     @Shadow private int cellNoiseMinY;
     @Shadow private int firstCellZ;
+    @Shadow private int firstCellX;
     @Shadow private int cellHeight;
     @Shadow private int cellWidth;
     @Shadow private int cellStartBlockY;
@@ -236,6 +239,25 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         ((AdrenalineNoiseChunkMaterialAccess) this).adrenaline$fillMaterialArrays((NoiseChunk) (Object) this);
 
         this.arrayInterpolationCounter++;
+    }
+
+    @Override
+    public boolean adrenaline$supportsSectionTraversal(int minCellY, int cellCountY) {
+        if (this.cellWidth != 4 || this.cellHeight != 8 || this.cellCountXZ != 4
+            || this.cellNoiseMinY != minCellY || this.cellCountY != cellCountY) {
+            return false;
+        }
+        for (CellDensityEvaluator evaluator : this.adrenaline$cellDensityEvaluators(this.adrenaline$cellCacheArray())) {
+            if (!(evaluator instanceof NativeCellDensityEvaluator)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public void adrenaline$setSectionCellX(int cellX) {
+        this.cellStartBlockX = (this.firstCellX + cellX) * this.cellWidth;
     }
 
     @Override

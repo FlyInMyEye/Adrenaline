@@ -11,4 +11,13 @@ public interface MixinLevelChunkSectionAccessor {
 
     @Accessor("states")
     PalettedContainer<BlockState> adrenaline$getStates();
+
+    @Accessor("nonEmptyBlockCount")
+    void adrenaline$setNonEmptyBlockCount(short count);
+
+    @Accessor("tickingBlockCount")
+    void adrenaline$setTickingBlockCount(short count);
+
+    @Accessor("tickingFluidCount")
+    void adrenaline$setTickingFluidCount(short count);
 }

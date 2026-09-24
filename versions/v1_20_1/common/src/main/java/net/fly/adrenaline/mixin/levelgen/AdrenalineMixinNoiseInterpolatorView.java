@@ -18,6 +18,12 @@ public interface AdrenalineMixinNoiseInterpolatorView {
     @Accessor("slice1")
     double[][] adrenaline$getSlice1();
 
+    @Accessor("slice0")
+    void adrenaline$setSlice0(double[][] slice);
+
+    @Accessor("slice1")
+    void adrenaline$setSlice1(double[][] slice);
+
     @Invoker("fillArray")
     void adrenaline$fillArray(double[] array, DensityFunction.ContextProvider contextProvider);
 
