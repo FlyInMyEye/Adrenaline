@@ -30,7 +30,7 @@ public final class WorldgenDifferenceHud {
             return;
         }
 
-        WorldgenDifferenceState.Difference difference = WorldgenDifferenceState.difference(server, pos);
+        WorldgenDifferenceState.Difference difference = WorldgenDifferenceState.difference(server, minecraft.level.dimension(), pos);
         if (difference == null) {
             return;
         }
@@ -45,7 +45,7 @@ public final class WorldgenDifferenceHud {
             return null;
         }
         if (minecraft.hitResult instanceof BlockHitResult hitResult
-            && WorldgenDifferenceState.difference(server, hitResult.getBlockPos()) != null) {
+            && WorldgenDifferenceState.difference(server, minecraft.level.dimension(), hitResult.getBlockPos()) != null) {
             return hitResult.getBlockPos().immutable();
         }
 
@@ -59,7 +59,7 @@ public final class WorldgenDifferenceHud {
         for (double distance = 0.25D; distance <= maxDistance; distance += 0.05D) {
             Vec3 point = eye.add(direction.scale(distance));
             BlockPos candidate = BlockPos.containing(point);
-            if (!candidate.equals(previous) && WorldgenDifferenceState.difference(server, candidate) != null) {
+            if (!candidate.equals(previous) && WorldgenDifferenceState.difference(server, minecraft.level.dimension(), candidate) != null) {
                 return candidate.immutable();
             }
             previous = candidate;
