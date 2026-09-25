@@ -32,6 +32,7 @@ public class AdrenalineMixinPlugin implements IMixinConfigPlugin {
         "net.fly.adrenaline.mixin.MixinLoggerChunkProgressListener",
         "net.fly.adrenaline.mixin.MixinMinecraftServerWorldgenDebug",
         "net.fly.adrenaline.mixin.MixinPlayerList",
+        "net.fly.adrenaline.mixin.MixinServerChunkCacheDebug",
         "net.fly.adrenaline.mixin.MixinWorldgenDifferenceInput"
     );
     private static final String FLAT_CACHE_MIXIN = "net.fly.adrenaline.mixin.MixinNoiseChunkFlatCacheAllocation";

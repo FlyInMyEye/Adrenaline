@@ -22,6 +22,7 @@ public class AdrenalineConfig {
     private static JsonConfigManager<Data> manager;
     private static volatile Data data = DEFAULTS;
     private static volatile Data runtimeOverride;
+    private static final ThreadLocal<Data> THREAD_OVERRIDE = new ThreadLocal<>();
 
     public static synchronized void init(Path configDirectory) {
         manager = new JsonConfigManager<>(
@@ -58,8 +59,21 @@ public class AdrenalineConfig {
         if (!BuildConfig.DEBUG) {
             return data;
         }
-        Data override = runtimeOverride;
+        Data override = THREAD_OVERRIDE.get();
+        if (override == null) {
+            override = runtimeOverride;
+        }
         return override == null ? data : override;
+    }
+
+    public static Data setThreadOverride(Data value) {
+        Data previous = THREAD_OVERRIDE.get();
+        if (value == null) {
+            THREAD_OVERRIDE.remove();
+        } else {
+            THREAD_OVERRIDE.set(value);
+        }
+        return previous;
     }
 
     public static Data copy() {
@@ -209,7 +223,8 @@ public class AdrenalineConfig {
     }
 
     public static boolean inlineTerrainFillTasks() {
-        return terrainFillOptimizationsEnabled() || parallelWorldgenEnabled() && OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
+        return BuildConfig.DEBUG && THREAD_OVERRIDE.get() != null
+            || terrainFillOptimizationsEnabled() || parallelWorldgenEnabled() && OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
     }
 
     public static boolean surfaceOptimizationsEnabled() {
