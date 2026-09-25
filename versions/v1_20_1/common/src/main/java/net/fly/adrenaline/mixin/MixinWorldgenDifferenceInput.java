@@ -5,6 +5,9 @@ import net.fly.adrenaline.client.WorldgenDifferenceHud;
 import net.fly.adrenaline.util.WorldgenDifferenceState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import org.spongepowered.asm.mixin.Mixin;
@@ -49,7 +52,13 @@ public class MixinWorldgenDifferenceInput {
         if (pos == null) {
             return;
         }
-        integratedServer.execute(() -> WorldgenDifferenceState.cycle(integratedServer.overworld(), pos));
+        ResourceKey<Level> dimension = minecraft.level.dimension();
+        integratedServer.execute(() -> {
+            ServerLevel level = integratedServer.getLevel(dimension);
+            if (level != null) {
+                WorldgenDifferenceState.cycle(level, pos);
+            }
+        });
         minecraft.player.swing(hand);
         ci.cancel();
     }
