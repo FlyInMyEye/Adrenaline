@@ -21,6 +21,7 @@
     "MixinMinecraftServerSpawnTicket",
     "MixinMinecraftServerWorldgenDebug",
     "MixinPlayerList",
+    "MixinServerChunkCacheDebug",
     "MixinMessageAccessor",
     "MixinMaterialRuleList",
     "MixinWorldGenRegion",

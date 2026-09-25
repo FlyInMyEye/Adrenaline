@@ -11,6 +11,7 @@ import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.natives.NativeHardwareInfo;
 import net.fly.adrenaline.natives.NativeRuntimeStats;
 import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.DebugChunkCommands;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 
@@ -33,6 +34,7 @@ public final class AdrenalineFabric implements ModInitializer {
             CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> dispatcher.register(
                 Commands.literal("adrenaline")
                     .requires(source -> source.hasPermission(2))
+                    .then(DebugChunkCommands.commands())
                     .then(Commands.literal("stats")
                         .then(Commands.literal("on").executes(context -> setWorldgenStats(context.getSource(), true)))
                         .then(Commands.literal("off").executes(context -> setWorldgenStats(context.getSource(), false))))

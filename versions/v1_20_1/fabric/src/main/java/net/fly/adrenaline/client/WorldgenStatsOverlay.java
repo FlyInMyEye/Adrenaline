@@ -1,5 +1,6 @@
 package net.fly.adrenaline.client;
 
+import com.mojang.brigadier.arguments.StringArgumentType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -28,6 +29,8 @@ public final class WorldgenStatsOverlay {
     public static void initialize() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
             ClientCommandManager.literal("adrenaline")
+                .then(ClientCommandManager.literal("chunk")
+                    .then(ClientCommandManager.argument("arguments", StringArgumentType.greedyString())))
                 .then(ClientCommandManager.literal("stats")
                     .then(ClientCommandManager.literal("on").executes(context -> setEnabled(context.getSource(), true)))
                     .then(ClientCommandManager.literal("off").executes(context -> setEnabled(context.getSource(), false))))

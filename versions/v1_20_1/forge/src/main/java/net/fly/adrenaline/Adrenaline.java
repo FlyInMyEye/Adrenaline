@@ -6,6 +6,7 @@ import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.natives.NativeHardwareInfo;
 import net.fly.adrenaline.natives.NativeRuntimeStats;
 import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.DebugChunkCommands;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -57,6 +58,7 @@ public class Adrenaline {
         event.getDispatcher().register(
             Commands.literal("adrenaline")
                 .requires(source -> source.hasPermission(2))
+                .then(DebugChunkCommands.commands())
                 .then(Commands.literal("stats")
                     .then(Commands.literal("on").executes(context -> setWorldgenStats(context.getSource(), true)))
                     .then(Commands.literal("off").executes(context -> setWorldgenStats(context.getSource(), false))))
