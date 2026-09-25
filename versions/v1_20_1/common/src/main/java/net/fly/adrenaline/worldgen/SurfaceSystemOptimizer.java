@@ -15,7 +15,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.BlockColumn;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import net.minecraft.world.level.levelgen.RandomState;
@@ -24,6 +23,8 @@ import net.minecraft.world.level.levelgen.SurfaceSystem;
 import net.minecraft.world.level.levelgen.WorldGenerationContext;
 
 public final class SurfaceSystemOptimizer {
+
+    private static final boolean BUFFERED = Boolean.parseBoolean(System.getProperty("adrenaline.bufferedSurface", "true"));
 
     private SurfaceSystemOptimizer() {
     }
@@ -36,11 +37,13 @@ public final class SurfaceSystemOptimizer {
         MutableBlockPos extensionPos = new MutableBlockPos();
         MutableBlockPos postProcessPos = new MutableBlockPos();
         Set<LevelChunkSection> dirtySections = new HashSet<>();
-        FastSurfaceColumn column = new FastSurfaceColumn(chunk, postProcessPos, dirtySections);
         SurfaceRulePipeline surfaceRulePipeline = SurfaceRulesContextFactory.createPipeline(system, randomState, chunk, noiseChunk, biomeManager::getBiome, biomeRegistry, context, ruleSource);
+        boolean buffered = BUFFERED && SectionPaletteBuilder.available()
+            && (chunk.getMinBuildHeight() & 15) == 0 && (chunk.getHeight() & 15) == 0
+            && surfaceRulePipeline.supportsBufferedWrites();
+        FastSurfaceColumn column = new FastSurfaceColumn(chunk, postProcessPos, dirtySections, buffered);
         SurfaceHeightTracker heightTracker = new SurfaceHeightTracker(chunk);
         int minBuildHeight = chunk.getMinBuildHeight();
-        int maxBuildHeight = chunk.getMaxBuildHeight();
 
         for (int localX = 0; localX < 16; localX++) {
             for (int localZ = 0; localZ < 16; localZ++) {
@@ -57,6 +60,7 @@ public final class SurfaceSystemOptimizer {
                 }
 
                 int scanTopY = column.worldSurface();
+                column.prepareRuns(defaultBlock, stonePredicate, scanTopY);
                 surfaceRulePipeline.updateXZ(blockX, blockZ);
                 int stoneDepthAbove = 0;
                 int waterHeight = Integer.MIN_VALUE;
@@ -79,13 +83,7 @@ public final class SurfaceSystemOptimizer {
                     }
 
                     if (minStoneY >= y) {
-                        minStoneY = DimensionType.WAY_BELOW_MIN_Y;
-                        for (int below = y - 1; below >= minBuildHeight - 1; below--) {
-                            if (!stonePredicate.test(column.getBlock(below))) {
-                                minStoneY = below + 1;
-                                break;
-                            }
-                        }
+                        minStoneY = column.stoneBottom(y, stonePredicate);
                     }
 
                     stoneDepthAbove++;
@@ -96,17 +94,12 @@ public final class SurfaceSystemOptimizer {
                     }
 
                     if (defaultRunBottom > y) {
-                        defaultRunBottom = y;
-                        while (defaultRunBottom > minBuildHeight && column.getBlock(defaultRunBottom - 1) == defaultBlock) {
-                            defaultRunBottom--;
-                        }
+                        defaultRunBottom = column.defaultBottom(y, defaultBlock);
                     }
                     BlockState surfaceState = surfaceRulePipeline.tryApplySpan(blockX, y, blockZ, stoneDepthAbove, stoneDepthBelow, waterHeight, defaultRunBottom);
                     int spanBottom = surfaceRulePipeline.spanBottom();
                     if (surfaceState != null) {
-                        for (int writeY = y; writeY >= spanBottom; writeY--) {
-                            column.setBlock(writeY, surfaceState);
-                        }
+                        column.setSpan(spanBottom, y, surfaceState);
                     }
                     stoneDepthAbove += y - spanBottom;
                     y = spanBottom;
@@ -117,12 +110,11 @@ public final class SurfaceSystemOptimizer {
                 }
 
                 heightTracker.set(localX, localZ, column.worldSurface(), column.oceanFloor());
+                column.finishColumn();
             }
         }
 
-        for (LevelChunkSection dirtySection : dirtySections) {
-            dirtySection.recalcBlockCounts();
-        }
+        column.finish();
 
         Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG);
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG);

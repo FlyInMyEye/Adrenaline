@@ -2,6 +2,9 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.reflect.RecordComponent;
 import java.util.List;
+import java.util.function.BooleanSupplier;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.levelgen.Noises;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextApi;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Blocks;
@@ -21,6 +24,8 @@ public final class SurfaceRulePlan {
     private static final Class<?> WATER = SurfaceRules.waterBlockCheck(0, 0).getClass();
     private static final Class<?> STONE = SurfaceRules.ON_FLOOR.getClass();
     private static final Class<?> GRADIENT = SurfaceRules.verticalGradient("adrenaline:plan", VerticalAnchor.absolute(0), VerticalAnchor.absolute(1)).getClass();
+    private static final Class<?> NOISE = SurfaceRules.noiseCondition(Noises.SURFACE, 0.0D).getClass();
+    private static final Class<?> BIOME = SurfaceRules.isBiome(Biomes.PLAINS).getClass();
     private final Rule root;
     private final AdrenalineMixinSurfaceRulesContextApi context;
     private int y;
@@ -35,9 +40,9 @@ public final class SurfaceRulePlan {
         this.context = context;
     }
 
-    public static SurfaceRulePlan compile(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation) {
+    public static SurfaceRulePlan compile(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, AdrenalineMixinSurfaceRulesContextApi contextApi) {
         try {
-            return new SurfaceRulePlan(rule(source, generation, 0), (AdrenalineMixinSurfaceRulesContextApi) context);
+            return new SurfaceRulePlan(rule(source, context, generation, 0), contextApi);
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return null;
         }
@@ -77,7 +82,7 @@ public final class SurfaceRulePlan {
         return result;
     }
 
-    private static Rule rule(SurfaceRules.RuleSource source, WorldGenerationContext generation, int depth) throws ReflectiveOperationException {
+    private static Rule rule(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, int depth) throws ReflectiveOperationException {
         if (depth > 128) {
             throw new IllegalArgumentException("Surface rule depth");
         }
@@ -89,7 +94,7 @@ public final class SurfaceRulePlan {
             List<?> sequence = (List<?>) component(source, 0);
             Rule[] rules = new Rule[sequence.size()];
             for (int i = 0; i < rules.length; i++) {
-                rules[i] = rule((SurfaceRules.RuleSource) sequence.get(i), generation, depth + 1);
+                rules[i] = rule((SurfaceRules.RuleSource) sequence.get(i), context, generation, depth + 1);
             }
             return plan -> {
                 for (Rule child : rules) {
@@ -102,8 +107,8 @@ public final class SurfaceRulePlan {
             };
         }
         if (source.getClass() == TEST) {
-            Condition condition = condition((SurfaceRules.ConditionSource) component(source, 0), generation, depth + 1);
-            Rule child = rule((SurfaceRules.RuleSource) component(source, 1), generation, depth + 1);
+            Condition condition = condition((SurfaceRules.ConditionSource) component(source, 0), context, generation, depth + 1);
+            Rule child = rule((SurfaceRules.RuleSource) component(source, 1), context, generation, depth + 1);
             return plan -> condition.test(plan) && !plan.uncertain ? child.apply(plan) : null;
         }
         return plan -> {
@@ -112,9 +117,20 @@ public final class SurfaceRulePlan {
         };
     }
 
-    private static Condition condition(SurfaceRules.ConditionSource source, WorldGenerationContext generation, int depth) throws ReflectiveOperationException {
+    private static Condition condition(SurfaceRules.ConditionSource source, Object context, WorldGenerationContext generation, int depth) throws ReflectiveOperationException {
         if (depth > 128) {
             throw new IllegalArgumentException("Surface condition depth");
+        }
+        if (source.getClass() == NOISE || source == SurfaceRules.steep()) {
+            BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
+            return plan -> test.getAsBoolean();
+        }
+        if (source.getClass() == BIOME) {
+            BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
+            return plan -> {
+                plan.bottom = plan.y;
+                return test.getAsBoolean();
+            };
         }
         if (source == SurfaceRules.abovePreliminarySurface()) {
             return plan -> plan.atLeast(plan.context.adrenaline$getMinSurfaceLevel());
@@ -123,7 +139,7 @@ public final class SurfaceRulePlan {
             return plan -> plan.context.adrenaline$getSurfaceDepth() <= 0;
         }
         if (source.getClass() == NOT) {
-            Condition target = condition((SurfaceRules.ConditionSource) component(source, 0), generation, depth + 1);
+            Condition target = condition((SurfaceRules.ConditionSource) component(source, 0), context, generation, depth + 1);
             return plan -> !target.test(plan);
         }
         if (source.getClass() == Y) {
@@ -177,6 +193,40 @@ public final class SurfaceRulePlan {
             plan.uncertain = true;
             return false;
         };
+    }
+
+    public static boolean supportsBufferedWrites(SurfaceRules.RuleSource source) {
+        try {
+            return builtInTree(source, 0);
+        } catch (ReflectiveOperationException | RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private static boolean builtInTree(Object node, int depth) throws ReflectiveOperationException {
+        if (depth > 128 || node.getClass().getEnclosingClass() != SurfaceRules.class) {
+            return false;
+        }
+        RecordComponent[] components = node.getClass().getRecordComponents();
+        if (components == null) {
+            return true;
+        }
+        for (int i = 0; i < components.length; i++) {
+            Object value = component(node, i);
+            if (value instanceof SurfaceRules.RuleSource || value instanceof SurfaceRules.ConditionSource) {
+                if (!builtInTree(value, depth + 1)) {
+                    return false;
+                }
+            } else if (value instanceof List<?> children) {
+                for (Object child : children) {
+                    if ((child instanceof SurfaceRules.RuleSource || child instanceof SurfaceRules.ConditionSource)
+                        && !builtInTree(child, depth + 1)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private static Object component(Object record, int index) throws ReflectiveOperationException {

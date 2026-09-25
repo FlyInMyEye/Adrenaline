@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.BooleanSupplier;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -58,6 +59,22 @@ public final class SurfaceRulesContextFactory {
 
     public static Object apply(SurfaceRules.RuleSource ruleSource, Object context) {
         return applyUnchecked(ruleSource, context);
+    }
+
+    public static BooleanSupplier createCondition(SurfaceRules.ConditionSource source, Object context) throws ReflectiveOperationException {
+        Object condition = applyUnchecked(source, context);
+        Method method = java.util.Arrays.stream(condition.getClass().getMethods())
+            .filter(candidate -> candidate.getParameterCount() == 0 && candidate.getReturnType() == boolean.class)
+            .findFirst().orElseThrow(() -> new NoSuchMethodException("Surface condition test method"));
+        method.setAccessible(true);
+        MethodHandle test = LOOKUP.unreflect(method).bindTo(condition);
+        return () -> {
+            try {
+                return (boolean) test.invokeExact();
+            } catch (Throwable throwable) {
+                throw new IllegalStateException("Surface condition evaluation failed", throwable);
+            }
+        };
     }
 
     public static SurfaceRulePipeline createPipeline(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
