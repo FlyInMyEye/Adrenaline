@@ -2,7 +2,6 @@ package net.fly.adrenaline.worldgen;
 
 import java.util.Set;
 
-import net.fly.adrenaline.mixin.MixinChunkAccessAccessor;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,6 +17,7 @@ public final class FastSurfaceColumn implements BlockColumn {
     private final LevelChunkSection[] sections;
     private final MutableBlockPos postProcessPos;
     private final Set<LevelChunkSection> dirtySections;
+    private final SurfaceColumnBuffer buffer;
     private final int minBuildHeight;
     private final int maxBuildHeight;
 
@@ -28,13 +28,14 @@ public final class FastSurfaceColumn implements BlockColumn {
     private int worldSurface;
     private int oceanFloor;
 
-    public FastSurfaceColumn(ChunkAccess chunk, MutableBlockPos postProcessPos, Set<LevelChunkSection> dirtySections) {
+    public FastSurfaceColumn(ChunkAccess chunk, MutableBlockPos postProcessPos, Set<LevelChunkSection> dirtySections, boolean buffered) {
         this.chunk = chunk;
-        this.sections = ((MixinChunkAccessAccessor) chunk).adrenaline$getSections();
+        this.sections = chunk.getSections();
         this.postProcessPos = postProcessPos;
         this.dirtySections = dirtySections;
         this.minBuildHeight = chunk.getMinBuildHeight();
         this.maxBuildHeight = chunk.getMaxBuildHeight();
+        this.buffer = buffered ? new SurfaceColumnBuffer(this.sections, this.minBuildHeight) : null;
     }
 
     public void resetColumn(int localX, int localZ, int blockX, int blockZ, int worldSurface, int oceanFloor) {
@@ -44,12 +45,18 @@ public final class FastSurfaceColumn implements BlockColumn {
         this.blockZ = blockZ;
         this.worldSurface = worldSurface;
         this.oceanFloor = oceanFloor;
+        if (this.buffer != null) {
+            this.buffer.load(localX, localZ);
+        }
     }
 
     @Override
     public BlockState getBlock(int y) {
         if (y < this.minBuildHeight || y >= this.maxBuildHeight) {
             return AIR;
+        }
+        if (this.buffer != null) {
+            return this.buffer.get(y);
         }
 
         LevelChunkSection section = this.sections[this.chunk.getSectionIndex(y)];
@@ -66,15 +73,94 @@ public final class FastSurfaceColumn implements BlockColumn {
             return;
         }
 
-        LevelChunkSection section = this.sections[this.chunk.getSectionIndex(y)];
-        BlockState previousState = section.hasOnlyAir() ? AIR : section.getBlockState(this.localX, y & 15, this.localZ);
-        FastSectionAccess.writeUnchecked(section, this.localX, y & 15, this.localZ, state);
-        this.dirtySections.add(section);
+        BlockState previousState = this.getBlock(y);
+        if (this.buffer != null) {
+            this.buffer.set(y, state);
+        } else {
+            LevelChunkSection section = this.sections[this.chunk.getSectionIndex(y)];
+            FastSectionAccess.writeUnchecked(section, this.localX, y & 15, this.localZ, state);
+            this.dirtySections.add(section);
+        }
         this.updateHeights(y, previousState, state);
 
         if (!state.getFluidState().isEmpty()) {
             this.postProcessPos.set(this.blockX, y, this.blockZ);
             this.chunk.markPosForPostprocessing(this.postProcessPos);
+        }
+    }
+
+    public void prepareRuns(BlockState defaultBlock, SurfaceSystemOptimizer.StonePredicate predicate, int top) {
+        if (this.buffer != null) {
+            this.buffer.prepareRuns(defaultBlock, predicate, top);
+        }
+    }
+
+    public int stoneBottom(int y, SurfaceSystemOptimizer.StonePredicate predicate) {
+        if (this.buffer != null) {
+            return this.buffer.stoneBottom(y);
+        }
+        for (int below = y - 1; below >= this.minBuildHeight - 1; below--) {
+            if (!predicate.test(this.getBlock(below))) {
+                return below + 1;
+            }
+        }
+        return net.minecraft.world.level.dimension.DimensionType.WAY_BELOW_MIN_Y;
+    }
+
+    public int defaultBottom(int y, BlockState defaultBlock) {
+        if (this.buffer != null) {
+            return this.buffer.defaultBottom(y);
+        }
+        int bottom = y;
+        while (bottom > this.minBuildHeight && this.getBlock(bottom - 1) == defaultBlock) {
+            bottom--;
+        }
+        return bottom;
+    }
+
+    public void setSpan(int bottom, int top, BlockState state) {
+        if (this.buffer == null) {
+            for (int y = top; y >= bottom; y--) {
+                this.setBlock(y, state);
+            }
+            return;
+        }
+        bottom = Math.max(bottom, this.minBuildHeight);
+        top = Math.min(top, this.maxBuildHeight - 1);
+        if (bottom > top) {
+            return;
+        }
+        this.buffer.fill(bottom, top, state);
+        if (!state.isAir()) {
+            this.worldSurface = Math.max(this.worldSurface, top + 1);
+        } else if (this.worldSurface > bottom && this.worldSurface <= top + 1) {
+            this.worldSurface = this.findWorldSurface(bottom - 1);
+        }
+        if (!state.isAir() && state.getFluidState().isEmpty()) {
+            this.oceanFloor = Math.max(this.oceanFloor, top + 1);
+        } else if (this.oceanFloor > bottom && this.oceanFloor <= top + 1) {
+            this.oceanFloor = this.findOceanFloor(bottom - 1);
+        }
+        if (!state.getFluidState().isEmpty()) {
+            for (int y = top; y >= bottom; y--) {
+                this.chunk.markPosForPostprocessing(this.postProcessPos.set(this.blockX, y, this.blockZ));
+            }
+        }
+    }
+
+    public void finishColumn() {
+        if (this.buffer != null) {
+            this.buffer.store();
+        }
+    }
+
+    public void finish() {
+        if (this.buffer != null) {
+            this.buffer.commit();
+        } else {
+            for (LevelChunkSection section : this.dirtySections) {
+                section.recalcBlockCounts();
+            }
         }
     }
 

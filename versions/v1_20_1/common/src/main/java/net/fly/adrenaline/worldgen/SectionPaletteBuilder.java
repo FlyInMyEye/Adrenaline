@@ -28,6 +28,29 @@ public final class SectionPaletteBuilder {
         return ACCESS != null;
     }
 
+    public static BlockState[] unpackColumns(PalettedContainer<BlockState> source) {
+        if (ACCESS == null) {
+            throw new IllegalStateException("Palette access unavailable");
+        }
+        try {
+            Object data = ACCESS.data.get(source);
+            BitStorage storage = (BitStorage) ACCESS.storage.invoke(data);
+            @SuppressWarnings("unchecked")
+            Palette<BlockState> palette = (Palette<BlockState>) ACCESS.palette.invoke(data);
+            int[] ids = new int[4096];
+            storage.unpack(ids);
+            BlockState[] states = new BlockState[4096];
+            for (int column = 0; column < 256; column++) {
+                for (int y = 0; y < 16; y++) {
+                    states[column * 16 + y] = palette.valueFor(ids[y * 256 + column]);
+                }
+            }
+            return states;
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
     public static void commit(PalettedContainer<BlockState> target, List<BlockState> states, int[] ids) {
         if (ACCESS == null || ids.length != 4096 || states.isEmpty()) {
             throw new IllegalArgumentException();
@@ -76,7 +99,11 @@ public final class SectionPaletteBuilder {
                 bits.setAccessible(true);
                 Constructor<?> constructor = type.getDeclaredConstructor(configurationType, BitStorage.class, Palette.class);
                 constructor.setAccessible(true);
-                return new Access(field, configuration, factory, bits, constructor);
+                Method storage = components[1].getAccessor();
+                Method palette = components[2].getAccessor();
+                storage.setAccessible(true);
+                palette.setAccessible(true);
+                return new Access(field, configuration, factory, bits, constructor, storage, palette);
             }
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return null;
@@ -84,6 +111,6 @@ public final class SectionPaletteBuilder {
         return null;
     }
 
-    private record Access(Field data, Method configuration, Method factory, Method bits, Constructor<?> constructor) {
+    private record Access(Field data, Method configuration, Method factory, Method bits, Constructor<?> constructor, Method storage, Method palette) {
     }
 }

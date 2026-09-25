@@ -23,6 +23,7 @@ public final class SurfaceRulePipeline {
     private final AdrenalineMixinSurfaceRulesContextApi contextApi;
     private final AdrenalineMixinSurfaceRulesContextMutable contextMutable;
     private final SurfaceRulePlan plan;
+    private final boolean bufferedWrites;
     private int spanBottom;
 
     public SurfaceRulePipeline(Object surfaceRule, Object context, SurfaceRules.RuleSource source, WorldGenerationContext generation) {
@@ -30,7 +31,12 @@ public final class SurfaceRulePipeline {
         this.tryApplyHandle = SurfaceRulesContextFactory.createTryApplyHandle(surfaceRule);
         this.contextApi = (AdrenalineMixinSurfaceRulesContextApi) context;
         this.contextMutable = (AdrenalineMixinSurfaceRulesContextMutable) context;
-        this.plan = SurfaceRulePlan.compile(source, context, generation);
+        this.plan = SurfaceRulePlan.compile(source, context, generation, this.contextApi);
+        this.bufferedWrites = SurfaceRulePlan.supportsBufferedWrites(source);
+    }
+
+    public boolean supportsBufferedWrites() {
+        return this.bufferedWrites;
     }
 
     public void rebind(ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter) {
