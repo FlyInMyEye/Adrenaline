@@ -55,9 +55,11 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
     @Unique private DensityFunction adrenaline$veinGap;
     @Unique private PositionalRandomFactory adrenaline$oreRandomFactory;
     @Unique private double[] adrenaline$veinToggleValues;
+    @Unique private double[] adrenaline$veinRidgedValues;
     @Unique private long adrenaline$materialArrayFillNanos;
     @Unique private boolean adrenaline$materialEvaluatorsInitialized;
     @Unique private CellDensityEvaluator adrenaline$veinToggleEvaluator;
+    @Unique private CellDensityEvaluator adrenaline$veinRidgedEvaluator;
 
     @Redirect(
         method = "<init>",
@@ -137,6 +139,7 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
             if (this.adrenaline$veinToggle != null) {
                 int size = this.adrenaline$finalDensityValues.length;
                 this.adrenaline$veinToggleValues = new double[size];
+                this.adrenaline$veinRidgedValues = new double[size];
             }
             this.adrenaline$hasDirectMaterialPath = true;
         }
@@ -174,9 +177,11 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
         long startedNanos = BuildConfig.DEBUG ? System.nanoTime() : 0L;
         if (!this.adrenaline$materialEvaluatorsInitialized) {
             this.adrenaline$veinToggleEvaluator = CellDensityCompiler.compile(this.adrenaline$veinToggle);
+            this.adrenaline$veinRidgedEvaluator = CellDensityCompiler.compile(this.adrenaline$veinRidged);
             this.adrenaline$materialEvaluatorsInitialized = true;
         }
         this.adrenaline$fillMaterialArray(this.adrenaline$veinToggleEvaluator, this.adrenaline$veinToggle, this.adrenaline$veinToggleValues, contextProvider);
+        this.adrenaline$fillMaterialArray(this.adrenaline$veinRidgedEvaluator, this.adrenaline$veinRidged, this.adrenaline$veinRidgedValues, contextProvider);
         this.adrenaline$materialArrayFillNanos = BuildConfig.DEBUG ? System.nanoTime() - startedNanos : 0L;
     }
 
@@ -222,7 +227,7 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
             return null;
         }
         RandomSource random = this.adrenaline$oreRandomFactory.at(context.blockX(), blockY, context.blockZ());
-        if (random.nextFloat() > 0.7F || this.adrenaline$veinRidged.compute(context) >= 0.0D) {
+        if (random.nextFloat() > 0.7F || this.adrenaline$veinRidgedValues[index] >= 0.0D) {
             return null;
         }
         double richness = Mth.clampedMap(absVeininess, 0.4000000059604645D, 0.6000000238418579D, 0.10000000149011612D, 0.30000001192092896D);
