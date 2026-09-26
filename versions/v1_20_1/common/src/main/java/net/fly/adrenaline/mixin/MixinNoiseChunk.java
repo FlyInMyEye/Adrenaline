@@ -10,6 +10,7 @@ import java.util.function.Function;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
+import net.fly.adrenaline.worldgen.DensityMapCache;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NativeCellDensityEvaluator;
@@ -31,6 +32,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
@@ -59,6 +61,31 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Shadow private DensityFunction initialDensityNoJaggedness;
     @Shadow private NoiseSettings noiseSettings;
     @Shadow private Map<DensityFunction, DensityFunction> wrapped;
+
+    @Unique private DensityMapCache adrenaline$densityMapCache;
+
+    @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/NoiseRouter;"), index = 0)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    private DensityFunction.Visitor adrenaline$cacheRouterMapping(DensityFunction.Visitor visitor) {
+        return this.adrenaline$mappingVisitor(visitor);
+    }
+
+    @ModifyArg(method = {"<init>", "cachedClimateSampler"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/DensityFunction;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/DensityFunction;"), index = 0)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    private DensityFunction.Visitor adrenaline$cacheDensityMapping(DensityFunction.Visitor visitor) {
+        return this.adrenaline$mappingVisitor(visitor);
+    }
+
+    @Unique
+    private DensityFunction.Visitor adrenaline$mappingVisitor(DensityFunction.Visitor visitor) {
+        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+            return visitor;
+        }
+        if (this.adrenaline$densityMapCache == null) {
+            this.adrenaline$densityMapCache = new DensityMapCache(visitor);
+        }
+        return this.adrenaline$densityMapCache;
+    }
 
     @Unique
     private AdrenalineMixinNoiseInterpolatorView[] adrenaline$interpolatorArray;
