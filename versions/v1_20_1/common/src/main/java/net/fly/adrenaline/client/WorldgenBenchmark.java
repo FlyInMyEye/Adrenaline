@@ -203,7 +203,7 @@ public final class WorldgenBenchmark {
         int centerZ = (baseZ + diameter / 2) * 16 + 8;
         int centerY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, centerX, centerZ) + 1;
         level.setDefaultSpawnPos(new BlockPos(centerX, centerY, centerZ), 0.0F);
-        BlockState marker = Blocks.PURPLE_GLAZED_TERRACOTTA.defaultBlockState();
+        BlockState marker = Blocks.SOUL_CAMPFIRE.defaultBlockState();
         for (BlockDifference difference : report.fullDifferences()) {
             BlockPos pos = new BlockPos(difference.x(), difference.y(), difference.z());
             level.setBlock(pos, marker, 2);
