@@ -43,7 +43,7 @@ public final class WorldgenStatsOverlay {
 
     private static void render(GuiGraphics graphics, float tickDelta) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!WorldgenStageStats.isEnabled() || minecraft.options.renderDebug) {
+        if (!WorldgenStageStats.isHudVisible() || minecraft.options.renderDebug) {
             return;
         }
 
@@ -60,7 +60,7 @@ public final class WorldgenStatsOverlay {
     }
 
     private static int setEnabled(FabricClientCommandSource source, boolean enabled) {
-        WorldgenStageStats.setEnabled(enabled);
+        WorldgenStageStats.setHudVisible(enabled);
         source.sendFeedback(Component.translatable(enabled ? "message.adrenaline.stats.enabled" : "message.adrenaline.stats.disabled"));
         return 1;
     }

@@ -46,7 +46,7 @@ public final class WorldgenStatsOverlay {
 
     @SubscribeEvent
     public void onDebugText(CustomizeGuiOverlayEvent.DebugText event) {
-        if (!BuildConfig.DEBUG || !WorldgenStageStats.isEnabled()) {
+        if (!BuildConfig.DEBUG || !WorldgenStageStats.isHudVisible()) {
             return;
         }
         event.getLeft().addAll(lines());
@@ -55,7 +55,7 @@ public final class WorldgenStatsOverlay {
     @SubscribeEvent
     public void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (!BuildConfig.DEBUG || !WorldgenStageStats.isEnabled() || minecraft.options.renderDebug) {
+        if (!BuildConfig.DEBUG || !WorldgenStageStats.isHudVisible() || minecraft.options.renderDebug) {
             return;
         }
 
@@ -73,7 +73,7 @@ public final class WorldgenStatsOverlay {
     }
 
     private static int setEnabled(CommandSourceStack source, boolean enabled) {
-        WorldgenStageStats.setEnabled(enabled);
+        WorldgenStageStats.setHudVisible(enabled);
         source.sendSuccess(() -> Component.translatable(enabled ? "message.adrenaline.stats.enabled" : "message.adrenaline.stats.disabled"), false);
         return 1;
     }

@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenBenchmarkHooks;
 import net.fly.adrenaline.util.WorldgenDifferenceState;
 import net.minecraft.server.MinecraftServer;
@@ -12,6 +13,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MinecraftServer.class)
 public class MixinMinecraftServerWorldgenDebug {
+
+    @Inject(method = "runServer", at = @At("HEAD"))
+    private void adrenaline$resetWorldgenStats(CallbackInfo ci) {
+        WorldgenStageStats.reset();
+    }
 
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void adrenaline$clearWorldgenDifferenceState(CallbackInfo ci) {
