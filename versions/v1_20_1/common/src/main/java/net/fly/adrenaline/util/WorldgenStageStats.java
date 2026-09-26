@@ -28,45 +28,49 @@ public final class WorldgenStageStats {
     private static final WaitingReason[] WAITING_REASONS = WaitingReason.values();
     private static final AtomicLongArray WAITING_REASON_AVERAGE_NANOS = new AtomicLongArray(WAITING_REASONS.length);
     private static final AtomicLong EPOCH = new AtomicLong();
-    private static volatile boolean enabled;
+    private static volatile boolean hudVisible;
 
     private WorldgenStageStats() {
     }
 
     public static boolean isEnabled() {
-        if (!BuildConfig.DEBUG) {
-            return false;
-        }
-        return enabled;
+        return BuildConfig.DEBUG;
     }
 
-    public static void setEnabled(boolean enabled) {
+    public static boolean isHudVisible() {
+        return BuildConfig.DEBUG && hudVisible;
+    }
+
+    public static void setHudVisible(boolean visible) {
+        if (BuildConfig.DEBUG) {
+            hudVisible = visible;
+        }
+    }
+
+    public static void reset() {
         if (!BuildConfig.DEBUG) {
             return;
         }
         EPOCH.incrementAndGet();
-        WorldgenStageStats.enabled = enabled;
-        if (enabled) {
-            for (int i = 0; i < STATUSES.size(); i++) {
-                AVERAGE_NANOS.set(i, 0L);
-            }
-            for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
-                NOISE_AVERAGE_NANOS.set(i, 0L);
-            }
-            STAGE_SCHEDULING.clear();
-            CHUNK_SCHEDULING.clear();
-            LAST_STAGE_FINISH_NANOS.clear();
-            REFERENCE_AVERAGE_NANOS.set(0L);
-            SCHEDULING_AVERAGE_NANOS.set(0L);
-            WAITING_AVERAGE_NANOS.set(0L);
-            for (int i = 0; i < WAITING_REASONS.length; i++) {
-                WAITING_REASON_AVERAGE_NANOS.set(i, 0L);
-            }
+        for (int i = 0; i < STATUSES.size(); i++) {
+            AVERAGE_NANOS.set(i, 0L);
+        }
+        for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
+            NOISE_AVERAGE_NANOS.set(i, 0L);
+        }
+        STAGE_SCHEDULING.clear();
+        CHUNK_SCHEDULING.clear();
+        LAST_STAGE_FINISH_NANOS.clear();
+        REFERENCE_AVERAGE_NANOS.set(0L);
+        SCHEDULING_AVERAGE_NANOS.set(0L);
+        WAITING_AVERAGE_NANOS.set(0L);
+        for (int i = 0; i < WAITING_REASONS.length; i++) {
+            WAITING_REASON_AVERAGE_NANOS.set(i, 0L);
         }
     }
 
     public static void beginScheduling(ChunkPos pos, ChunkStatus status) {
-        if (!BuildConfig.DEBUG || !enabled) {
+        if (!BuildConfig.DEBUG) {
             return;
         }
         long now = System.nanoTime();
@@ -78,14 +82,14 @@ public final class WorldgenStageStats {
             return;
         }
         SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
-        if (state == null || !enabled || EPOCH.get() != state.epoch) {
+        if (state == null || EPOCH.get() != state.epoch) {
             return;
         }
         state.schedulingNanos.addAndGet(System.nanoTime() - state.startedNanos);
     }
 
     public static SchedulingWork beginSchedulingWork(ChunkPos pos, ChunkStatus status) {
-        if (!BuildConfig.DEBUG || !enabled) {
+        if (!BuildConfig.DEBUG) {
             return null;
         }
         SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
@@ -93,14 +97,14 @@ public final class WorldgenStageStats {
     }
 
     public static void finishSchedulingWork(SchedulingWork work) {
-        if (!BuildConfig.DEBUG || work == null || !enabled || EPOCH.get() != work.state.epoch) {
+        if (!BuildConfig.DEBUG || work == null || EPOCH.get() != work.state.epoch) {
             return;
         }
         work.state.schedulingNanos.addAndGet(System.nanoTime() - work.startedNanos);
     }
 
     public static void markDependenciesReady(ChunkPos pos, ChunkStatus status) {
-        if (!BuildConfig.DEBUG || !enabled) {
+        if (!BuildConfig.DEBUG) {
             return;
         }
         SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
@@ -110,7 +114,7 @@ public final class WorldgenStageStats {
     }
 
     public static void addWaitingInterval(ChunkPos pos, ChunkStatus status, WaitingReason reason, long startedNanos, long finishedNanos) {
-        if (!BuildConfig.DEBUG || !enabled || finishedNanos <= startedNanos) {
+        if (!BuildConfig.DEBUG || finishedNanos <= startedNanos) {
             return;
         }
         SchedulingState state = STAGE_SCHEDULING.get(new StageKey(pos.toLong(), status.getIndex()));
@@ -120,7 +124,7 @@ public final class WorldgenStageStats {
     }
 
     public static long beginStage(ChunkPos pos, ChunkStatus status) {
-        if (!BuildConfig.DEBUG || !enabled) {
+        if (!BuildConfig.DEBUG) {
             return 0L;
         }
         long now = System.nanoTime();
@@ -163,7 +167,7 @@ public final class WorldgenStageStats {
         if (status == ChunkStatus.BIOMES) {
             long epoch = EPOCH.get();
             long referenceNanos = WorldgenReference.measure();
-            if (referenceNanos != 0L && enabled && EPOCH.get() == epoch) {
+            if (referenceNanos != 0L && EPOCH.get() == epoch) {
                 updateAverage(REFERENCE_AVERAGE_NANOS, referenceNanos);
             }
             return System.nanoTime();
@@ -172,11 +176,11 @@ public final class WorldgenStageStats {
     }
 
     public static NoiseProfile beginNoiseProfile() {
-        return BuildConfig.DEBUG && enabled ? new NoiseProfile(EPOCH.get()) : null;
+        return BuildConfig.DEBUG ? new NoiseProfile(EPOCH.get()) : null;
     }
 
     public static void finishNoiseProfile(NoiseProfile profile) {
-        if (!BuildConfig.DEBUG || profile == null || !enabled || EPOCH.get() != profile.epoch) {
+        if (!BuildConfig.DEBUG || profile == null || EPOCH.get() != profile.epoch) {
             return;
         }
         for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
@@ -192,7 +196,7 @@ public final class WorldgenStageStats {
         int index = status.getIndex();
         long epoch = EPOCH.get();
         future.whenComplete((value, throwable) -> {
-            if (enabled && EPOCH.get() == epoch) {
+            if (EPOCH.get() == epoch) {
                 long finishedNanos = System.nanoTime();
                 updateAverage(AVERAGE_NANOS, index, finishedNanos - startedNanos);
                 LAST_STAGE_FINISH_NANOS.computeIfAbsent(pos.toLong(), ignored -> new AtomicLong()).accumulateAndGet(finishedNanos, Math::max);

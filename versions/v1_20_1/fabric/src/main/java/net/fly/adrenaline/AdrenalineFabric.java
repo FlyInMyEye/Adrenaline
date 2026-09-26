@@ -58,7 +58,7 @@ public final class AdrenalineFabric implements ModInitializer {
     }
 
     private static int setWorldgenStats(net.minecraft.commands.CommandSourceStack source, boolean enabled) {
-        WorldgenStageStats.setEnabled(enabled);
+        WorldgenStageStats.setHudVisible(enabled);
         source.sendSuccess(() -> Component.translatable(enabled ? "message.adrenaline.stats.enabled" : "message.adrenaline.stats.disabled"), false);
         return 1;
     }
