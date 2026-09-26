@@ -119,7 +119,7 @@ public final class DebugChunkCommands {
             if (highlight) {
                 WorldgenDifferenceState.activate(level, differences);
                 for (long key : differences.keySet()) {
-                    level.setBlock(BlockPos.of(key), Blocks.PURPLE_GLAZED_TERRACOTTA.defaultBlockState(), 2 | 16 | 32);
+                    level.setBlock(BlockPos.of(key), Blocks.SOUL_CAMPFIRE.defaultBlockState(), 2 | 16 | 32);
                 }
                 if (source.getEntity() instanceof ServerPlayer player) {
                     ItemStack tool = new ItemStack(Items.STICK);

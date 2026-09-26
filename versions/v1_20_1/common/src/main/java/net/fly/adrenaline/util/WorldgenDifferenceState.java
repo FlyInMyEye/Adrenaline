@@ -73,12 +73,12 @@ public final class WorldgenDifferenceState {
 
         BlockState current = level.getBlockState(pos);
         BlockState next;
-        if (current.is(Blocks.PURPLE_GLAZED_TERRACOTTA)) {
+        if (current.is(Blocks.SOUL_CAMPFIRE)) {
             next = Block.BLOCK_STATE_REGISTRY.byId(difference.vanillaStateId());
         } else if (Block.getId(current) == difference.vanillaStateId()) {
             next = Block.BLOCK_STATE_REGISTRY.byId(difference.adrenalineStateId());
         } else {
-            next = Blocks.PURPLE_GLAZED_TERRACOTTA.defaultBlockState();
+            next = Blocks.SOUL_CAMPFIRE.defaultBlockState();
         }
         if (next != null) {
             level.setBlock(pos, next, 3);
