@@ -56,6 +56,21 @@ public final class DebugChunkCommands {
             .then(operation("highlight", true, true));
     }
 
+    public static LiteralArgumentBuilder<CommandSourceStack> stickCommand() {
+        return Commands.literal("stick")
+            .requires(source -> source.hasPermission(2))
+            .executes(context -> {
+                ServerPlayer player = context.getSource().getPlayerOrException();
+                ItemStack tool = new ItemStack(Items.STICK);
+                tool.setHoverName(Component.literal("Adrenaline"));
+                if (!player.getInventory().add(tool)) {
+                    player.drop(tool, false);
+                }
+                player.containerMenu.broadcastChanges();
+                return 1;
+            });
+    }
+
     private static LiteralArgumentBuilder<CommandSourceStack> operation(String name, boolean optimized, boolean highlight) {
         return Commands.literal(name)
             .executes(context -> run(context.getSource(), context.getSource().getPlayerOrException().blockPosition(), optimized, highlight))

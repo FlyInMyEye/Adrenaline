@@ -33,6 +33,7 @@ public final class WorldgenStatsOverlay {
         }
         event.getDispatcher().register(
             Commands.literal("adrenaline")
+                .then(Commands.literal("stick"))
                 .then(Commands.literal("chunk")
                     .then(Commands.argument("arguments", StringArgumentType.greedyString())))
                 .then(Commands.literal("stats")

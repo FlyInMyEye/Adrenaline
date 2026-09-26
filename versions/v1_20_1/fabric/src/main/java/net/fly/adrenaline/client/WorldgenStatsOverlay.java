@@ -29,6 +29,7 @@ public final class WorldgenStatsOverlay {
     public static void initialize() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(
             ClientCommandManager.literal("adrenaline")
+                .then(ClientCommandManager.literal("stick"))
                 .then(ClientCommandManager.literal("chunk")
                     .then(ClientCommandManager.argument("arguments", StringArgumentType.greedyString())))
                 .then(ClientCommandManager.literal("stats")

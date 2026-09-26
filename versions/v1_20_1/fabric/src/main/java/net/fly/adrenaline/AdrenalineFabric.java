@@ -35,6 +35,7 @@ public final class AdrenalineFabric implements ModInitializer {
                 Commands.literal("adrenaline")
                     .requires(source -> source.hasPermission(2))
                     .then(DebugChunkCommands.commands())
+                    .then(DebugChunkCommands.stickCommand())
                     .then(Commands.literal("stats")
                         .then(Commands.literal("on").executes(context -> setWorldgenStats(context.getSource(), true)))
                         .then(Commands.literal("off").executes(context -> setWorldgenStats(context.getSource(), false))))
