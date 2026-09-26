@@ -125,6 +125,7 @@ public final class BackgroundWorldgenWarmup {
             new GameRules(),
             WorldDataConfiguration.DEFAULT
         );
+        // TODO: Skip recipes, advancements, and other data unnecessary for worldgen warmup during world loading.
         minecraft.createWorldOpenFlows().createFreshLevel(
             levelId,
             settings,

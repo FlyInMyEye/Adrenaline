@@ -38,6 +38,7 @@
     "MixinCubicSplineMultipointInvoker",
     "MixinCubicSplineMultipoint",
     "MixinPerlinNoise",
+    "MixinDensityFunctionsHolderHolder",
     "MixinDensityFunctionsAp2",
     "MixinDensityFunctionsBlendDensity",
     "MixinDensityFunctionsNoise",
