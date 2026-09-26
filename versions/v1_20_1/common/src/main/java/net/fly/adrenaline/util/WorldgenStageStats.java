@@ -22,6 +22,7 @@ public final class WorldgenStageStats {
     private static final ConcurrentHashMap<StageKey, SchedulingState> STAGE_SCHEDULING = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Long, ChunkScheduling> CHUNK_SCHEDULING = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Long, AtomicLong> LAST_STAGE_FINISH_NANOS = new ConcurrentHashMap<>();
+    private static final AtomicLong REFERENCE_AVERAGE_NANOS = new AtomicLong();
     private static final AtomicLong SCHEDULING_AVERAGE_NANOS = new AtomicLong();
     private static final AtomicLong WAITING_AVERAGE_NANOS = new AtomicLong();
     private static final WaitingReason[] WAITING_REASONS = WaitingReason.values();
@@ -55,6 +56,7 @@ public final class WorldgenStageStats {
             STAGE_SCHEDULING.clear();
             CHUNK_SCHEDULING.clear();
             LAST_STAGE_FINISH_NANOS.clear();
+            REFERENCE_AVERAGE_NANOS.set(0L);
             SCHEDULING_AVERAGE_NANOS.set(0L);
             WAITING_AVERAGE_NANOS.set(0L);
             for (int i = 0; i < WAITING_REASONS.length; i++) {
@@ -158,6 +160,14 @@ public final class WorldgenStageStats {
                 chunkScheduling.waitingReasonNanos.addAndGet(WaitingReason.UNCLASSIFIED.ordinal(), waitingNanos - categorizedNanos);
             }
         }
+        if (status == ChunkStatus.BIOMES) {
+            long epoch = EPOCH.get();
+            long referenceNanos = WorldgenReference.measure();
+            if (referenceNanos != 0L && enabled && EPOCH.get() == epoch) {
+                updateAverage(REFERENCE_AVERAGE_NANOS, referenceNanos);
+            }
+            return System.nanoTime();
+        }
         return now;
     }
 
@@ -218,6 +228,7 @@ public final class WorldgenStageStats {
         Collections.reverse(timings);
         StageTiming scheduling = timings.remove(timings.size() - 1);
         timings.add(0, scheduling);
+        timings.add(1, new StageTiming("REFERENCE", REFERENCE_AVERAGE_NANOS.get()));
         int noiseIndex = -1;
         for (int i = 0; i < timings.size(); i++) {
             if ("NOISE".equals(timings.get(i).name())) {

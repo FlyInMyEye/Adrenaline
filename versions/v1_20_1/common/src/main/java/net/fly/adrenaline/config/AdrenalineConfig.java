@@ -113,6 +113,10 @@ public class AdrenalineConfig {
         }
     }
 
+    public static boolean hasGenerationOverride() {
+        return BuildConfig.DEBUG && (runtimeOverride != null || THREAD_OVERRIDE.get() != null);
+    }
+
     public static int resolvedGenerationWorkerThreads() {
         int v = get().generationWorkerThreads;
         return v == 0 ? recommendedWorkerThreads() : Math.max(1, v);
