@@ -42,6 +42,7 @@
     "MixinDensityFunctionsAp2",
     "MixinDensityFunctionsBlendDensity",
     "MixinDensityFunctionsNoise",
+    "MixinDensityFunctionsShiftedNoise",
     "MixinDensityFunctionsConstant",
     "MixinDensityFunctionsBeardifierMarker",
     "MixinDensityFunctionsClamp",
