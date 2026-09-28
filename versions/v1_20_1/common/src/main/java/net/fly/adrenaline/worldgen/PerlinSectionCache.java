@@ -1,6 +1,8 @@
 package net.fly.adrenaline.worldgen;
 
 import java.util.IdentityHashMap;
+import net.fly.adrenaline.natives.BlendedNativeSampler;
+import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 
 public final class PerlinSectionCache {
@@ -14,6 +16,7 @@ public final class PerlinSectionCache {
     private final int yCount;
     private final int zCount;
     private final IdentityHashMap<Object, PerlinSection> sections = new IdentityHashMap<>();
+    private final IdentityHashMap<BlendedNoise, double[]> blendedSections = new IdentityHashMap<>();
 
     public PerlinSectionCache(int baseBlockX, int baseBlockY, int baseBlockZ, int cellWidth, int cellHeight, int xCount, int yCount, int zCount) {
         this.baseBlockX = baseBlockX;
@@ -47,6 +50,29 @@ public final class PerlinSectionCache {
             && zIndex >= 0 && zIndex < this.zCount
             && values.length == this.yCount
             && this.section(key, noise, xzScale, yScale).fillColumn(xIndex, zIndex, values);
+    }
+
+    public double valueAt(BlendedNoise noise, int blockX, int blockY, int blockZ, int xIndex, int zIndex) {
+        if (xIndex < 0 || xIndex >= this.xCount || zIndex < 0 || zIndex >= this.zCount
+            || blockX != this.baseBlockX + xIndex * this.cellWidth || blockZ != this.baseBlockZ + zIndex * this.cellWidth) {
+            return Double.NaN;
+        }
+        int yOffset = blockY - this.baseBlockY;
+        int yIndex = yOffset / this.cellHeight;
+        if (yOffset % this.cellHeight != 0 || yIndex < 0 || yIndex >= this.yCount) {
+            return Double.NaN;
+        }
+        double[] values = this.blendedSections.get(noise);
+        if (values == null) {
+            values = new double[this.xCount * this.yCount * this.zCount];
+            if (!BlendedNativeSampler.sampleGrid(((AdrenalineBlendedNoiseAccess) noise).adrenaline$getNativeData(),
+                this.baseBlockX, this.baseBlockY, this.baseBlockZ, this.cellWidth, this.cellHeight, this.cellWidth,
+                this.xCount, this.yCount, this.zCount, values)) {
+                values = new double[0];
+            }
+            this.blendedSections.put(noise, values);
+        }
+        return values.length == 0 ? Double.NaN : values[(xIndex * this.zCount + zIndex) * this.yCount + yIndex];
     }
 
     private PerlinSection section(Object key, NormalNoise noise, double xzScale, double yScale) {

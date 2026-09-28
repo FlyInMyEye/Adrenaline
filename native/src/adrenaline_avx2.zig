@@ -6,6 +6,10 @@ const c = @cImport({
 const std = @import("std");
 const native = @import("adrenaline_native.zig");
 
+pub export fn adrenaline_blended_noise_grid_avx2(min: [*]const u8, max: [*]const u8, main: [*]const u8, config: *const native.BlendedNoiseConfig, base_x: c.jint, base_y: c.jint, base_z: c.jint, step_x: c.jint, step_y: c.jint, step_z: c.jint, x_count: usize, y_count: usize, z_count: usize, values: [*]f64) callconv(.c) void {
+    native.blended_noise_grid_avx2(min, max, main, config, base_x, base_y, base_z, step_x, step_y, step_z, x_count, y_count, z_count, values[0 .. x_count * y_count * z_count]);
+}
+
 pub export fn adrenaline_normal_noise_batch_avx2(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, y_step: f64, count: usize, values: [*]f64) callconv(.c) void {
     native.normal_noise_batch_avx2(first, first_count, second, second_count, value_factor, x, y, z, y_step, values[0..count]);
 }

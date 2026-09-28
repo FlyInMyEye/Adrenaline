@@ -35,6 +35,7 @@
     "MixinNoiseChunk",
     "MixinNoiseInterpolator",
     "MixinNormalNoise",
+    "MixinBlendedNoise",
     "MixinCubicSplineMultipointInvoker",
     "MixinCubicSplineMultipoint",
     "MixinPerlinNoise",

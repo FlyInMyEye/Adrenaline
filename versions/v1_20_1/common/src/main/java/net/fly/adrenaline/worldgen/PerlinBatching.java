@@ -5,6 +5,7 @@ import java.util.function.DoubleSupplier;
 import net.fly.adrenaline.natives.PerlinNativeSampler;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
+import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 
 public final class PerlinBatching {
     private static final ThreadLocal<BatchContext> CONTEXT = new ThreadLocal<>();
@@ -33,6 +34,11 @@ public final class PerlinBatching {
     public static double tryGetSection(Object key, NormalNoise noise, double xzScale, double yScale, int blockX, int blockY, int blockZ) {
         SectionScope scope = SECTION_SCOPE.get();
         return scope.active ? scope.sections.valueAt(key, noise, xzScale, yScale, blockX, blockY, blockZ, scope.xIndex, scope.zIndex) : Double.NaN;
+    }
+
+    public static double tryGetSection(BlendedNoise noise, int blockX, int blockY, int blockZ) {
+        SectionScope scope = SECTION_SCOPE.get();
+        return scope.active ? scope.sections.valueAt(noise, blockX, blockY, blockZ, scope.xIndex, scope.zIndex) : Double.NaN;
     }
 
     public static boolean tryFillSection(Object key, NormalNoise noise, double xzScale, double yScale, double[] values, DensityFunction.ContextProvider provider) {

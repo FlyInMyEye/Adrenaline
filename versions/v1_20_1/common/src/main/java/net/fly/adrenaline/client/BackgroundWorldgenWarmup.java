@@ -48,6 +48,7 @@ public final class BackgroundWorldgenWarmup {
             }
             start(minecraft);
             if (warmupMode == AdrenalineConfig.WarmupMode.ON && running) {
+                // TODO: Keep rendering and processing window events during blocking warmup so the whole window does not freeze.
                 minecraft.managedBlock(() -> !running || server != null && (server.isReady() || server.isShutdown()));
                 stop(minecraft);
             }
