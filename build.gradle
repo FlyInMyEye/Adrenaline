@@ -76,6 +76,13 @@ tasks.register('buildNative') {
                     file('native/src/adrenaline_avx2.zig').absolutePath, '-femit-bin=' + avxObject.absolutePath
                 ])
                 linkInputs.add(avxObject.absolutePath)
+                def smallAvxObject = file("${library}.avx2-small.o")
+                runZig([
+                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
+                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
+                    file('native/src/adrenaline_avx2_small.zig').absolutePath, '-femit-bin=' + smallAvxObject.absolutePath
+                ])
+                linkInputs.add(smallAvxObject.absolutePath)
             }
             runZig(([
                 'build-lib', '-dynamic', '-lc', '-fPIC', '-O', 'ReleaseFast', '-target', target.triple,

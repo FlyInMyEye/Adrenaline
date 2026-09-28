@@ -6,6 +6,10 @@ const c = @cImport({
 const std = @import("std");
 const native = @import("adrenaline_native.zig");
 
+pub export fn adrenaline_normal_noise_batch_avx2(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, y_step: f64, count: usize, values: [*]f64) callconv(.c) void {
+    native.normal_noise_batch_avx2(first, first_count, second, second_count, value_factor, x, y, z, y_step, values[0..count]);
+}
+
 pub export fn adrenaline_normal_noise_grid_avx2(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, x_count: usize, y_count: usize, z_count: usize, values: [*]f64) callconv(.c) void {
     native.normal_noise_grid_avx2(first, first_count, second, second_count, value_factor, x, y, z, x_step, y_step, z_step, x_count, y_count, z_count, values[0 .. x_count * y_count * z_count]);
 }
