@@ -11,6 +11,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
 import net.fly.adrenaline.worldgen.DensityMapCache;
+import net.fly.adrenaline.worldgen.AdrenalineShiftedNoiseAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NativeCellDensityEvaluator;
@@ -23,7 +24,10 @@ import net.fly.adrenaline.worldgen.PerlinBatching;
 import net.fly.adrenaline.worldgen.PerlinSectionCache;
 import net.minecraft.core.QuartPos;
 import net.minecraft.server.level.ColumnPos;
+import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.DensityFunctions;
+import net.minecraft.world.level.levelgen.NoiseRouter;
 import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,6 +38,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(NoiseChunk.class)
 public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess, AdrenalineCellGridAccess, AdrenalineSectionNoiseAccess {
@@ -85,6 +90,29 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             this.adrenaline$densityMapCache = new DensityMapCache(visitor);
         }
         return this.adrenaline$densityMapCache;
+    }
+
+    @Inject(method = "cachedClimateSampler", at = @At("RETURN"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    private void adrenaline$cacheClimateColumns(NoiseRouter router, List<Climate.ParameterPoint> spawnTarget, CallbackInfoReturnable<Climate.Sampler> cir) {
+        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+            return;
+        }
+        Climate.Sampler sampler = cir.getReturnValue();
+        DensityFunction temperature = this.adrenaline$cacheClimateNoise(sampler.temperature());
+        DensityFunction humidity = this.adrenaline$cacheClimateNoise(sampler.humidity());
+        if (temperature != sampler.temperature() || humidity != sampler.humidity()) {
+            cir.setReturnValue(new Climate.Sampler(temperature, humidity, sampler.continentalness(), sampler.erosion(),
+                sampler.depth(), sampler.weirdness(), sampler.spawnTarget()));
+        }
+    }
+
+    @Unique
+    private DensityFunction adrenaline$cacheClimateNoise(DensityFunction function) {
+        if (function instanceof AdrenalineShiftedNoiseAccess shifted && shifted.adrenaline$isHeightIndependent()) {
+            return this.wrap(DensityFunctions.flatCache(function));
+        }
+        return function;
     }
 
     @Unique
