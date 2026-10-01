@@ -659,6 +659,10 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
         while (z_index < width) : (z_index += 1) {
             const z: i32 = base_z + @as(i32, @intCast(z_index));
             const column_index = x_index * width + z_index;
+            const cell_grid_x = @divFloor(x - 5, 16);
+            const cell_grid_z = @divFloor(z - 5, 16);
+            const local_grid_x = cell_grid_x - min_grid_x;
+            const local_grid_z = cell_grid_z - min_grid_z;
             var search: ?AquiferSearch = null;
             var fluid_bound_grid_y: i32 = std.math.minInt(i32);
             var maximum_fluid_level: i32 = std.math.minInt(i32);
@@ -692,8 +696,6 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
                     var cache_key: ?usize = null;
                     const local_grid_y = grid_y - min_grid_y;
                     if (cache_fluid_max) {
-                        const local_grid_x = @divFloor(x - 5, 16) - min_grid_x;
-                        const local_grid_z = @divFloor(z - 5, 16) - min_grid_z;
                         if (local_grid_x >= 0 and local_grid_x + 1 < grid_size_x and local_grid_z >= 0 and local_grid_z + 1 < grid_size_z and local_grid_y >= 1) {
                             const key = (@as(usize, @intCast(local_grid_y)) * @as(usize, @intCast(grid_size_z)) + @as(usize, @intCast(local_grid_z))) * @as(usize, @intCast(grid_size_x)) + @as(usize, @intCast(local_grid_x));
                             if (key < fluid_levels.len) cache_key = key;
@@ -705,11 +707,11 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
                             fluid_cache_ready = true;
                         }
                         if (fluid_max_cache[key] == std.math.minInt(i32)) {
-                            fluid_max_cache[key] = aquifer_maximum_fluid_level(fluid_levels, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, x, grid_y, z) orelse return null;
+                            fluid_max_cache[key] = aquifer_maximum_fluid_level(fluid_levels, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z) orelse return null;
                         }
                         maximum_fluid_level = fluid_max_cache[key];
                     } else {
-                        maximum_fluid_level = aquifer_maximum_fluid_level(fluid_levels, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, x, grid_y, z) orelse return null;
+                        maximum_fluid_level = aquifer_maximum_fluid_level(fluid_levels, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z) orelse return null;
                     }
                     fluid_bound_grid_y = grid_y;
                 }
@@ -722,10 +724,10 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
                     if (cached.grid_y == grid_y and advance_y_down(avx2, neon, cached, y)) {
                         break :block cached.candidates();
                     }
-                    search = aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, x, y, z) orelse return null;
+                    search = aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
                     break :block search.?.candidates();
                 } else block: {
-                    search = aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, x, y, z) orelse return null;
+                    search = aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
                     break :block search.?.candidates();
                 };
                 const nearest_type = aquifer_type_at(fluid_levels[candidates.nearest_index], fluid_types[candidates.nearest_index], y) orelse return null;
@@ -740,41 +742,44 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
                     materials[index] = 2 | 4;
                     continue;
                 }
-                if (aquifer_pressure_uses_barrier(y, fluid_levels[candidates.nearest_index], nearest_type, fluid_levels[candidates.second_index], second_type)) {
+                const near_second_pressure = aquifer_pressure(y, fluid_levels[candidates.nearest_index], nearest_type, fluid_levels[candidates.second_index], second_type, 0.0);
+                if (fluid_levels[candidates.nearest_index] != fluid_levels[candidates.second_index] and !((nearest_type == 3 and second_type == 2) or (nearest_type == 2 and second_type == 3)) and near_second_pressure >= -4.0 and near_second_pressure <= 4.0) {
                     if (deferred_count >= deferred_indices.len) return null;
                     deferred_indices[deferred_count] = @intCast(index);
                     deferred_count += 1;
                     pack_aquifer_candidates(candidate_values[index * 2 .. index * 2 + 2], candidates) orelse return null;
                     continue;
                 }
-                if (density[index] + nearest_similarity * aquifer_pressure(y, fluid_levels[candidates.nearest_index], nearest_type, fluid_levels[candidates.second_index], second_type, 0.0) > 0.0) {
+                if (density[index] + nearest_similarity * near_second_pressure > 0.0) {
                     continue;
                 }
 
                 const nearest_third_similarity = aquifer_similarity(candidates.nearest_distance, candidates.third_distance);
                 if (nearest_third_similarity > 0.0) {
-                    if (aquifer_pressure_uses_barrier(y, fluid_levels[candidates.nearest_index], nearest_type, fluid_levels[candidates.third_index], third_type)) {
+                    const near_third_pressure = aquifer_pressure(y, fluid_levels[candidates.nearest_index], nearest_type, fluid_levels[candidates.third_index], third_type, 0.0);
+                    if (fluid_levels[candidates.nearest_index] != fluid_levels[candidates.third_index] and !((nearest_type == 3 and third_type == 2) or (nearest_type == 2 and third_type == 3)) and near_third_pressure >= -4.0 and near_third_pressure <= 4.0) {
                         if (deferred_count >= deferred_indices.len) return null;
                         deferred_indices[deferred_count] = @intCast(index);
                         deferred_count += 1;
                         pack_aquifer_candidates(candidate_values[index * 2 .. index * 2 + 2], candidates) orelse return null;
                         continue;
                     }
-                    if (density[index] + nearest_similarity * nearest_third_similarity * aquifer_pressure(y, fluid_levels[candidates.nearest_index], nearest_type, fluid_levels[candidates.third_index], third_type, 0.0) > 0.0) {
+                    if (density[index] + nearest_similarity * nearest_third_similarity * near_third_pressure > 0.0) {
                         continue;
                     }
                 }
 
                 const second_third_similarity = aquifer_similarity(candidates.second_distance, candidates.third_distance);
                 if (second_third_similarity > 0.0) {
-                    if (aquifer_pressure_uses_barrier(y, fluid_levels[candidates.second_index], second_type, fluid_levels[candidates.third_index], third_type)) {
+                    const second_third_pressure = aquifer_pressure(y, fluid_levels[candidates.second_index], second_type, fluid_levels[candidates.third_index], third_type, 0.0);
+                    if (fluid_levels[candidates.second_index] != fluid_levels[candidates.third_index] and !((second_type == 3 and third_type == 2) or (second_type == 2 and third_type == 3)) and second_third_pressure >= -4.0 and second_third_pressure <= 4.0) {
                         if (deferred_count >= deferred_indices.len) return null;
                         deferred_indices[deferred_count] = @intCast(index);
                         deferred_count += 1;
                         pack_aquifer_candidates(candidate_values[index * 2 .. index * 2 + 2], candidates) orelse return null;
                         continue;
                     }
-                    if (density[index] + nearest_similarity * second_third_similarity * aquifer_pressure(y, fluid_levels[candidates.second_index], second_type, fluid_levels[candidates.third_index], third_type, 0.0) > 0.0) {
+                    if (density[index] + nearest_similarity * second_third_similarity * second_third_pressure > 0.0) {
                         continue;
                     }
                 }
@@ -932,7 +937,7 @@ const AquiferSearch = struct {
         var nearest_index: usize = 0;
         var second_index: usize = 0;
         var third_index: usize = 0;
-        inline for (0..12) |order_value| {
+        for (0..12) |order_value| {
             const distance = self.distances[order_value];
             const index = self.indices[order_value];
             if (distance <= nearest_distance) {
@@ -1056,10 +1061,7 @@ const AquiferCenters = struct {
     z: [12]i32,
 };
 
-fn aquifer_search_cached(cache: *[16]AquiferCenters, valid: *u16, packed_locations: []const c.jshort, min_grid_x: i32, min_grid_y: i32, min_grid_z: i32, grid_size_x: i32, grid_size_z: i32, x: i32, y: i32, z: i32) ?AquiferSearch {
-    const grid_x = @divFloor(x - 5, 16);
-    const grid_y = @divFloor(y + 1, 12);
-    const grid_z = @divFloor(z - 5, 16);
+fn aquifer_search_cached(cache: *[16]AquiferCenters, valid: *u16, packed_locations: []const c.jshort, min_grid_x: i32, min_grid_y: i32, min_grid_z: i32, grid_size_x: i32, grid_size_z: i32, grid_x: i32, grid_y: i32, grid_z: i32, x: i32, y: i32, z: i32) ?AquiferSearch {
     const slot: usize = @intCast((@as(u32, @bitCast(grid_y)) & 3) * 4 + (@as(u32, @bitCast(grid_x)) & 1) * 2 + (@as(u32, @bitCast(grid_z)) & 1));
     const mask: u16 = @as(u16, 1) << @as(u4, @intCast(slot));
     const centers = &cache[slot];
@@ -1109,9 +1111,7 @@ fn aquifer_search_cached(cache: *[16]AquiferCenters, valid: *u16, packed_locatio
     return result;
 }
 
-fn aquifer_maximum_fluid_level(fluid_levels: []const c.jint, min_grid_x: c.jint, min_grid_y: c.jint, min_grid_z: c.jint, grid_size_x: c.jint, grid_size_z: c.jint, x: i32, grid_y: i32, z: i32) ?i32 {
-    const grid_x = @divFloor(x - 5, 16);
-    const grid_z = @divFloor(z - 5, 16);
+fn aquifer_maximum_fluid_level(fluid_levels: []const c.jint, min_grid_x: c.jint, min_grid_y: c.jint, min_grid_z: c.jint, grid_size_x: c.jint, grid_size_z: c.jint, grid_x: i32, grid_y: i32, grid_z: i32) ?i32 {
     const local_grid_x = grid_x - min_grid_x;
     const local_grid_y = grid_y - min_grid_y;
     const local_grid_z = grid_z - min_grid_z;
@@ -1404,6 +1404,12 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
                             const corner0 = corner00 + fx * (corner10 - corner00);
                             const corner1 = corner01 + fx * (corner11 - corner01);
                             const row = ((height - 1 - direct_y) * width + direct_x) * width;
+                            if (width == 4) {
+                                const z4: Vec4 = @bitCast(interpolation_width[0..4].*);
+                                const result = @as(Vec4, @splat(corner0)) + z4 * @as(Vec4, @splat(corner1 - corner0));
+                                output[row..][0..4].* = @bitCast(result);
+                                continue;
+                            }
                             var direct_z: usize = 0;
                             while (direct_z < width) : (direct_z += 1) {
                                 const fz = interpolation_width[direct_z];
@@ -1563,6 +1569,17 @@ pub fn normal_noise_grid_avx2(first: [*]const u8, first_count: usize, second: [*
 }
 
 fn normal_noise_grid_impl(comptime avx2: bool, first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
+    if (y_step == 0.0 and y_count > 1) {
+        const columns = x_count * z_count;
+        normal_noise_grid_impl(avx2, first, first_count, second, second_count, value_factor, x, y, z, x_step, y_step, z_step, x_count, 1, z_count, values[0..columns]);
+        var column = columns;
+        while (column > 0) {
+            column -= 1;
+            const value = values[column];
+            @memset(values[column * y_count ..][0..y_count], value);
+        }
+        return;
+    }
     @memset(values, 0.0);
     perlin_value_grid(avx2, first, first_count, x, y, z, x_step, y_step, z_step, 1.0, x_count, y_count, z_count, values);
     perlin_value_grid(avx2, second, second_count, x, y, z, x_step, y_step, z_step, normal_noise_input_factor, x_count, y_count, z_count, values);
@@ -1956,6 +1973,16 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
             const sx = smoothstep(fx);
             const x_hash = permutation_value(permutation, integer_x);
             const next_x_hash = permutation_value(permutation, integer_x + 1);
+            var xy0: [max_grid_axis]i32 = undefined;
+            var xy1: [max_grid_axis]i32 = undefined;
+            var xn0: [max_grid_axis]i32 = undefined;
+            var xn1: [max_grid_axis]i32 = undefined;
+            for (integer_y[0..raw_y.len], 0..) |iy, j| {
+                xy0[j] = permutation_value(permutation, x_hash + iy);
+                xy1[j] = permutation_value(permutation, x_hash + iy + 1);
+                xn0[j] = permutation_value(permutation, next_x_hash + iy);
+                xn1[j] = permutation_value(permutation, next_x_hash + iy + 1);
+            }
             for (raw_z, 0..) |_, iz_index| {
                 const iz = integer_z[iz_index];
                 const fz = fraction_z[iz_index];
@@ -1978,11 +2005,11 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
                             const fade4: Vec4 = @bitCast(fade_y[i..][0..4].*);
                             const sampled = if (@reduce(.And, ys == @as(Vec4i, @splat(ys[0])))) block: {
                                 if (ys[0] != previous_y) {
-                                    line = GradientCell.init(permutation, x_hash, next_x_hash, ys[0], iz).line_paired(fx, fz);
+                                    line = GradientCell.init_cached(permutation, xy0[i], xy1[i], xn0[i], xn1[i], iz).line_paired(fx, fz);
                                     previous_y = ys[0];
                                 }
                                 break :block line.sample_smoothed_shifted4(y4, sx, fade4, sz);
-                            } else blended_sample(4, permutation, x_hash, next_x_hash, ys, iz, fx, y4, fz, sx, fade4, sz);
+                            } else blended_sample(4, permutation, @bitCast(xy0[i..][0..4].*), @bitCast(xy1[i..][0..4].*), @bitCast(xn0[i..][0..4].*), @bitCast(xn1[i..][0..4].*), iz, fx, y4, fz, sx, fade4, sz);
                             const current: Vec4 = @bitCast(output[i..][0..4].*);
                             output[i..][0..4].* = @bitCast(current + sampled / @as(Vec4, @splat(input_factor)));
                             i += 4;
@@ -1990,10 +2017,9 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
                         }
                     }
                     if (i + 1 < output.len and blended_active(kind, selector, i + 1) and integer_y[i] != integer_y[i + 1]) {
-                        const ys: @Vector(2, i32) = @bitCast(integer_y[i..][0..2].*);
                         const y2: Vec2 = @bitCast(adjusted_y[i..][0..2].*);
                         const fade2: Vec2 = @bitCast(fade_y[i..][0..2].*);
-                        const sampled = blended_sample(2, permutation, x_hash, next_x_hash, ys, iz, fx, y2, fz, sx, fade2, sz);
+                        const sampled = blended_sample(2, permutation, @bitCast(xy0[i..][0..2].*), @bitCast(xy1[i..][0..2].*), @bitCast(xn0[i..][0..2].*), @bitCast(xn1[i..][0..2].*), iz, fx, y2, fz, sx, fade2, sz);
                         const current: Vec2 = @bitCast(output[i..][0..2].*);
                         output[i..][0..2].* = @bitCast(current + sampled / @as(Vec2, @splat(input_factor)));
                         i += 2;
@@ -2001,7 +2027,7 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
                     }
                     const iy = integer_y[i];
                     if (iy != previous_y) {
-                        line = GradientCell.init(permutation, x_hash, next_x_hash, iy, iz).line_paired(fx, fz);
+                        line = GradientCell.init_cached(permutation, xy0[i], xy1[i], xn0[i], xn1[i], iz).line_paired(fx, fz);
                         previous_y = iy;
                     }
                     var end = i + 1;
@@ -2022,7 +2048,45 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
     }
 }
 
-fn blended_sample(comptime lanes: usize, permutation: [*]const u8, x_hash: i32, next_x_hash: i32, y: @Vector(lanes, i32), z: i32, fx: f64, fy: @Vector(lanes, f64), fz: f64, sx: f64, sy: @Vector(lanes, f64), sz: f64) @Vector(lanes, f64) {
+fn blended_sample(comptime lanes: usize, permutation: [*]const u8, xy: @Vector(lanes, i32), xy_next: @Vector(lanes, i32), next_xy: @Vector(lanes, i32), next_xy_next: @Vector(lanes, i32), z: i32, fx: f64, fy: @Vector(lanes, f64), fz: f64, sx: f64, sy: @Vector(lanes, f64), sz: f64) @Vector(lanes, f64) {
+    @setFloatMode(.strict);
+    const V = @Vector(lanes, f64);
+    var hashes: [8]@Vector(lanes, i32) = undefined;
+    inline for (0..lanes) |lane| {
+        hashes[0][lane] = permutation_value(permutation, xy[lane] + z);
+        hashes[1][lane] = permutation_value(permutation, next_xy[lane] + z);
+        hashes[2][lane] = permutation_value(permutation, xy_next[lane] + z);
+        hashes[3][lane] = permutation_value(permutation, next_xy_next[lane] + z);
+        hashes[4][lane] = permutation_value(permutation, xy[lane] + z + 1);
+        hashes[5][lane] = permutation_value(permutation, next_xy[lane] + z + 1);
+        hashes[6][lane] = permutation_value(permutation, xy_next[lane] + z + 1);
+        hashes[7][lane] = permutation_value(permutation, next_xy_next[lane] + z + 1);
+    }
+    const x0: V = @splat(fx);
+    const x1: V = @splat(fx - 1.0);
+    const y1 = fy - @as(V, @splat(1.0));
+    const z0: V = @splat(fz);
+    const z1: V = @splat(fz - 1.0);
+    const v000 = blended_gradient(lanes, hashes[0], x0, fy, z0);
+    const v100 = blended_gradient(lanes, hashes[1], x1, fy, z0);
+    const v010 = blended_gradient(lanes, hashes[2], x0, y1, z0);
+    const v110 = blended_gradient(lanes, hashes[3], x1, y1, z0);
+    const v001 = blended_gradient(lanes, hashes[4], x0, fy, z1);
+    const v101 = blended_gradient(lanes, hashes[5], x1, fy, z1);
+    const v011 = blended_gradient(lanes, hashes[6], x0, y1, z1);
+    const v111 = blended_gradient(lanes, hashes[7], x1, y1, z1);
+    return if (lanes == 4) lerp3_4(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111) else lerp3_2(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111);
+}
+
+fn blended_gradient(comptime lanes: usize, hash: @Vector(lanes, i32), x: @Vector(lanes, f64), y: @Vector(lanes, f64), z: @Vector(lanes, f64)) @Vector(lanes, f64) {
+    const I = @Vector(lanes, i32);
+    const h = hash & @as(I, @splat(15));
+    const u = @select(f64, h < @as(I, @splat(8)), x, y);
+    const v = @select(f64, h < @as(I, @splat(4)), y, @select(f64, (h == @as(I, @splat(12))) | (h == @as(I, @splat(14))), x, z));
+    return @select(f64, (h & @as(I, @splat(1))) == @as(I, @splat(0)), u, -u) + @select(f64, (h & @as(I, @splat(2))) == @as(I, @splat(0)), v, -v);
+}
+
+fn sample_distinct_y(comptime lanes: usize, permutation: [*]const u8, x_hash: i32, next_x_hash: i32, y: @Vector(lanes, i32), z: i32, fx: f64, fy: @Vector(lanes, f64), fz: f64, sx: f64, sy: @Vector(lanes, f64), sz: f64) @Vector(lanes, f64) {
     @setFloatMode(.strict);
     const V = @Vector(lanes, f64);
     var hashes: [8]@Vector(lanes, i32) = undefined;
@@ -2045,18 +2109,18 @@ fn blended_sample(comptime lanes: usize, permutation: [*]const u8, x_hash: i32, 
     const y1 = fy - @as(V, @splat(1.0));
     const z0: V = @splat(fz);
     const z1: V = @splat(fz - 1.0);
-    const v000 = blended_gradient(lanes, hashes[0], x0, fy, z0);
-    const v100 = blended_gradient(lanes, hashes[1], x1, fy, z0);
-    const v010 = blended_gradient(lanes, hashes[2], x0, y1, z0);
-    const v110 = blended_gradient(lanes, hashes[3], x1, y1, z0);
-    const v001 = blended_gradient(lanes, hashes[4], x0, fy, z1);
-    const v101 = blended_gradient(lanes, hashes[5], x1, fy, z1);
-    const v011 = blended_gradient(lanes, hashes[6], x0, y1, z1);
-    const v111 = blended_gradient(lanes, hashes[7], x1, y1, z1);
-    return if (lanes == 4) lerp3_4(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111) else lerp3_2(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111);
+    const v000 = gradient_vector(lanes, hashes[0], x0, fy, z0);
+    const v100 = gradient_vector(lanes, hashes[1], x1, fy, z0);
+    const v010 = gradient_vector(lanes, hashes[2], x0, y1, z0);
+    const v110 = gradient_vector(lanes, hashes[3], x1, y1, z0);
+    const v001 = gradient_vector(lanes, hashes[4], x0, fy, z1);
+    const v101 = gradient_vector(lanes, hashes[5], x1, fy, z1);
+    const v011 = gradient_vector(lanes, hashes[6], x0, y1, z1);
+    const v111 = gradient_vector(lanes, hashes[7], x1, y1, z1);
+    return if (lanes == 8) lerp3_8(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111) else if (lanes == 4) lerp3_4(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111) else lerp3_2(@splat(sx), sy, @splat(sz), v000, v100, v010, v110, v001, v101, v011, v111);
 }
 
-fn blended_gradient(comptime lanes: usize, hash: @Vector(lanes, i32), x: @Vector(lanes, f64), y: @Vector(lanes, f64), z: @Vector(lanes, f64)) @Vector(lanes, f64) {
+fn gradient_vector(comptime lanes: usize, hash: @Vector(lanes, i32), x: @Vector(lanes, f64), y: @Vector(lanes, f64), z: @Vector(lanes, f64)) @Vector(lanes, f64) {
     const I = @Vector(lanes, i32);
     const h = hash & @as(I, @splat(15));
     const u = @select(f64, h < @as(I, @splat(8)), x, y);
@@ -2121,6 +2185,38 @@ fn perlin_value_batch_impl(comptime paired: bool, data: [*]const u8, octaves: us
             while (index < values.len) {
                 var shifted_y: f64 = undefined;
                 var integer_y: i32 = undefined;
+                if (comptime avx_only and !small_only) {
+                    if (index + 7 < values.len and @abs(y_step * coordinate_scale * input_factor) >= 1.0) {
+                        const indices: Vec8d = @floatFromInt(@as(Vec8i, .{ @intCast(index), @intCast(index + 1), @intCast(index + 2), @intCast(index + 3), @intCast(index + 4), @intCast(index + 5), @intCast(index + 6), @intCast(index + 7) }));
+                        const sample_y4 = @as(Vec8d, @splat(y)) + indices * @as(Vec8d, @splat(y_step));
+                        const scaled4 = sample_y4 * @as(Vec8d, @splat(coordinate_scale)) * @as(Vec8d, @splat(input_factor));
+                        const wrapped4 = if (no_wrap_y) scaled4 - @as(Vec8d, @splat(0.0)) else scaled4 - @floor(scaled4 / @as(Vec8d, @splat(33554432.0)) + @as(Vec8d, @splat(0.5))) * @as(Vec8d, @splat(33554432.0));
+                        const shifted4 = wrapped4 + @as(Vec8d, @splat(yo));
+                        const cells: Vec8i = @intFromFloat(@floor(shifted4));
+                        const fy = shifted4 - @as(Vec8d, @floatFromInt(cells));
+                        const smooth: Vec8d = .{ smoothstep(fy[0]), smoothstep(fy[1]), smoothstep(fy[2]), smoothstep(fy[3]), smoothstep(fy[4]), smoothstep(fy[5]), smoothstep(fy[6]), smoothstep(fy[7]) };
+                        const sampled = sample_distinct_y(8, permutation, x_hash, next_x_hash, cells, integer_z, fraction_x, fy, fraction_z, smooth_x, smooth, smooth_z);
+                        const current: Vec8d = @bitCast(values[index..][0..8].*);
+                        values[index..][0..8].* = @bitCast(current + @as(Vec8d, @splat(amplitude)) * sampled * @as(Vec8d, @splat(value_factor)));
+                        index += 8;
+                        continue;
+                    }
+                    if (index + 3 < values.len and @abs(y_step * coordinate_scale * input_factor) >= 1.0) {
+                        const indices: Vec4 = @floatFromInt(@as(Vec4i, .{ @intCast(index), @intCast(index + 1), @intCast(index + 2), @intCast(index + 3) }));
+                        const sample_y4 = @as(Vec4, @splat(y)) + indices * @as(Vec4, @splat(y_step));
+                        const scaled4 = sample_y4 * @as(Vec4, @splat(coordinate_scale)) * @as(Vec4, @splat(input_factor));
+                        const wrapped4 = if (no_wrap_y) scaled4 - @as(Vec4, @splat(0.0)) else scaled4 - @floor(scaled4 / @as(Vec4, @splat(33554432.0)) + @as(Vec4, @splat(0.5))) * @as(Vec4, @splat(33554432.0));
+                        const shifted4 = wrapped4 + @as(Vec4, @splat(yo));
+                        const cells: Vec4i = @intFromFloat(@floor(shifted4));
+                        const fy = shifted4 - @as(Vec4, @floatFromInt(cells));
+                        const smooth: Vec4 = .{ smoothstep(fy[0]), smoothstep(fy[1]), smoothstep(fy[2]), smoothstep(fy[3]) };
+                        const sampled = sample_distinct_y(4, permutation, x_hash, next_x_hash, cells, integer_z, fraction_x, fy, fraction_z, smooth_x, smooth, smooth_z);
+                        const current: Vec4 = @bitCast(values[index..][0..4].*);
+                        values[index..][0..4].* = @bitCast(current + @as(Vec4, @splat(amplitude)) * sampled * @as(Vec4, @splat(value_factor)));
+                        index += 4;
+                        continue;
+                    }
+                }
                 if (comptime small_only) {
                     if (index + 15 < values.len and @abs(y_step * coordinate_scale * input_factor) < 0.25) {
                         const indices: Vec16d = @floatFromInt(@as(Vec16i, .{ @intCast(index + 0), @intCast(index + 1), @intCast(index + 2), @intCast(index + 3), @intCast(index + 4), @intCast(index + 5), @intCast(index + 6), @intCast(index + 7), @intCast(index + 8), @intCast(index + 9), @intCast(index + 10), @intCast(index + 11), @intCast(index + 12), @intCast(index + 13), @intCast(index + 14), @intCast(index + 15) }));
@@ -2228,7 +2324,23 @@ fn perlin_value_batch_impl(comptime paired: bool, data: [*]const u8, octaves: us
     }
 }
 
-fn perlin_value_grid(comptime avx2: bool, data: [*]const u8, octaves: usize, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, coordinate_scale: f64, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
+inline fn perlin_value_grid(comptime avx2: bool, data: [*]const u8, octaves: usize, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, coordinate_scale: f64, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
+    if (comptime avx2) {
+        const last_factor = read_f64(data, 8) * @as(f64, @floatFromInt(@as(u64, 1) << @as(u6, @intCast(octaves -| 1))));
+        if (y_count == 1 or @abs(y_step * coordinate_scale * last_factor) >= 1.0) {
+            if (comptime avx2) {
+                if (z_count >= 4 and y_count > 1 and @abs(z_step * coordinate_scale * read_f64(data, 8)) < 1.0) return perlin_value_grid_impl(avx2, true, true, data, octaves, x, y, z, x_step, y_step, z_step, coordinate_scale, x_count, y_count, z_count, values);
+            }
+            return perlin_value_grid_impl(avx2, true, false, data, octaves, x, y, z, x_step, y_step, z_step, coordinate_scale, x_count, y_count, z_count, values);
+        }
+    }
+    if (comptime avx2) {
+        if (z_count >= 4 and y_count > 1 and @abs(z_step * coordinate_scale * read_f64(data, 8)) < 1.0) return perlin_value_grid_impl(avx2, false, true, data, octaves, x, y, z, x_step, y_step, z_step, coordinate_scale, x_count, y_count, z_count, values);
+    }
+    return perlin_value_grid_impl(avx2, false, false, data, octaves, x, y, z, x_step, y_step, z_step, coordinate_scale, x_count, y_count, z_count, values);
+}
+
+fn perlin_value_grid_impl(comptime avx2: bool, comptime packed_corners: bool, comptime z4_enabled: bool, data: [*]const u8, octaves: usize, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, coordinate_scale: f64, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
     @setFloatMode(.strict);
     if (x_count > max_grid_axis or y_count > max_grid_axis or z_count > max_grid_axis) {
         var x_index: usize = 0;
@@ -2287,8 +2399,30 @@ fn perlin_value_grid(comptime avx2: bool, data: [*]const u8, octaves: usize, x: 
                         var x_index = x_start;
                         while (x_index < x_end) : (x_index += 1) {
                             var z_index = z_start;
+                            if (comptime avx2 and z4_enabled) {
+                                while (z_index + 3 < z_end and y_end > y_start + 1) : (z_index += 4) {
+                                    const fz4: Vec4 = @bitCast(fraction_z[z_index..][0..4].*);
+                                    const sz4: Vec4 = @bitCast(smooth_z[z_index..][0..4].*);
+                                    const line4 = gradients.line_z4(fraction_x[x_index], fz4);
+                                    var yi = y_start;
+                                    while (yi < y_end) : (yi += 1) {
+                                        const sampled = line4.sample(fraction_y[yi], smooth_x[x_index], smooth_y[yi], sz4);
+                                        const first_index = (x_index * z_count + z_index) * y_count + yi;
+                                        const current: Vec4 = .{ values[first_index], values[first_index + y_count], values[first_index + 2 * y_count], values[first_index + 3 * y_count] };
+                                        const result = current + @as(Vec4, @splat(amplitude)) * sampled * @as(Vec4, @splat(value_factor));
+                                        values[first_index] = result[0];
+                                        values[first_index + y_count] = result[1];
+                                        values[first_index + 2 * y_count] = result[2];
+                                        values[first_index + 3 * y_count] = result[3];
+                                    }
+                                }
+                            }
                             while (z_index < z_end) : (z_index += 1) {
                                 const offset = (x_index * z_count + z_index) * y_count;
+                                if (packed_corners and y_end == y_start + 1) {
+                                    values[offset + y_start] += amplitude * gradients.sample_packed(fraction_x[x_index], fraction_y[y_start], fraction_z[z_index], smooth_x[x_index], smooth_y[y_start], smooth_z[z_index]) * value_factor;
+                                    continue;
+                                }
                                 const line = if (x_count * y_count * z_count >= 256)
                                     gradients.line_paired(fraction_x[x_index], fraction_z[z_index])
                                 else
@@ -2507,6 +2641,31 @@ const GradientCell = struct {
         } };
     }
 
+    fn init_cached(permutation: [*]const u8, xy: i32, xy_next: i32, next_xy: i32, next_xy_next: i32, z: i32) GradientCell {
+        return .{ .values = .{
+            permutation_value(permutation, xy + z),          permutation_value(permutation, next_xy + z),
+            permutation_value(permutation, xy_next + z),     permutation_value(permutation, next_xy_next + z),
+            permutation_value(permutation, xy + z + 1),      permutation_value(permutation, next_xy + z + 1),
+            permutation_value(permutation, xy_next + z + 1), permutation_value(permutation, next_xy_next + z + 1),
+        } };
+    }
+
+    fn sample_packed(self: GradientCell, x: f64, y: f64, z: f64, sx: f64, sy: f64, sz: f64) f64 {
+        @setFloatMode(.strict);
+        const hashes: Vec8i = @bitCast(self.values);
+        const xx: Vec8d = .{ x, x - 1.0, x, x - 1.0, x, x - 1.0, x, x - 1.0 };
+        const yy: Vec8d = .{ y, y, y - 1.0, y - 1.0, y, y, y - 1.0, y - 1.0 };
+        const zz: Vec8d = .{ z, z, z, z, z - 1.0, z - 1.0, z - 1.0, z - 1.0 };
+        const dots = gradient_vector(8, hashes, xx, yy, zz);
+        const x0 = @shuffle(f64, dots, undefined, @as(@Vector(4, i32), .{ 0, 2, 4, 6 }));
+        const x1 = @shuffle(f64, dots, undefined, @as(@Vector(4, i32), .{ 1, 3, 5, 7 }));
+        const vx = x0 + @as(Vec4, @splat(sx)) * (x1 - x0);
+        const y0 = @shuffle(f64, vx, undefined, @as(@Vector(2, i32), .{ 0, 2 }));
+        const y1 = @shuffle(f64, vx, undefined, @as(@Vector(2, i32), .{ 1, 3 }));
+        const vy = y0 + @as(Vec2, @splat(sy)) * (y1 - y0);
+        return vy[0] + sz * (vy[1] - vy[0]);
+    }
+
     fn sample(self: GradientCell, fraction_x: f64, fraction_y: f64, fraction_z: f64) f64 {
         const value000 = gradient(self.values[0], fraction_x, fraction_y, fraction_z);
         const value100 = gradient(self.values[1], fraction_x - 1.0, fraction_y, fraction_z);
@@ -2539,6 +2698,22 @@ const GradientCell = struct {
         return .{ .values = .{
             pair00[0], pair10[0], pair00[1], pair10[1],
             pair01[0], pair11[0], pair01[1], pair11[1],
+        } };
+    }
+
+    fn line_z4(self: GradientCell, fraction_x: f64, fraction_z: Vec4) GradientLineZ4 {
+        const fx0: Vec4 = @splat(fraction_x);
+        const fx1: Vec4 = @splat(fraction_x - 1.0);
+        const fz1 = fraction_z - @as(Vec4, @splat(1.0));
+        return .{ .values = .{
+            gradient_term_z4(self.values[0], fx0, fraction_z),
+            gradient_term_z4(self.values[1], fx1, fraction_z),
+            gradient_term_z4(self.values[2], fx0, fraction_z),
+            gradient_term_z4(self.values[3], fx1, fraction_z),
+            gradient_term_z4(self.values[4], fx0, fz1),
+            gradient_term_z4(self.values[5], fx1, fz1),
+            gradient_term_z4(self.values[6], fx0, fz1),
+            gradient_term_z4(self.values[7], fx1, fz1),
         } };
     }
 
@@ -2661,6 +2836,50 @@ const GradientLine = struct {
         return lerp3_4(@splat(smooth_x), smooth_y, @splat(smooth_z), self.values[0].sample_shifted4(y0), self.values[1].sample_shifted4(y0), self.values[2].sample_shifted4(y1), self.values[3].sample_shifted4(y1), self.values[4].sample_shifted4(y0), self.values[5].sample_shifted4(y0), self.values[6].sample_shifted4(y1), self.values[7].sample_shifted4(y1));
     }
 };
+
+const GradientTermZ4 = struct {
+    base: Vec4,
+    mode: enum { none, add, subtract },
+
+    fn sample(self: GradientTermZ4, shifted: Vec4) Vec4 {
+        return switch (self.mode) {
+            .none => self.base,
+            .add => self.base + shifted,
+            .subtract => self.base - shifted,
+        };
+    }
+};
+
+const GradientLineZ4 = struct {
+    values: [8]GradientTermZ4,
+
+    fn sample(self: GradientLineZ4, y: f64, sx: f64, sy: f64, sz: Vec4) Vec4 {
+        const y0: Vec4 = @splat(y + 0.0);
+        const y1: Vec4 = @splat(y + -1.0);
+        return lerp3_4(@splat(sx), @splat(sy), sz, self.values[0].sample(y0), self.values[1].sample(y0), self.values[2].sample(y1), self.values[3].sample(y1), self.values[4].sample(y0), self.values[5].sample(y0), self.values[6].sample(y1), self.values[7].sample(y1));
+    }
+};
+
+fn gradient_term_z4(value: i32, x: Vec4, z: Vec4) GradientTermZ4 {
+    return switch (value & 15) {
+        0 => .{ .base = x, .mode = .add },
+        1 => .{ .base = -x, .mode = .add },
+        2 => .{ .base = x, .mode = .subtract },
+        3 => .{ .base = -x, .mode = .subtract },
+        4 => .{ .base = x + z, .mode = .none },
+        5 => .{ .base = -x + z, .mode = .none },
+        6 => .{ .base = x - z, .mode = .none },
+        7 => .{ .base = -x - z, .mode = .none },
+        8 => .{ .base = z, .mode = .add },
+        9 => .{ .base = z, .mode = .subtract },
+        10 => .{ .base = -z, .mode = .add },
+        11 => .{ .base = -z, .mode = .subtract },
+        12 => .{ .base = x, .mode = .add },
+        13 => .{ .base = z, .mode = .subtract },
+        14 => .{ .base = -x, .mode = .add },
+        else => .{ .base = -z, .mode = .subtract },
+    };
+}
 
 fn gradient_term(value: i32, x: f64, z: f64, y_offset: f64) GradientTerm {
     _ = y_offset;
