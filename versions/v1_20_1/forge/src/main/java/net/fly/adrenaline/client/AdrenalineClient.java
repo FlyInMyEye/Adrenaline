@@ -25,7 +25,6 @@ public final class AdrenalineClient {
         MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onClientTick);
         if (BuildConfig.DEBUG) {
             MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onRenderGui);
-            MinecraftForge.EVENT_BUS.register(new BuildWarningOverlay());
             MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());
         }
 
@@ -41,6 +40,7 @@ public final class AdrenalineClient {
     }
 
     private static void onRenderGui(RenderGuiEvent.Post event) {
+        BuildWarningOverlay.renderGui(event.getGuiGraphics());
         WorldgenDifferenceHud.render(event.getGuiGraphics());
     }
 }
