@@ -80,6 +80,7 @@
     "MixinLevelStorageSource",
     "MixinDirectoryLock",
     "MixinGui",
+    "MixinDebugScreenOverlay",
     "MixinLevelSummary",
     "MixinMinecraft",
     "MixinReceivingLevelScreen",
