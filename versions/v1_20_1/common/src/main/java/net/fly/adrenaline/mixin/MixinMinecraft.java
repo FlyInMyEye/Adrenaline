@@ -61,6 +61,7 @@ public class MixinMinecraft {
 
     @Inject(method = "destroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;close()V"))
     private void adrenaline$finishBackgroundSaveBeforeShutdown(CallbackInfo ci) {
+        BackgroundWorldgenWarmup.stop((Minecraft) (Object) this);
         BackgroundWorldSave.awaitCompletion();
     }
 

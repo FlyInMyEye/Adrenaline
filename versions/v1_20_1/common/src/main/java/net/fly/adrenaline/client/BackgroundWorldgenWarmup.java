@@ -1,21 +1,34 @@
 package net.fly.adrenaline.client;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
+import net.fly.adrenaline.util.WarmupResourceLoading;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.WorldLoader;
+import net.minecraft.server.WorldStem;
+import net.minecraft.server.packs.repository.PackRepository;
+import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
 import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.presets.WorldPresets;
+import net.minecraft.world.level.storage.LevelStorageSource;
+import net.minecraft.world.level.storage.PrimaryLevelData;
 
 public final class BackgroundWorldgenWarmup {
 
@@ -27,39 +40,36 @@ public final class BackgroundWorldgenWarmup {
     private static boolean running;
     private static String levelId;
     private static volatile IntegratedServer server;
+    private static CompletableFuture<WorldStem> loading;
 
     public void tick(Minecraft minecraft) {
         if (!ClientResourceReloadState.isReady()) {
             return;
         }
         Screen screen = minecraft.screen;
-        if (!AdrenalineConfig.prepareWorldCreationContext() && WorldCreationContextWaiter.get() != null) {
+        if (!AdrenalineConfig.prepareWorldCreationContext()) {
             WorldCreationContextWaiter.consume();
         }
         AdrenalineConfig.WarmupMode warmupMode = AdrenalineConfig.warmupMode();
-        boolean completed = server != null && server.isReady();
+        boolean completed = server != null && (server.isReady() || server.isShutdown());
         if (running && (warmupMode == AdrenalineConfig.WarmupMode.OFF || completed || screen instanceof ConnectScreen)) {
             stop(minecraft);
         }
         if (!started && warmupMode != AdrenalineConfig.WarmupMode.OFF && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning()) {
             started = true;
-            if (AdrenalineConfig.prepareWorldCreationContext()) {
-                WorldCreationContextWaiter.preload(minecraft);
-            }
             start(minecraft);
-            if (warmupMode == AdrenalineConfig.WarmupMode.ON && running) {
-                // TODO: Keep rendering and processing window events during blocking warmup so the whole window does not freeze.
-                minecraft.managedBlock(() -> !running || server != null && (server.isReady() || server.isShutdown()));
-                stop(minecraft);
-            }
         }
-        if (started && !running && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning() && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
+        if ((!running || server != null) && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning() && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
             WorldCreationContextWaiter.preload(minecraft);
         }
     }
 
     public static boolean isRunning() {
         return running || WorldCreationContextWaiter.isPreloading();
+    }
+
+    public static boolean isBlocking() {
+        return running && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON;
     }
 
     public static String branding() {
@@ -99,10 +109,14 @@ public final class BackgroundWorldgenWarmup {
         WARMUP_CALL.remove();
         IntegratedServer detachedServer = server;
         server = null;
+        boolean pendingLoad = loading != null;
+        loading = null;
         if (detachedServer != null) {
             detachedServer.halt(false);
         }
-        WorldDeletion.deleteAsync(minecraft, detachedServer, levelId);
+        if (!pendingLoad) {
+            WorldDeletion.deleteAsync(minecraft, detachedServer, levelId);
+        }
     }
 
     public static void exitWorldLoad(String exitedLevelId) {
@@ -113,7 +127,6 @@ public final class BackgroundWorldgenWarmup {
 
     private static void start(Minecraft minecraft) {
         running = true;
-        BackgroundWorldgenWarmupState.begin();
         levelId = LEVEL_PREFIX + UUID.randomUUID().toString().replace("-", "");
         server = null;
 
@@ -126,17 +139,86 @@ public final class BackgroundWorldgenWarmup {
             new GameRules(),
             WorldDataConfiguration.DEFAULT
         );
-        // TODO: Skip recipes, advancements, and other data unnecessary for worldgen warmup during world loading.
-        minecraft.createWorldOpenFlows().createFreshLevel(
-            levelId,
-            settings,
-            WorldOptions.defaultWithRandomSeed(),
-            WorldPresets::createNormalWorldDimensions
+        String warmupLevelId = levelId;
+        LevelStorageSource.LevelStorageAccess access;
+        try {
+            access = minecraft.getLevelSource().validateAndCreateAccess(warmupLevelId);
+        } catch (Exception failure) {
+            GlobalCommon.LOGGER.warn("Failed to create warmup world", failure);
+            stop(minecraft);
+            return;
+        }
+        PackRepository packs = ServerPacksSource.createPackRepository(access);
+        WorldOptions options = WorldOptions.defaultWithRandomSeed();
+        CompletableFuture<WorldStem> current = WarmupResourceLoading.load(
+            new WorldLoader.InitConfig(new WorldLoader.PackConfig(packs, settings.getDataConfiguration(), false, false), Commands.CommandSelection.INTEGRATED, 2),
+            context -> {
+                WorldDimensions.Complete dimensions = WorldPresets.createNormalWorldDimensions(context.datapackWorldgen())
+                    .bake(context.datapackDimensions().registryOrThrow(Registries.LEVEL_STEM));
+                return new WorldLoader.DataLoadOutput<>(
+                    new PrimaryLevelData(settings, options, dimensions.specialWorldProperty(), dimensions.lifecycle()),
+                    dimensions.dimensionsRegistryAccess()
+                );
+            },
+            WorldStem::new,
+            Util.backgroundExecutor(),
+            minecraft
         );
-        if (running && server == null) {
-            running = false;
-            BackgroundWorldgenWarmupState.end();
-            WorldDeletion.deleteAsync(minecraft, null, levelId);
+        loading = current;
+        current.whenCompleteAsync((stem, failure) -> {
+            if (loading != current || !minecraft.isRunning()) {
+                closeLoad(access, stem);
+                WorldDeletion.deleteAsync(minecraft, null, warmupLevelId);
+                return;
+            }
+            if (minecraft.screen instanceof ConnectScreen || minecraft.getSingleplayerServer() != null || AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.OFF) {
+                stop(minecraft);
+                closeLoad(access, stem);
+                WorldDeletion.deleteAsync(minecraft, null, warmupLevelId);
+                return;
+            }
+            loading = null;
+            if (failure != null) {
+                GlobalCommon.LOGGER.warn("Failed to load warmup world", failure);
+                closeLoad(access, stem);
+                stop(minecraft);
+                return;
+            }
+            BackgroundWorldgenWarmupState.begin();
+            try {
+                minecraft.doWorldLoad(warmupLevelId, access, packs, stem, true);
+            } catch (RuntimeException launchFailure) {
+                GlobalCommon.LOGGER.warn("Failed to start warmup server", launchFailure);
+                if (server == null) {
+                    server = minecraft.getSingleplayerServer();
+                    if (server != null) {
+                        minecraft.clearLevel(minecraft.screen);
+                    } else {
+                        closeLoad(access, stem);
+                    }
+                }
+                stop(minecraft);
+                return;
+            } finally {
+                WARMUP_CALL.remove();
+            }
+            if (server == null) {
+                closeLoad(access, stem);
+                stop(minecraft);
+            } else if (AdrenalineConfig.prepareWorldCreationContext()) {
+                WorldCreationContextWaiter.preload(minecraft);
+            }
+        }, minecraft);
+    }
+
+    private static void closeLoad(LevelStorageSource.LevelStorageAccess access, WorldStem stem) {
+        if (stem != null) {
+            stem.close();
+        }
+        try {
+            access.close();
+        } catch (Exception failure) {
+            GlobalCommon.LOGGER.warn("Failed to close warmup world", failure);
         }
     }
 

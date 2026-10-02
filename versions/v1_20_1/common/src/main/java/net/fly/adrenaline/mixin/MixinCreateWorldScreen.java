@@ -50,15 +50,15 @@ public abstract class MixinCreateWorldScreen extends Screen {
 
     @Inject(method = "queueLoadScreen", at = @At("HEAD"), cancellable = true)
     private static void adrenaline$suppressPreloadMessage(Minecraft minecraft, Component message, CallbackInfo ci) {
-        if (WorldCreationContextWaiter.isPreloading()) {
+        if (WorldCreationContextWaiter.isCapturingPreload()) {
             ci.cancel();
         }
     }
 
-    @Redirect(method = "openFresh", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V"))
-    private static void adrenaline$suppressPreloadScreen(Minecraft minecraft, Screen screen) {
-        if (!WorldCreationContextWaiter.isPreloading()) {
-            minecraft.setScreen(screen);
+    @Inject(method = "openFresh", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;managedBlock(Ljava/util/function/BooleanSupplier;)V"), cancellable = true)
+    private static void adrenaline$finishPreloadLaunch(Minecraft minecraft, Screen parent, CallbackInfo ci) {
+        if (WorldCreationContextWaiter.isCapturingPreload()) {
+            ci.cancel();
         }
     }
 

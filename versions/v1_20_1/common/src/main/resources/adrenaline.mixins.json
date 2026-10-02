@@ -5,6 +5,8 @@
   "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "MixinWarmupReloadListener",
+    "MixinWorldLoader",
     "MixinChunkMap",
     "MixinChunkMapMaintenanceInvoker",
     "MixinChunkStorageAccessor",
@@ -67,6 +69,7 @@
     "MixinNoiseChunkOreVeinifier"
   ],
   "client": [
+    "MixinLoadingOverlay",
     "MixinIntegratedServerPausedChunkMaintenance",
     "MixinBackgroundWorldSave",
     "MixinCreateWorldScreen",

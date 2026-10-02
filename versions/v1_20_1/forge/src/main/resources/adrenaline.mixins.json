@@ -6,6 +6,8 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "adrenaline.refmap.json",
   "mixins": [
+    "MixinWarmupReloadListener",
+    "MixinWorldLoader",
     "MixinChunkMap",
     "MixinChunkMapMaintenanceInvoker",
     "MixinChunkStorageAccessor",
@@ -68,6 +70,8 @@
     "MixinNoiseChunkOreVeinifier"
   ],
   "client": [
+    "MixinLoadingOverlay",
+    "MixinForgeLoadingOverlay",
     "MixinIntegratedServerPausedChunkMaintenance",
     "MixinBrandingControl",
     "MixinBackgroundWorldSave",
