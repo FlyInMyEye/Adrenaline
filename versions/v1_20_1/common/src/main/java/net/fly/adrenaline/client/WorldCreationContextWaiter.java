@@ -2,6 +2,7 @@ package net.fly.adrenaline.client;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.util.WorldgenPreparation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -11,8 +12,8 @@ import net.minecraft.server.WorldLoader;
 public final class WorldCreationContextWaiter {
 
     private static CompletableFuture<WorldCreationContext> future;
-    private static boolean preloading;
     private static boolean worldLoadActive;
+    private static boolean capturingPreload;
 
     private WorldCreationContextWaiter() {
     }
@@ -24,6 +25,10 @@ public final class WorldCreationContextWaiter {
 
     public static void set(WorldCreationContext context) {
         future = CompletableFuture.completedFuture(context);
+        prepare(context);
+    }
+
+    private static void prepare(WorldCreationContext context) {
         if (context.options().generateStructures()) {
             WorldgenPreparation.prepare(context.selectedDimensions().overworld(), context.worldgenLoadContext(), context.options().seed());
         } else {
@@ -32,24 +37,40 @@ public final class WorldCreationContextWaiter {
     }
 
     public static boolean isPreloading() {
-        return preloading;
+        return future != null && !future.isDone();
     }
 
     public static boolean canPreload() {
-        return !worldLoadActive && !preloading && get() == null;
+        return !worldLoadActive && future == null;
+    }
+
+    public static boolean isCapturingPreload() {
+        return capturingPreload;
     }
 
     public static void preload(Minecraft minecraft) {
-        if (preloading || future != null && !future.isCompletedExceptionally()) {
+        if (!canPreload()) {
             return;
         }
-        future = null;
-        preloading = true;
+        capturingPreload = true;
         try {
             CreateWorldScreen.openFresh(minecraft, minecraft.screen);
         } finally {
-            preloading = false;
+            capturingPreload = false;
         }
+        CompletableFuture<WorldCreationContext> current = future;
+        if (current == null) {
+            return;
+        }
+        current.whenCompleteAsync((context, failure) -> {
+            if (future == current) {
+                if (failure == null) {
+                    prepare(context);
+                } else {
+                    GlobalCommon.LOGGER.warn("Failed to prepare world creation context", failure);
+                }
+            }
+        }, minecraft);
     }
 
     @SuppressWarnings("unchecked")
@@ -61,13 +82,10 @@ public final class WorldCreationContextWaiter {
         Executor gameExecutor
     ) {
         if (future == null || future.isCompletedExceptionally()) {
-            future = (CompletableFuture<WorldCreationContext>) (CompletableFuture<?>) WorldLoader.load(
-                initConfig,
-                dataSupplier,
-                resultFactory,
-                backgroundExecutor,
-                gameExecutor
-            );
+            future = (CompletableFuture<WorldCreationContext>) (CompletableFuture<?>) CompletableFuture.supplyAsync(
+                () -> WorldLoader.load(initConfig, dataSupplier, resultFactory, backgroundExecutor, gameExecutor),
+                backgroundExecutor
+            ).thenCompose(current -> current);
         }
         return (CompletableFuture<R>) (CompletableFuture<?>) future;
     }
