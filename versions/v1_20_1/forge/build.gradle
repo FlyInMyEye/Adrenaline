@@ -25,6 +25,7 @@ def forgeVersionRange = '[47,)'
 def loaderVersionRange = '[47,)'
 def prodBuild = providers.gradleProperty('prodBuild').map { it.toBoolean() }.orElse(false)
 def generatedBuildConfigDir = layout.buildDirectory.dir('generated/sources/buildConfig/java')
+def generatedForgeMixinsDir = layout.buildDirectory.dir('generated/resources/forgeMixins')
 
 version = modVersion
 group = modGroupId
@@ -111,6 +112,32 @@ public final class BuildConfig {
 """
     }
 }
+
+def generateForgeMixinConfigs = tasks.register('generateForgeMixinConfigs') {
+    def sharedMixinConfigs = files(
+        "../common/src/main/resources/${modId}.mixins.json",
+        "../common/src/main/resources/${modId}.levelgen.mixins.json"
+    )
+    inputs.files(sharedMixinConfigs)
+    inputs.property('refmap', "${modId}.refmap.json")
+    outputs.dir(generatedForgeMixinsDir)
+    doLast {
+        File outputDirectory = generatedForgeMixinsDir.get().asFile
+        delete(outputDirectory)
+        outputDirectory.mkdirs()
+        sharedMixinConfigs.each { inputFile ->
+            def config = new groovy.json.JsonSlurper().parse(inputFile)
+            config.refmap = "${modId}.refmap.json".toString()
+            if (inputFile.name == "${modId}.mixins.json") {
+                config.client.removeAll(['MixinGui', 'MixinDebugScreenOverlay', 'MixinTitleScreenBranding'])
+                config.client.addAll(['MixinForgeLoadingOverlay', 'MixinBrandingControl'])
+            }
+            new File(outputDirectory, inputFile.name).text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(config)) + '\n'
+        }
+    }
+}
+
+sourceSets.main.resources.srcDir(generateForgeMixinConfigs)
 
 tasks.named('compileJava', JavaCompile).configure {
     dependsOn tasks.named('generateBuildConfig')
