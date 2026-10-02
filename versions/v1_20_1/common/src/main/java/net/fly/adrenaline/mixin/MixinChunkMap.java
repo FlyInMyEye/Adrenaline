@@ -3,7 +3,12 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.mojang.datafixers.util.Either;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
@@ -12,6 +17,7 @@ import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.scheduler.PendingChunkStatusAccess;
 import net.fly.adrenaline.util.WorldgenPreparation;
+import net.fly.adrenaline.util.SaveBackpressure;
 import net.fly.adrenaline.util.WorldgenWarmup;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.SchedulingWork;
@@ -21,6 +27,7 @@ import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Unit;
+import net.minecraft.util.thread.BlockableEventLoop;
 import net.minecraft.util.thread.ProcessorHandle;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -35,6 +42,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -46,12 +54,105 @@ public class MixinChunkMap {
     @Final
     private ServerLevel level;
 
+    @Shadow
+    @Final
+    private BlockableEventLoop<Runnable> mainThreadExecutor;
+
     @Unique
     private ThreadLocal<ChunkHolder> adrenaline$currentHolder;
+
+    @Unique
+    private int adrenaline$saveFlushDepth;
+
+    @Unique
+    private int adrenaline$processedUnloads;
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
         this.adrenaline$currentHolder = new ThreadLocal<>();
+    }
+
+    @ModifyArg(
+        method = "prepareAccessibleChunk",
+        at = @At(
+            value = "INVOKE",
+            target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;",
+            remap = false
+        ),
+        index = 1
+    )
+    private Executor adrenaline$completeAccessibleChunksWithoutStarvation(Executor executor) {
+        return this.mainThreadExecutor;
+    }
+
+    @WrapMethod(method = "scheduleChunkGeneration")
+    private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> adrenaline$waitForSaveCapacity(
+        ChunkHolder holder,
+        ChunkStatus status,
+        Operation<CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> original
+    ) {
+        if (status != ChunkStatus.FULL) {
+            return original.call(holder, status);
+        }
+        CompletableFuture<Void> capacity = this.adrenaline$saveBackpressure().adrenaline$awaitSaveCapacity();
+        if (capacity.isDone()) {
+            return original.call(holder, status);
+        }
+        return capacity.thenComposeAsync(ignored -> original.call(holder, status), this.level.getServer());
+    }
+
+    @WrapMethod(method = "saveAllChunks")
+    private void adrenaline$flushSaveQueue(boolean flush, Operation<Void> original) {
+        if (flush) {
+            this.adrenaline$saveFlushDepth++;
+        }
+        try {
+            original.call(flush);
+        } finally {
+            if (flush) {
+                this.adrenaline$saveFlushDepth--;
+            }
+        }
+    }
+
+    @Inject(method = "processUnloads", at = @At("HEAD"))
+    private void adrenaline$resetUnloadBudget(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
+        this.adrenaline$processedUnloads = 0;
+    }
+
+    @Redirect(method = "processUnloads", at = @At(value = "INVOKE", target = "Ljava/util/Queue;poll()Ljava/lang/Object;"))
+    private Object adrenaline$pollUnloadWithSaveCapacity(Queue<Runnable> queue, BooleanSupplier shouldKeepTicking) {
+        SaveBackpressure backpressure = this.adrenaline$saveBackpressure();
+        if (this.adrenaline$saveFlushDepth > 0) {
+            backpressure.adrenaline$awaitSaveCapacity().join();
+        } else if (!backpressure.adrenaline$hasSaveCapacity()
+            || this.adrenaline$processedUnloads > 0 && !shouldKeepTicking.getAsBoolean()) {
+            return null;
+        }
+        Runnable task = queue.poll();
+        if (task != null) {
+            this.adrenaline$processedUnloads++;
+        }
+        return task;
+    }
+
+    @Inject(method = "saveChunkIfNeeded", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$deferAutosaveWhenFull(ChunkHolder holder, CallbackInfoReturnable<Boolean> cir) {
+        if (this.adrenaline$saveFlushDepth == 0 && !this.adrenaline$saveBackpressure().adrenaline$hasSaveCapacity()) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    @Inject(method = "save", at = @At("HEAD"))
+    private void adrenaline$boundFlushSerialization(ChunkAccess chunk, CallbackInfoReturnable<Boolean> cir) {
+        if (this.adrenaline$saveFlushDepth > 0 && chunk.isUnsaved()) {
+            this.adrenaline$saveBackpressure().adrenaline$awaitSaveCapacity().join();
+        }
+    }
+
+    @Unique
+    private SaveBackpressure adrenaline$saveBackpressure() {
+        return (SaveBackpressure) ((MixinChunkStorageAccessor) (Object) this).adrenaline$getWorker();
     }
 
     @Redirect(
