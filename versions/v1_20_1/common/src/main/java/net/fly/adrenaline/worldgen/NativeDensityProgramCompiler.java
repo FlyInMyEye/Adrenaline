@@ -1,6 +1,5 @@
 package net.fly.adrenaline.worldgen;
 
-import java.lang.reflect.RecordComponent;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -30,21 +29,6 @@ public final class NativeDensityProgramCompiler {
         builder.code.put(NativeDensityProgram.END);
         builder.code.flip();
         return new Result(new NativeDensityProgram(builder.code, builder.keepAlive.toArray(), builder.interpolators.toArray(NativeDensityProgram.InterpolatorBinding[]::new)), null);
-    }
-
-    private static int operationOrdinal(Object function) throws ReflectiveOperationException {
-        RecordComponent[] components = function.getClass().getRecordComponents();
-        if (components == null) {
-            throw new IllegalArgumentException();
-        }
-        for (RecordComponent component : components) {
-            if (component.getType().isEnum()) {
-                var accessor = component.getAccessor();
-                accessor.setAccessible(true);
-                return ((Enum<?>) accessor.invoke(function)).ordinal();
-            }
-        }
-        throw new IllegalArgumentException();
     }
 
     private static final class Builder {
@@ -88,14 +72,14 @@ public final class NativeDensityProgramCompiler {
                 if (!this.emit(mapped.adrenaline$mappedInput(), depth + 1)) {
                     return false;
                 }
-                return this.putMapped(operationOrdinal(mapped));
+                return this.putMapped(DensityFunctionOperation.ordinal(mapped));
             }
             if (function instanceof AdrenalineMulOrAddAccess transform) {
                 if (!this.emit(transform.adrenaline$transformInput(), depth + 1)) {
                     return false;
                 }
                 this.code.put(NativeDensityProgram.CONSTANT).putDouble(transform.adrenaline$transformArgument());
-                int operation = operationOrdinal(transform);
+                int operation = DensityFunctionOperation.ordinal(transform);
                 if (operation == 0) {
                     this.code.put(NativeDensityProgram.MULTIPLY);
                     return true;
@@ -106,13 +90,13 @@ public final class NativeDensityProgramCompiler {
                 }
                 return false;
             }
-            if (function instanceof AdrenalineBinaryFunctionAccess binary && operationOrdinal(function) == 0) {
+            if (function instanceof AdrenalineBinaryFunctionAccess binary && DensityFunctionOperation.ordinal(function) == 0) {
                 return this.emit(binary.adrenaline$firstArgument(), depth + 1)
                     && this.emit(binary.adrenaline$secondArgument(), depth + 1)
                     && this.put(NativeDensityProgram.ADD);
             }
             if (function instanceof AdrenalineBinaryFunctionAccess binary) {
-                int operation = operationOrdinal(function);
+                int operation = DensityFunctionOperation.ordinal(function);
                 return this.emit(binary.adrenaline$firstArgument(), depth + 1)
                     && this.emit(binary.adrenaline$secondArgument(), depth + 1)
                     && this.putBinary(operation);

@@ -2,7 +2,6 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -85,21 +84,6 @@ public final class CellDensityCompiler implements Opcodes {
         } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
             return null;
         }
-    }
-
-    private static int operationOrdinal(Object function) throws ReflectiveOperationException {
-        RecordComponent[] components = function.getClass().getRecordComponents();
-        if (components == null) {
-            throw new IllegalArgumentException();
-        }
-        for (RecordComponent component : components) {
-            if (component.getType().isEnum()) {
-                var accessor = component.getAccessor();
-                accessor.setAccessible(true);
-                return ((Enum<?>) accessor.invoke(function)).ordinal();
-            }
-        }
-        throw new IllegalArgumentException();
     }
 
     private static final class Generator {
@@ -225,7 +209,7 @@ public final class CellDensityCompiler implements Opcodes {
             }
             if (function instanceof AdrenalineMappedFunctionAccess mapped) {
                 this.operators++;
-                int operation = operationOrdinal(mapped);
+                int operation = DensityFunctionOperation.ordinal(mapped);
                 this.key.append('U').append(operation).append('{');
                 this.emitMapped(mapped, operation, depth + 1);
                 this.key.append('}');
@@ -233,7 +217,7 @@ public final class CellDensityCompiler implements Opcodes {
             }
             if (function instanceof AdrenalineMulOrAddAccess transform) {
                 this.operators++;
-                int operation = operationOrdinal(transform);
+                int operation = DensityFunctionOperation.ordinal(transform);
                 this.key.append('S').append(operation);
                 this.append(transform.adrenaline$transformArgument());
                 this.key.append('{');
@@ -245,7 +229,7 @@ public final class CellDensityCompiler implements Opcodes {
             }
             if (function instanceof AdrenalineBinaryFunctionAccess binary) {
                 this.operators++;
-                int operation = operationOrdinal(function);
+                int operation = DensityFunctionOperation.ordinal(function);
                 this.key.append('B').append(operation);
                 if (operation == 2) {
                     this.append(binary.adrenaline$secondArgument().minValue());
