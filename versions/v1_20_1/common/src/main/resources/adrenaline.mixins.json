@@ -71,6 +71,7 @@
   "client": [
     "MixinLoadingOverlay",
     "MixinTitleScreen",
+    "MixinTitleScreenBranding",
     "MixinIntegratedServerPausedChunkMaintenance",
     "MixinBackgroundWorldSave",
     "MixinCreateWorldScreen",

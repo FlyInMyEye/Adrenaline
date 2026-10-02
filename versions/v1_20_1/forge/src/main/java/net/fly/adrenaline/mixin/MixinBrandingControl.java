@@ -2,8 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import java.util.List;
 import java.util.function.BiConsumer;
-import net.fly.adrenaline.client.BackgroundWorldSave;
-import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
+import net.fly.adrenaline.client.WorldLoadStatus;
 import net.minecraftforge.internal.BrandingControl;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -22,12 +21,10 @@ public class MixinBrandingControl {
 
     @Inject(method = "forEachLine", at = @At("TAIL"), remap = false)
     private static void adrenaline$addWarmupBranding(boolean includeMinecraft, boolean reverse, BiConsumer<Integer, String> lineConsumer, CallbackInfo ci) {
-        if (BackgroundWorldgenWarmup.isRunning()) {
+        String status = WorldLoadStatus.text();
+        if (status != null) {
             List<String> lines = includeMinecraft ? brandings : brandingsNoMC;
-            lineConsumer.accept(lines.size(), BackgroundWorldgenWarmup.branding());
-        } else if (BackgroundWorldSave.isRunning()) {
-            List<String> lines = includeMinecraft ? brandings : brandingsNoMC;
-            lineConsumer.accept(lines.size(), "Adrenaline saving world...");
+            lineConsumer.accept(lines.size(), status);
         }
     }
 }
