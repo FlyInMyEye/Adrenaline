@@ -7,7 +7,7 @@ import net.fly.adrenaline.natives.NativeAquiferSampler;
 import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
 import net.fly.adrenaline.worldgen.AdrenalineFluidStatusAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNativeAquiferAccess;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import net.fly.adrenaline.worldgen.SharedAquiferFluidStatuses;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
 public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAccess, AdrenalineNativeAquiferAccess {
 
     @Unique
-    private static final Map<PositionalRandomFactory, AdrenalineSharedFluidStatuses> adrenaline$sharedFluidStatuses = new IdentityHashMap<>();
+    private static final Map<PositionalRandomFactory, SharedAquiferFluidStatuses> adrenaline$sharedFluidStatuses = new IdentityHashMap<>();
 
     @Unique
     private static final Object adrenaline$sharedFluidStatusesLock = new Object();
@@ -133,9 +133,8 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     private boolean adrenaline$nativeGlobalFluidUnsupported;
 
     @Unique
-    private AdrenalineSharedFluidStatuses adrenaline$sharedFluidStatusCache;
+    private SharedAquiferFluidStatuses adrenaline$sharedFluidStatusCache;
 
-    @Unique
     @Inject(method = "<init>", at = @At("TAIL"))
     @ControlsOptimization(Optimization.AQUIFER)
     private void adrenaline$prewarmCenterCache(CallbackInfo ci) {
@@ -545,12 +544,12 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         int x = (minGridX + localX) * 16 + (packedLocation >> 8);
         int y = (minGridY + localY) * 12 + (packedLocation >> 4 & 15);
         int z = (minGridZ + localZ) * 16 + (packedLocation & 15);
-        AdrenalineSharedFluidStatuses sharedCache = this.adrenaline$sharedFluidStatusCache;
+        SharedAquiferFluidStatuses sharedCache = this.adrenaline$sharedFluidStatusCache;
         long location = aquiferLocationCache[index];
         if (sharedCache != null) {
-            status = sharedCache.adrenaline$get(location);
+            status = sharedCache.get(location);
             if (status == null) {
-                status = sharedCache.adrenaline$put(location, computeFluid(x, y, z));
+                status = sharedCache.put(location, computeFluid(x, y, z));
             }
         } else {
             status = computeFluid(x, y, z);
@@ -560,59 +559,9 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     }
 
     @Unique
-    private static AdrenalineSharedFluidStatuses adrenaline$sharedFluidStatusCache(PositionalRandomFactory randomFactory) {
+    private static SharedAquiferFluidStatuses adrenaline$sharedFluidStatusCache(PositionalRandomFactory randomFactory) {
         synchronized (adrenaline$sharedFluidStatusesLock) {
-            return adrenaline$sharedFluidStatuses.computeIfAbsent(randomFactory, ignored -> new AdrenalineSharedFluidStatuses());
-        }
-    }
-
-    @Unique
-    private static final class AdrenalineSharedFluidStatuses {
-
-        private static final int SHARD_COUNT = 32;
-        private static final int ENTRIES_PER_SHARD = 4096;
-        private final AdrenalineSharedFluidStatusShard[] shards = new AdrenalineSharedFluidStatusShard[SHARD_COUNT];
-
-        private AdrenalineSharedFluidStatuses() {
-            for (int index = 0; index < SHARD_COUNT; index++) {
-                this.shards[index] = new AdrenalineSharedFluidStatusShard();
-            }
-        }
-
-        private Aquifer.FluidStatus adrenaline$get(long location) {
-            return this.adrenaline$shard(location).adrenaline$get(location);
-        }
-
-        private Aquifer.FluidStatus adrenaline$put(long location, Aquifer.FluidStatus status) {
-            return this.adrenaline$shard(location).adrenaline$put(location, status);
-        }
-
-        private AdrenalineSharedFluidStatusShard adrenaline$shard(long location) {
-            int hash = (int) (location ^ location >>> 32);
-            hash ^= hash >>> 16;
-            return this.shards[hash & (SHARD_COUNT - 1)];
-        }
-    }
-
-    @Unique
-    private static final class AdrenalineSharedFluidStatusShard {
-
-        private final Long2ObjectLinkedOpenHashMap<Aquifer.FluidStatus> statuses = new Long2ObjectLinkedOpenHashMap<>();
-
-        private synchronized Aquifer.FluidStatus adrenaline$get(long location) {
-            return this.statuses.getAndMoveToLast(location);
-        }
-
-        private synchronized Aquifer.FluidStatus adrenaline$put(long location, Aquifer.FluidStatus status) {
-            Aquifer.FluidStatus existing = this.statuses.getAndMoveToLast(location);
-            if (existing != null) {
-                return existing;
-            }
-            this.statuses.putAndMoveToLast(location, status);
-            if (this.statuses.size() > AdrenalineSharedFluidStatuses.ENTRIES_PER_SHARD) {
-                this.statuses.removeFirst();
-            }
-            return status;
+            return adrenaline$sharedFluidStatuses.computeIfAbsent(randomFactory, ignored -> new SharedAquiferFluidStatuses());
         }
     }
 

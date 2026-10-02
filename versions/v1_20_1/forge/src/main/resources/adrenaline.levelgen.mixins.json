@@ -6,6 +6,7 @@
   "refmap": "adrenaline.refmap.json",
   "mixins": [
     "AdrenalineMixinCacheAllInCellAccessor",
+    "AdrenalineMixinImprovedNoiseAccess",
     "AdrenalineMixinNoiseInterpolatorView",
     "AdrenalineMixinSurfaceRulesContext",
     "AdrenalineMixinSurfaceRulesContextApi",
