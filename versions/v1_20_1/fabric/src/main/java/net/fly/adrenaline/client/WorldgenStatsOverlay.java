@@ -78,7 +78,7 @@ public final class WorldgenStatsOverlay {
         return 1;
     }
 
-    private static List<String> lines() {
+    public static List<String> lines() {
         List<StageTiming> timings = WorldgenStageStats.snapshot();
         long maxNanos = 0L;
         for (StageTiming timing : timings) {

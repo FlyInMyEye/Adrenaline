@@ -27,6 +27,7 @@ import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
     private static final Set<String> DEBUG_MIXINS = Set.of(
+        "net.fly.adrenaline.mixin.MixinDebugScreenOverlay",
         "net.fly.adrenaline.mixin.MixinGui",
         "net.fly.adrenaline.mixin.MixinLoggerChunkProgressListener",
         "net.fly.adrenaline.mixin.MixinMinecraftServerWorldgenDebug",
