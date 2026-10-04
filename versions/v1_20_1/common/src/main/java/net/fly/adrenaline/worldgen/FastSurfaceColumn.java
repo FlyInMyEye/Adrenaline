@@ -1,6 +1,8 @@
 package net.fly.adrenaline.worldgen;
 
 import java.util.Set;
+import java.util.function.Predicate;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.world.level.block.Blocks;
@@ -11,6 +13,7 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 
 public final class FastSurfaceColumn implements BlockColumn {
 
+    private static final Predicate<BlockState> OCEAN_FLOOR = Heightmap.Types.OCEAN_FLOOR_WG.isOpaque();
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
     private final ChunkAccess chunk;
@@ -136,7 +139,7 @@ public final class FastSurfaceColumn implements BlockColumn {
         } else if (this.worldSurface > bottom && this.worldSurface <= top + 1) {
             this.worldSurface = this.findWorldSurface(bottom - 1);
         }
-        if (!state.isAir() && state.getFluidState().isEmpty()) {
+        if (OCEAN_FLOOR.test(state)) {
             this.oceanFloor = Math.max(this.oceanFloor, top + 1);
         } else if (this.oceanFloor > bottom && this.oceanFloor <= top + 1) {
             this.oceanFloor = this.findOceanFloor(bottom - 1);
@@ -184,8 +187,8 @@ public final class FastSurfaceColumn implements BlockColumn {
             this.worldSurface = this.findWorldSurface(y - 1);
         }
 
-        boolean previousCountsForOceanFloor = !previousState.isAir() && previousState.getFluidState().isEmpty();
-        boolean newCountsForOceanFloor = !newState.isAir() && newState.getFluidState().isEmpty();
+        boolean previousCountsForOceanFloor = OCEAN_FLOOR.test(previousState);
+        boolean newCountsForOceanFloor = OCEAN_FLOOR.test(newState);
         if (newCountsForOceanFloor && height > this.oceanFloor) {
             this.oceanFloor = height;
         } else if (previousCountsForOceanFloor && !newCountsForOceanFloor && height == this.oceanFloor) {
@@ -206,7 +209,7 @@ public final class FastSurfaceColumn implements BlockColumn {
     public int findOceanFloor(int fromY) {
         for (int y = Math.min(fromY, this.maxBuildHeight - 1); y >= this.minBuildHeight; y--) {
             BlockState state = this.getBlock(y);
-            if (!state.isAir() && state.getFluidState().isEmpty()) {
+            if (OCEAN_FLOOR.test(state)) {
                 return y + 1;
             }
         }
