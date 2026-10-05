@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.worldgen.BiomeFiddleCache;
 import net.fly.adrenaline.worldgen.SurfaceSystemOptimizer;
 import net.fly.adrenaline.worldgen.SurfaceNoiseBatch;
 import net.minecraft.core.BlockPos.MutableBlockPos;
@@ -50,7 +51,8 @@ public abstract class MixinSurfaceSystem {
             return;
         }
 
-        try (SurfaceNoiseBatch batch = new SurfaceNoiseBatch(this.surfaceNoise, chunk.getPos().getMinBlockX(), chunk.getPos().getMinBlockZ())) {
+        try (SurfaceNoiseBatch batch = new SurfaceNoiseBatch(this.surfaceNoise, chunk.getPos().getMinBlockX(), chunk.getPos().getMinBlockZ());
+             BiomeFiddleCache.Scope biomeCache = BiomeFiddleCache.open()) {
             SurfaceSystemOptimizer.buildSurface((SurfaceSystem) (Object) this, this.defaultBlock, this::isStone, this::erodedBadlandsExtension, this::frozenOceanExtension, randomState, biomeManager, biomeRegistry, useLegacyRandomSource, context, chunk, noiseChunk, ruleSource);
         }
         ci.cancel();

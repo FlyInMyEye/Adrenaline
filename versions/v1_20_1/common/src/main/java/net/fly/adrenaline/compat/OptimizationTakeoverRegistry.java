@@ -7,18 +7,20 @@ import net.fly.adrenaline.GlobalCommon;
 
 public final class OptimizationTakeoverRegistry {
     private static final Map<Optimization, String> CONTROLLERS = new EnumMap<>(Optimization.class);
+    private static volatile long controlledOptimizations;
 
     private OptimizationTakeoverRegistry() {
     }
 
     public static synchronized void record(Optimization optimization, String controller) {
         if (CONTROLLERS.putIfAbsent(optimization, controller) == null) {
+            controlledOptimizations |= 1L << optimization.ordinal();
             GlobalCommon.LOGGER.info("{} took control of the {} optimization", controller, optimization.name().toLowerCase());
         }
     }
 
-    public static synchronized boolean isControlled(Optimization optimization) {
-        return CONTROLLERS.containsKey(optimization);
+    public static boolean isControlled(Optimization optimization) {
+        return (controlledOptimizations & (1L << optimization.ordinal())) != 0L;
     }
 
     public static synchronized Optional<String> controller(Optimization optimization) {
@@ -29,6 +31,7 @@ public final class OptimizationTakeoverRegistry {
         TERRAIN_FILL,
         SURFACE,
         NOISE_CHUNK,
+        BIOME_FIDDLE,
         MATERIAL_RULE,
         AQUIFER,
         BEARDIFIER,

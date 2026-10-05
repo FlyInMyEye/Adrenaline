@@ -239,6 +239,11 @@ public class AdrenalineConfig {
         return get().worldgenOptimizations && get().noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
     }
 
+    public static boolean biomeFiddleOptimizationsEnabled() {
+        Data data = get();
+        return data.worldgenOptimizations && data.noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BIOME_FIDDLE);
+    }
+
     public static boolean materialRuleOptimizationsEnabled() {
         return get().worldgenOptimizations && get().materialRuleOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
     }

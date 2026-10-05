@@ -3,6 +3,7 @@ package net.fly.adrenaline.compat;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -86,6 +87,10 @@ public final class OptimizationTakeoverDetector {
 
             String controller = externalOwner(targetMethod);
 
+            if (controller == null && claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.BIOME_FIDDLE)) {
+                controller = externalDependency(targetClass.name, targetMethod, methods, new HashSet<>());
+            }
+
             if (controller == null) {
                 for (AbstractInsnNode instruction : targetMethod.instructions) {
                     if (!(instruction instanceof MethodInsnNode call)) {
@@ -138,6 +143,31 @@ public final class OptimizationTakeoverDetector {
                         || normalizedName.contains("$wrap")
                         || normalizedName.contains("$modify")
         );
+    }
+
+    private static String externalDependency(String owner, MethodNode method, Map<String, MethodNode> methods, Set<String> visited) {
+        if (!visited.add(method.name + method.desc)) {
+            return null;
+        }
+        String controller = externalOwner(method);
+        if (controller != null) {
+            return controller;
+        }
+        if (mergedBy(method) != null) {
+            return null;
+        }
+        for (AbstractInsnNode instruction : method.instructions) {
+            if (instruction instanceof MethodInsnNode call && owner.equals(call.owner)) {
+                MethodNode dependency = methods.get(call.name + call.desc);
+                if (dependency != null) {
+                    controller = externalDependency(owner, dependency, methods, visited);
+                    if (controller != null) {
+                        return controller;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static String externalOwner(MethodNode method) {
