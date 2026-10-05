@@ -1,3 +1,5 @@
+#include <stdatomic.h>
+
 #if defined(__x86_64__) || defined(_M_X64)
 #include <cpuid.h>
 
@@ -9,7 +11,7 @@ static unsigned long long adrenaline_xgetbv(unsigned int index) {
 }
 #endif
 
-int adrenaline_has_avx2(void) {
+static int adrenaline_detect_avx2(void) {
 #if defined(__x86_64__) || defined(_M_X64)
     unsigned int eax;
     unsigned int ebx;
@@ -26,4 +28,14 @@ int adrenaline_has_avx2(void) {
 #else
     return 0;
 #endif
+}
+
+int adrenaline_has_avx2(void) {
+    static atomic_int cached = -1;
+    int result = atomic_load_explicit(&cached, memory_order_relaxed);
+    if (result < 0) {
+        result = adrenaline_detect_avx2();
+        atomic_store_explicit(&cached, result, memory_order_relaxed);
+    }
+    return result;
 }
