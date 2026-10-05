@@ -78,6 +78,10 @@ public final class SurfaceRulesContextFactory {
     }
 
     public static SurfaceRulePipeline createPipeline(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
+        return createPipeline(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context, ruleSource, false);
+    }
+
+    public static SurfaceRulePipeline createPipeline(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource, boolean cacheBiomes) {
         PipelineKey key = new PipelineKey(system, randomState, biomeRegistry, context, ruleSource);
         Map<PipelineKey, SurfaceRulePipeline> cache = PIPELINE_CACHE.get();
         SurfaceRulePipeline pipeline = cache.get(key);
@@ -87,9 +91,8 @@ public final class SurfaceRulesContextFactory {
             pipeline = new SurfaceRulePipeline(surfaceRule, surfaceContext, ruleSource, context);
             cache.clear();
             cache.put(key, pipeline);
-        } else {
-            pipeline.rebind(chunk, noiseChunk, biomeGetter);
         }
+        pipeline.rebind(chunk, noiseChunk, biomeGetter, cacheBiomes);
         return pipeline;
     }
 

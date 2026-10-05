@@ -18,6 +18,7 @@ public final class SurfaceRulePipeline {
 
     private static final long INITIAL_LAST_UPDATE = Long.MIN_VALUE + 1L;
 
+    private final SurfaceBiomeCache biomes = new SurfaceBiomeCache();
     private final Object context;
     private final MethodHandle tryApplyHandle;
     private final AdrenalineMixinSurfaceRulesContextApi contextApi;
@@ -40,9 +41,23 @@ public final class SurfaceRulePipeline {
     }
 
     public void rebind(ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter) {
+        this.rebind(chunk, noiseChunk, biomeGetter, false);
+    }
+
+    public void rebind(ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, boolean cacheBiomes) {
         this.contextMutable.adrenaline$setChunk(chunk);
         this.contextMutable.adrenaline$setNoiseChunk(noiseChunk);
-        this.contextMutable.adrenaline$setBiomeGetter(biomeGetter);
+        if (cacheBiomes && this.bufferedWrites) {
+            this.biomes.rebind(chunk, biomeGetter);
+            this.contextMutable.adrenaline$setBiomeGetter(this.biomes);
+        } else {
+            this.biomes.clear();
+            this.contextMutable.adrenaline$setBiomeGetter(biomeGetter);
+            cacheBiomes = false;
+        }
+        if (this.plan != null) {
+            this.plan.biomes(cacheBiomes ? this.biomes : null);
+        }
         this.contextMutable.adrenaline$setLastPreliminarySurfaceCellOrigin(Long.MAX_VALUE);
         this.contextMutable.adrenaline$setLastUpdateXZ(INITIAL_LAST_UPDATE);
         this.contextMutable.adrenaline$setLastSurfaceDepth2Update(INITIAL_LAST_UPDATE - 1L);
@@ -52,6 +67,7 @@ public final class SurfaceRulePipeline {
     }
 
     public void updateXZ(int blockX, int blockZ) {
+        this.biomes.column(blockX, blockZ);
         this.contextApi.adrenaline$updateXZ(blockX, blockZ);
     }
 
