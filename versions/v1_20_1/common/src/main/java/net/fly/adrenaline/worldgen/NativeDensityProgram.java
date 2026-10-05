@@ -20,6 +20,11 @@ public final class NativeDensityProgram {
     public static final byte MAX = 13;
     public static final byte RANGE = 14;
     public static final byte INTERPOLATOR = 15;
+    public static final byte RANGE_START = 16;
+    public static final byte RANGE_INSIDE_END = 17;
+    public static final byte RANGE_END = 18;
+    public static final byte BINARY_GUARD = 19;
+    public static final byte SHORT_CIRCUIT_MULTIPLY = 20;
 
     private final ByteBuffer bytecode;
     private final int length;
