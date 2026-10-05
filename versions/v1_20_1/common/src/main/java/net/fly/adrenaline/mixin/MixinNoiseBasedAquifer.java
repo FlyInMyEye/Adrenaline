@@ -97,6 +97,9 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     private int[] adrenaline$nativeFluidLevels;
 
     @Unique
+    private int adrenaline$nativeMaximumFluidLevel = Integer.MIN_VALUE;
+
+    @Unique
     private byte[] adrenaline$nativeFluidTypes;
 
     @Unique
@@ -201,6 +204,15 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
             adrenaline$nativeCandidates = new long[count * 2];
         }
 
+        if (adrenaline$cellAboveFluidLevels(baseX, baseY, baseZ, cellWidth, cellHeight)) {
+            for (int index = 0; index < count; index++) {
+                adrenaline$nativeMaterials[index] = (byte) (densityValues[index] > 0.0D ? 0 : 1);
+            }
+            adrenaline$nativeDeferredCount[0] = 0;
+            contextProvider.forIndex(count - 1);
+            return true;
+        }
+
         boolean prepared = NativeAquiferSampler.prepare(densityValues, adrenaline$nativeCandidates, adrenaline$packedAquiferLocations,
             adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ,
             baseX, baseY, baseZ, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials);
@@ -229,6 +241,28 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     }
 
     @Unique
+    private boolean adrenaline$cellAboveFluidLevels(int baseX, int baseY, int baseZ, int cellWidth, int cellHeight) {
+        if (cellWidth <= 0 || cellWidth > 32 || cellHeight <= 0 || cellHeight > 1024
+            || (long) cellWidth * cellWidth * cellHeight > 1024L
+            || adrenaline$nativeFluidLevels.length == 0 || adrenaline$nativeFluidLevels.length > 1024
+            || gridSizeX <= 1 || gridSizeZ <= 1
+            || gridSizeX > adrenaline$nativeFluidLevels.length || gridSizeZ > adrenaline$nativeFluidLevels.length
+            || (long) baseY < (long) adrenaline$nativeGlobalFluidLevel + 5L
+            || (long) baseY < (long) adrenaline$nativeMaximumFluidLevel + 5L) {
+            return false;
+        }
+        long minX = Math.floorDiv((long) baseX - 5L, 16L) - minGridX;
+        long maxX = Math.floorDiv((long) baseX + cellWidth - 6L, 16L) - minGridX;
+        long minZ = Math.floorDiv((long) baseZ - 5L, 16L) - minGridZ;
+        long maxZ = Math.floorDiv((long) baseZ + cellWidth - 6L, 16L) - minGridZ;
+        long minY = Math.floorDiv((long) baseY + 1L, 12L) - minGridY;
+        long maxY = Math.floorDiv((long) baseY + cellHeight, 12L) - minGridY;
+        long lastIndex = ((maxY + 1L) * gridSizeZ + maxZ + 1L) * gridSizeX + maxX + 1L;
+        return minX >= 0L && maxX + 1L < gridSizeX && minZ >= 0L && maxZ + 1L < gridSizeZ
+            && minY >= 1L && lastIndex < adrenaline$nativeFluidLevels.length;
+    }
+
+    @Unique
     private boolean adrenaline$prepareNativeFluidTable() {
         if (adrenaline$nativeFluidTableReady) {
             return true;
@@ -245,6 +279,7 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
                 return false;
             }
             adrenaline$nativeFluidLevels[index] = access.adrenaline$fluidLevel();
+            adrenaline$nativeMaximumFluidLevel = Math.max(adrenaline$nativeMaximumFluidLevel, adrenaline$nativeFluidLevels[index]);
             adrenaline$nativeFluidTypes[index] = (byte) material;
         }
         adrenaline$nativeFluidTableReady = true;
