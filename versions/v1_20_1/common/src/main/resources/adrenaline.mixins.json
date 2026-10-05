@@ -12,6 +12,8 @@
     "MixinChunkStorageAccessor",
     "MixinIOWorker",
     "MixinClimateParameterList",
+    "MixinBiomeManager",
+    "MixinBiomeOptimizationTakeoverDetector",
     "MixinChunkHolderPendingStatus",
     "MixinChunkTaskPriorityQueueSorter",
     "MixinChunkStatus",
