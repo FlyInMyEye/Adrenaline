@@ -131,11 +131,7 @@ public final class SectionTerrainBuffer {
                 }
             }
         }
-        int[] compactIds = new int[this.ids.length];
-        for (int i = 0; i < compactIds.length; i++) {
-            compactIds[i] = remap[this.ids[i]];
-        }
-        SectionPaletteBuilder.commit(section.getStates(), compact, compactIds);
+        SectionPaletteBuilder.commit(section.getStates(), compact, this.ids, remap);
         if (section instanceof MixinLevelChunkSectionAccessor access) {
             access.adrenaline$setNonEmptyBlockCount((short) nonEmpty);
             access.adrenaline$setTickingBlockCount((short) tickingBlocks);
