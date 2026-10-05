@@ -4,6 +4,7 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.BiomeFiddleCache;
+import net.fly.adrenaline.worldgen.AdrenalineBiomeManagerSourceAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
@@ -16,9 +17,19 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(BiomeManager.class)
-public abstract class MixinBiomeManager {
+public abstract class MixinBiomeManager implements AdrenalineBiomeManagerSourceAccess {
     @Shadow @Final private BiomeManager.NoiseBiomeSource noiseBiomeSource;
     @Shadow @Final private long biomeZoomSeed;
+
+    @Override
+    public BiomeManager.NoiseBiomeSource adrenaline$getNoiseBiomeSource() {
+        return this.noiseBiomeSource;
+    }
+
+    @Override
+    public long adrenaline$getBiomeZoomSeed() {
+        return this.biomeZoomSeed;
+    }
 
     @Inject(method = "getBiome", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.BIOME_FIDDLE)
