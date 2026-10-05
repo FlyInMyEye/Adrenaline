@@ -37,6 +37,7 @@ public final class NativeDensityProgramCompiler {
         private final List<Object> keepAlive = new ArrayList<>();
         private final List<NativeDensityProgram.InterpolatorBinding> interpolators = new ArrayList<>();
         private int operators;
+        private int noiseInspections;
         private String rejection;
 
         private boolean emit(DensityFunction function, int depth) throws ReflectiveOperationException {
@@ -97,17 +98,86 @@ public final class NativeDensityProgramCompiler {
             }
             if (function instanceof AdrenalineBinaryFunctionAccess binary) {
                 int operation = DensityFunctionOperation.ordinal(function);
-                return this.emit(binary.adrenaline$firstArgument(), depth + 1)
-                    && this.emit(binary.adrenaline$secondArgument(), depth + 1)
-                    && this.putBinary(operation);
+                if (operation < 1 || operation > 3 || !this.emit(binary.adrenaline$firstArgument(), depth + 1)) {
+                    return false;
+                }
+                DensityFunction second = binary.adrenaline$secondArgument();
+                if (!containsNoise(second, 0)) {
+                    return this.emit(second, depth + 1) && this.putBinary(operation);
+                }
+                double bound = operation == 2 ? second.minValue() : second.maxValue();
+                this.code.put(NativeDensityProgram.BINARY_GUARD).put((byte) operation).putDouble(bound);
+                int jump = this.code.position();
+                this.code.putInt(0);
+                if (!this.emit(second, depth + 1) || !this.putBinary(operation)) {
+                    return false;
+                }
+                this.code.putInt(jump, this.code.position());
+                return true;
             }
             if (function instanceof AdrenalineRangeChoiceAccess range) {
-                return this.emit(range.adrenaline$rangeInput(), depth + 1)
-                    && this.emit(range.adrenaline$whenInRange(), depth + 1)
-                    && this.emit(range.adrenaline$whenOutOfRange(), depth + 1)
-                    && this.putRange(range.adrenaline$minInclusive(), range.adrenaline$maxExclusive());
+                if (!containsNoise(range.adrenaline$whenInRange(), 0) && !containsNoise(range.adrenaline$whenOutOfRange(), 0)) {
+                    if (!this.emit(range.adrenaline$rangeInput(), depth + 1)
+                        || !this.emit(range.adrenaline$whenInRange(), depth + 1)
+                        || !this.emit(range.adrenaline$whenOutOfRange(), depth + 1)) {
+                        return false;
+                    }
+                    this.code.put(NativeDensityProgram.RANGE).putDouble(range.adrenaline$minInclusive()).putDouble(range.adrenaline$maxExclusive());
+                    return true;
+                }
+                if (!this.emit(range.adrenaline$rangeInput(), depth + 1)) {
+                    return false;
+                }
+                this.code.put(NativeDensityProgram.RANGE_START)
+                    .putDouble(range.adrenaline$minInclusive()).putDouble(range.adrenaline$maxExclusive());
+                int outside = this.code.position();
+                this.code.putInt(0);
+                int end = this.code.position();
+                this.code.putInt(0);
+                if (!this.emit(range.adrenaline$whenInRange(), depth + 1)) {
+                    return false;
+                }
+                this.code.put(NativeDensityProgram.RANGE_INSIDE_END);
+                this.code.putInt(outside, this.code.position());
+                if (!this.emit(range.adrenaline$whenOutOfRange(), depth + 1)) {
+                    return false;
+                }
+                this.code.put(NativeDensityProgram.RANGE_END);
+                this.code.putInt(end, this.code.position());
+                return true;
             }
             this.rejection = function.getClass().getName();
+            return false;
+        }
+
+        private boolean containsNoise(DensityFunction function, int depth) {
+            if (depth == 0) {
+                this.noiseInspections = 0;
+            }
+            if (depth > MAX_DEPTH || ++this.noiseInspections > MAX_OPERATORS) {
+                return true;
+            }
+            if (function instanceof AdrenalineNoiseFunctionAccess) {
+                return true;
+            }
+            if (function instanceof AdrenalineClampFunctionAccess clamp) {
+                return this.containsNoise(clamp.adrenaline$clampInput(), depth + 1);
+            }
+            if (function instanceof AdrenalineMappedFunctionAccess mapped) {
+                return this.containsNoise(mapped.adrenaline$mappedInput(), depth + 1);
+            }
+            if (function instanceof AdrenalineMulOrAddAccess transform) {
+                return this.containsNoise(transform.adrenaline$transformInput(), depth + 1);
+            }
+            if (function instanceof AdrenalineBinaryFunctionAccess binary) {
+                return this.containsNoise(binary.adrenaline$firstArgument(), depth + 1)
+                    || this.containsNoise(binary.adrenaline$secondArgument(), depth + 1);
+            }
+            if (function instanceof AdrenalineRangeChoiceAccess range) {
+                return this.containsNoise(range.adrenaline$rangeInput(), depth + 1)
+                    || this.containsNoise(range.adrenaline$whenInRange(), depth + 1)
+                    || this.containsNoise(range.adrenaline$whenOutOfRange(), depth + 1);
+            }
             return false;
         }
 
@@ -175,16 +245,11 @@ public final class NativeDensityProgramCompiler {
         private boolean putBinary(int operation) {
             return switch (operation) {
                 case 0 -> this.put(NativeDensityProgram.ADD);
-                case 1 -> this.put(NativeDensityProgram.MULTIPLY);
+                case 1 -> this.put(NativeDensityProgram.SHORT_CIRCUIT_MULTIPLY);
                 case 2 -> this.put(NativeDensityProgram.MIN);
                 case 3 -> this.put(NativeDensityProgram.MAX);
                 default -> false;
             };
-        }
-
-        private boolean putRange(double min, double max) {
-            this.code.put(NativeDensityProgram.RANGE).putDouble(min).putDouble(max);
-            return true;
         }
 
         private boolean put(byte opcode) {

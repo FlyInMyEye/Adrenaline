@@ -1202,6 +1202,15 @@ fn aquifer_pressure(y: i32, first_level: c.jint, first_type: u8, second_level: c
     return 2.0 * (barrier_value + pressure);
 }
 
+const DensityRangeFrame = struct {
+    base: usize,
+    outside: usize,
+    end: usize,
+    minimum: f64,
+    maximum: f64,
+    mode: u8,
+};
+
 fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble) bool {
     var stack: [max_density_stack][max_density_values]f64 = undefined;
     var interpolation_width: [max_density_values]f64 = undefined;
@@ -1209,12 +1218,14 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
     var interpolation_ready = false;
     var stack_size: usize = 0;
     var program_counter: usize = 0;
+    var range_frames: [max_density_stack]DensityRangeFrame = undefined;
+    var range_count: usize = 0;
     const total = output.len;
     while (program_counter < program.len) {
         const opcode = read_program_u8(program, &program_counter) orelse return false;
         switch (opcode) {
             0 => {
-                if (stack_size != 1 or program_counter != program.len) {
+                if (stack_size != 1 or range_count != 0 or program_counter != program.len) {
                     return false;
                 }
                 var y_index: usize = 0;
@@ -1272,6 +1283,13 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
                 }
                 for (stack[stack_size - 2][0..total], stack[stack_size - 1][0..total]) |*left, right| {
                     left.* *= right;
+                }
+                stack_size -= 1;
+            },
+            20 => {
+                if (stack_size < 2) return false;
+                for (stack[stack_size - 2][0..total], stack[stack_size - 1][0..total]) |*left, right| {
+                    left.* = if (left.* == 0.0) 0.0 else left.* * right;
                 }
                 stack_size -= 1;
             },
@@ -1343,7 +1361,9 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
                     return false;
                 }
                 for (stack[stack_size - 2][0..total], stack[stack_size - 1][0..total]) |*left, right| {
-                    left.* = @min(left.*, right);
+                    left.* = if (std.math.isNan(left.*)) left.* else if (std.math.isNan(right)) right
+                        else if (left.* == 0.0 and right == 0.0) @bitCast(@as(u64, @bitCast(left.*)) | @as(u64, @bitCast(right)))
+                        else @min(left.*, right);
                 }
                 stack_size -= 1;
             },
@@ -1352,7 +1372,9 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
                     return false;
                 }
                 for (stack[stack_size - 2][0..total], stack[stack_size - 1][0..total]) |*left, right| {
-                    left.* = @max(left.*, right);
+                    left.* = if (std.math.isNan(left.*)) left.* else if (std.math.isNan(right)) right
+                        else if (left.* == 0.0 and right == 0.0) @bitCast(@as(u64, @bitCast(left.*)) & @as(u64, @bitCast(right)))
+                        else @max(left.*, right);
                 }
                 stack_size -= 1;
             },
@@ -1366,6 +1388,80 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
                     input.* = if (input.* >= minimum and input.* < maximum) inside else outside;
                 }
                 stack_size -= 2;
+            },
+            16 => {
+                if (stack_size == 0 or range_count >= range_frames.len) return false;
+                const minimum = read_program_f64(program, &program_counter) orelse return false;
+                const maximum = read_program_f64(program, &program_counter) orelse return false;
+                const outside: usize = read_program_u32(program, &program_counter) orelse return false;
+                const end: usize = read_program_u32(program, &program_counter) orelse return false;
+                if (outside <= program_counter or end <= outside or end >= program.len) return false;
+                var any_inside = false;
+                var any_outside = false;
+                for (stack[stack_size - 1][0..total]) |value| {
+                    if (value >= minimum and value < maximum) {
+                        any_inside = true;
+                    } else {
+                        any_outside = true;
+                    }
+                    if (any_inside and any_outside) break;
+                }
+                const mode: u8 = if (any_inside and any_outside) 0 else if (any_inside) 1 else 2;
+                range_frames[range_count] = .{ .base = stack_size - 1, .outside = outside, .end = end, .minimum = minimum, .maximum = maximum, .mode = mode };
+                range_count += 1;
+                if (mode != 0) stack_size -= 1;
+                if (mode == 2) program_counter = outside;
+            },
+            17 => {
+                if (range_count == 0) return false;
+                const frame = range_frames[range_count - 1];
+                if (program_counter != frame.outside) return false;
+                if (frame.mode == 1) {
+                    if (stack_size != frame.base + 1) return false;
+                    program_counter = frame.end;
+                    range_count -= 1;
+                } else if (frame.mode != 0 or stack_size != frame.base + 2) {
+                    return false;
+                }
+            },
+            18 => {
+                if (range_count == 0) return false;
+                const frame = range_frames[range_count - 1];
+                if (program_counter != frame.end) return false;
+                if (frame.mode == 0) {
+                    if (stack_size != frame.base + 3) return false;
+                    for (stack[frame.base][0..total], stack[frame.base + 1][0..total], stack[frame.base + 2][0..total]) |*input, inside, outside| {
+                        input.* = if (input.* >= frame.minimum and input.* < frame.maximum) inside else outside;
+                    }
+                    stack_size -= 2;
+                } else if (frame.mode != 2 or stack_size != frame.base + 1) {
+                    return false;
+                }
+                range_count -= 1;
+            },
+            19 => {
+                if (stack_size == 0) return false;
+                const operation = read_program_u8(program, &program_counter) orelse return false;
+                const bound = read_program_f64(program, &program_counter) orelse return false;
+                const end: usize = read_program_u32(program, &program_counter) orelse return false;
+                if (operation < 1 or operation > 3 or end <= program_counter or end >= program.len) return false;
+                var skip = true;
+                for (stack[stack_size - 1][0..total]) |value| {
+                    const shortcut = switch (operation) {
+                        1 => value == 0.0,
+                        2 => value < bound,
+                        3 => value > bound,
+                        else => unreachable,
+                    };
+                    if (!shortcut) {
+                        skip = false;
+                        break;
+                    }
+                }
+                if (skip) {
+                    if (operation == 1) @memset(stack[stack_size - 1][0..total], 0.0);
+                    program_counter = end;
+                }
             },
             15 => {
                 if (stack_size >= max_density_stack) {
