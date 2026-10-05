@@ -235,6 +235,12 @@ public class AdrenalineConfig {
         return get().worldgenOptimizations && get().surfaceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
     }
 
+    public static boolean surfaceNoiseOptimizationsEnabled() {
+        Data data = get();
+        return data.worldgenOptimizations && data.surfaceOptimizations && !approximateNativePerlinEnabled()
+            && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE_NOISE);
+    }
+
     public static boolean noiseChunkOptimizationsEnabled() {
         return get().worldgenOptimizations && get().noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
     }

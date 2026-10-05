@@ -87,7 +87,8 @@ public final class OptimizationTakeoverDetector {
 
             String controller = externalOwner(targetMethod);
 
-            if (controller == null && claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.BIOME_FIDDLE)) {
+            if (controller == null && (claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.BIOME_FIDDLE)
+                || claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.SURFACE_NOISE))) {
                 controller = externalDependency(targetClass.name, targetMethod, methods, new HashSet<>());
             }
 
