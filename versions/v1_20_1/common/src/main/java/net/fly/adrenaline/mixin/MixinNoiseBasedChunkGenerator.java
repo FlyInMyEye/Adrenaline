@@ -115,7 +115,7 @@ public class MixinNoiseBasedChunkGenerator {
         NoiseProfile profile = BuildConfig.DEBUG ? WorldgenStageStats.beginNoiseProfile() : null;
         long phaseStart = profile == null ? 0L : System.nanoTime();
         NoiseChunk noiseChunk = chunk.getOrCreateNoiseChunk(access -> this.createNoiseChunk(access, structureManager, blender, randomState));
-        if (BuildConfig.DEBUG && SectionTerrainGenerator.enabled()) {
+        if (SectionTerrainGenerator.enabled()) {
             BlockState sectionDefaultBlock = this.settings.value().defaultBlock();
             if (SectionTerrainGenerator.supports(chunk, noiseChunk, sectionDefaultBlock, minCellY, cellCountY)) {
                 if (profile != null) {
