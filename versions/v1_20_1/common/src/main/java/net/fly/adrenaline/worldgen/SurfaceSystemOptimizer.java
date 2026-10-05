@@ -2,8 +2,10 @@ package net.fly.adrenaline.worldgen;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Function;
 import net.fly.adrenaline.config.AdrenalineConfig;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -39,8 +41,13 @@ public final class SurfaceSystemOptimizer {
         MutableBlockPos postProcessPos = new MutableBlockPos();
         Set<LevelChunkSection> dirtySections = new HashSet<>();
         boolean cacheBiomes = biomeManager.getClass() == BiomeManager.class && AdrenalineConfig.biomeFiddleOptimizationsEnabled();
+        Function<BlockPos, Holder<Biome>> biomeGetter = biomeManager::getBiome;
         SurfaceRulePipeline surfaceRulePipeline = SurfaceRulesContextFactory.createPipeline(system, randomState, chunk, noiseChunk,
-            biomeManager::getBiome, biomeRegistry, context, ruleSource, cacheBiomes);
+            biomeGetter, biomeRegistry, context, ruleSource, cacheBiomes);
+        if (cacheBiomes && biomeManager instanceof AdrenalineBiomeManagerSourceAccess && surfaceRulePipeline.supportsBufferedWrites()) {
+            biomeGetter = new SurfaceBiomeResolver(biomeManager, chunk);
+            surfaceRulePipeline.rebind(chunk, noiseChunk, biomeGetter, true);
+        }
         boolean buffered = BUFFERED && SectionPaletteBuilder.available()
             && (chunk.getMinBuildHeight() & 15) == 0 && (chunk.getHeight() & 15) == 0
             && surfaceRulePipeline.supportsBufferedWrites();
@@ -54,7 +61,7 @@ public final class SurfaceSystemOptimizer {
                 int blockZ = minBlockZ + localZ;
                 int topY = heightTracker.worldSurface(localX, localZ);
                 int biomeY = useLegacyRandomSource ? 0 : topY;
-                Holder<Biome> biomeHolder = biomeManager.getBiome(biomePos.set(blockX, biomeY, blockZ));
+                Holder<Biome> biomeHolder = biomeGetter.apply(biomePos.set(blockX, biomeY, blockZ));
 
                 column.resetColumn(localX, localZ, blockX, blockZ, topY, heightTracker.oceanFloor(localX, localZ));
 
