@@ -34,6 +34,7 @@ public final class SurfaceRulePlan {
     private int water;
     private int bottom;
     private boolean uncertain;
+    private SurfaceBiomeCache biomes;
 
     private SurfaceRulePlan(Rule root, AdrenalineMixinSurfaceRulesContextApi context) {
         this.root = root;
@@ -56,6 +57,10 @@ public final class SurfaceRulePlan {
         this.bottom = runBottom;
         this.uncertain = false;
         return this.root.apply(this);
+    }
+
+    public void biomes(SurfaceBiomeCache biomes) {
+        this.biomes = biomes;
     }
 
     public boolean uncertain() {
@@ -128,7 +133,7 @@ public final class SurfaceRulePlan {
         if (source.getClass() == BIOME) {
             BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
             return plan -> {
-                plan.bottom = plan.y;
+                plan.bottom = Math.max(plan.bottom, plan.biomes == null ? plan.y : plan.biomes.certifiedBottom(plan.y, plan.bottom));
                 return test.getAsBoolean();
             };
         }
@@ -177,6 +182,7 @@ public final class SurfaceRulePlan {
         if (source.getClass() == GRADIENT) {
             int low = ((VerticalAnchor) component(source, 1)).resolveY(generation);
             int high = ((VerticalAnchor) component(source, 2)).resolveY(generation);
+            BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
             return plan -> {
                 if (plan.y <= low) {
                     return true;
@@ -185,8 +191,15 @@ public final class SurfaceRulePlan {
                     plan.bottom = Math.max(plan.bottom, Math.max(high, low + 1));
                     return false;
                 }
-                plan.uncertain = true;
-                return false;
+                plan.bottom = plan.y;
+                return test.getAsBoolean();
+            };
+        }
+        if (source.getClass().getEnclosingClass() == SurfaceRules.class) {
+            BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
+            return plan -> {
+                plan.bottom = plan.y;
+                return test.getAsBoolean();
             };
         }
         return plan -> {

@@ -2,6 +2,7 @@ package net.fly.adrenaline.worldgen;
 
 import java.util.HashSet;
 import java.util.Set;
+import net.fly.adrenaline.config.AdrenalineConfig;
 
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.core.Holder;
@@ -37,7 +38,9 @@ public final class SurfaceSystemOptimizer {
         MutableBlockPos extensionPos = new MutableBlockPos();
         MutableBlockPos postProcessPos = new MutableBlockPos();
         Set<LevelChunkSection> dirtySections = new HashSet<>();
-        SurfaceRulePipeline surfaceRulePipeline = SurfaceRulesContextFactory.createPipeline(system, randomState, chunk, noiseChunk, biomeManager::getBiome, biomeRegistry, context, ruleSource);
+        boolean cacheBiomes = biomeManager.getClass() == BiomeManager.class && AdrenalineConfig.biomeFiddleOptimizationsEnabled();
+        SurfaceRulePipeline surfaceRulePipeline = SurfaceRulesContextFactory.createPipeline(system, randomState, chunk, noiseChunk,
+            biomeManager::getBiome, biomeRegistry, context, ruleSource, cacheBiomes);
         boolean buffered = BUFFERED && SectionPaletteBuilder.available()
             && (chunk.getMinBuildHeight() & 15) == 0 && (chunk.getHeight() & 15) == 0
             && surfaceRulePipeline.supportsBufferedWrites();
