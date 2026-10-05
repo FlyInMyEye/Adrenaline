@@ -12,7 +12,6 @@ public final class ClimateColumnIndex {
 
     private static final long MAX_PARAMETER = 1_000_000L;
     private static final int COLUMN_COUNT = 16;
-    private static final long CERTIFICATE_RADIUS = 2048L;
 
     private final Node root;
     private final Node[] nodes;
@@ -76,23 +75,7 @@ public final class ClimateColumnIndex {
     public Object search(Climate.TargetPoint target) {
         Column column = this.columns.get().get(target, this.nodes.length);
         long depth = target.depth();
-        Node winner;
-        if (column.certified != null && depth >= column.certifiedMin && depth <= column.certifiedMax) {
-            winner = column.certified;
-        } else {
-            winner = search(this.root, this.leaves.get(this.lastResult.get()), column, depth);
-            if (++column.queries >= column.nextCertificate && winner == column.previous) {
-                column.nextCertificate = column.queries + 8;
-                long min = depth - CERTIFICATE_RADIUS;
-                long max = depth + CERTIFICATE_RADIUS;
-                if (certify(this.root, winner, column, min, max)) {
-                    column.certified = winner;
-                    column.certifiedMin = min;
-                    column.certifiedMax = max;
-                }
-            }
-            column.previous = winner;
-        }
+        Node winner = search(this.root, this.leaves.get(this.lastResult.get()), column, depth);
         this.lastResult.set(winner.original);
         return winner.value;
     }
@@ -120,40 +103,6 @@ public final class ClimateColumnIndex {
     private static long distance(Node node, Column column, long depth) {
         long delta = delta(depth, node.minDepth, node.maxDepth);
         return column.base(node) + delta * delta;
-    }
-
-    private static boolean certify(Node node, Node winner, Column column, long min, long max) {
-        if (node == winner) {
-            return true;
-        }
-        if (strictlyFarther(node, winner, column, min, max)) {
-            return true;
-        }
-        if (node.children == null) {
-            return false;
-        }
-        for (Node child : node.children) {
-            if (!certify(child, winner, column, min, max)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean strictlyFarther(Node node, Node winner, Column column, long min, long max) {
-        return fartherAt(node, winner, column, min) && fartherAt(node, winner, column, max)
-            && fartherAt(node, winner, column, clamp(node.minDepth, min, max))
-            && fartherAt(node, winner, column, clamp(node.maxDepth, min, max))
-            && fartherAt(node, winner, column, clamp(winner.minDepth, min, max))
-            && fartherAt(node, winner, column, clamp(winner.maxDepth, min, max));
-    }
-
-    private static boolean fartherAt(Node node, Node winner, Column column, long depth) {
-        return distance(node, column, depth) > distance(winner, column, depth);
-    }
-
-    private static long clamp(long value, long min, long max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private static long delta(long value, long min, long max) {
@@ -264,12 +213,6 @@ public final class ClimateColumnIndex {
         private long[] distances;
         private int[] generations;
         private int generation;
-        private Node previous;
-        private Node certified;
-        private long certifiedMin;
-        private long certifiedMax;
-        private int queries;
-        private int nextCertificate = 2;
 
         private void prepare(int nodeCount) {
             if (this.distances == null) {
@@ -284,10 +227,6 @@ public final class ClimateColumnIndex {
             this.coordinates[2] = target.continentalness();
             this.coordinates[3] = target.erosion();
             this.coordinates[5] = target.weirdness();
-            this.previous = null;
-            this.certified = null;
-            this.queries = 0;
-            this.nextCertificate = 2;
             if (this.generation == Integer.MAX_VALUE) {
                 if (this.generations != null) {
                     Arrays.fill(this.generations, 0);
