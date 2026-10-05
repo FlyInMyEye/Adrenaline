@@ -20,6 +20,8 @@ import net.minecraft.world.level.chunk.PalettedContainer;
 public final class SectionPaletteBuilder {
 
     private static final Access ACCESS = access();
+    private static final ThreadLocal<int[]> PACK_IDS = ThreadLocal.withInitial(() -> new int[4096]);
+    private static final ThreadLocal<int[]> UNPACK_IDS = ThreadLocal.withInitial(() -> new int[4096]);
 
     private SectionPaletteBuilder() {
     }
@@ -37,9 +39,13 @@ public final class SectionPaletteBuilder {
             BitStorage storage = (BitStorage) ACCESS.storage.invoke(data);
             @SuppressWarnings("unchecked")
             Palette<BlockState> palette = (Palette<BlockState>) ACCESS.palette.invoke(data);
-            int[] ids = new int[4096];
-            storage.unpack(ids);
             BlockState[] states = new BlockState[4096];
+            if (storage.getBits() == 0) {
+                Arrays.fill(states, palette.valueFor(0));
+                return states;
+            }
+            int[] ids = UNPACK_IDS.get();
+            storage.unpack(ids);
             for (int column = 0; column < 256; column++) {
                 for (int y = 0; y < 16; y++) {
                     states[column * 16 + y] = palette.valueFor(ids[y * 256 + column]);
@@ -52,6 +58,10 @@ public final class SectionPaletteBuilder {
     }
 
     public static void commit(PalettedContainer<BlockState> target, List<BlockState> states, int[] ids) {
+        commit(target, states, ids, null);
+    }
+
+    public static void commit(PalettedContainer<BlockState> target, List<BlockState> states, int[] ids, int[] remap) {
         if (ACCESS == null || ids.length != 4096 || states.isEmpty()) {
             throw new IllegalArgumentException();
         }
@@ -61,15 +71,29 @@ public final class SectionPaletteBuilder {
             Palette.Factory factory = (Palette.Factory) ACCESS.factory.invoke(configuration);
             int bits = (int) ACCESS.bits.invoke(configuration);
             Palette<BlockState> palette = factory.create(bits, Block.BLOCK_STATE_REGISTRY, target, states);
-            int[] mapped = new int[ids.length];
-            int[] paletteIds = new int[states.size()];
-            for (int i = 0; i < paletteIds.length; i++) {
-                paletteIds[i] = palette.idFor(states.get(i));
+            BitStorage storage;
+            if (bits == 0) {
+                storage = new ZeroBitStorage(4096);
+            } else {
+                int[] paletteIds = new int[states.size()];
+                for (int i = 0; i < paletteIds.length; i++) {
+                    paletteIds[i] = palette.idFor(states.get(i));
+                }
+                if (remap != null) {
+                    int[] composed = new int[remap.length];
+                    for (int i = 0; i < remap.length; i++) {
+                        if (remap[i] >= 0) {
+                            composed[i] = paletteIds[remap[i]];
+                        }
+                    }
+                    paletteIds = composed;
+                }
+                int[] mapped = PACK_IDS.get();
+                for (int i = 0; i < ids.length; i++) {
+                    mapped[i] = paletteIds[ids[i]];
+                }
+                storage = new SimpleBitStorage(bits, 4096, mapped);
             }
-            for (int i = 0; i < mapped.length; i++) {
-                mapped[i] = paletteIds[ids[i]];
-            }
-            BitStorage storage = bits == 0 ? new ZeroBitStorage(4096) : new SimpleBitStorage(bits, 4096, mapped);
             ACCESS.data.set(target, ACCESS.constructor.newInstance(configuration, storage, palette));
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException(exception);
