@@ -30,6 +30,7 @@ public final class OptimizationTakeoverRegistry {
     public enum Optimization {
         TERRAIN_FILL,
         SURFACE,
+        SURFACE_NOISE,
         NOISE_CHUNK,
         BIOME_FIDDLE,
         MATERIAL_RULE,

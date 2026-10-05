@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.worldgen.AdrenalineNormalNoiseNativeAccess;
 import net.fly.adrenaline.worldgen.AdrenalinePerlinNativeAccess;
 import net.fly.adrenaline.natives.PerlinNativeSampler;
@@ -20,6 +22,7 @@ public abstract class MixinNormalNoise implements AdrenalineNormalNoiseNativeAcc
     @Shadow @Final private double valueFactor;
 
     @Inject(method = "getValue", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.SURFACE_NOISE)
     private void adrenaline$useNativeBatch(double x, double y, double z, CallbackInfoReturnable<Double> cir) {
         if (PerlinBatching.isVanillaSampleSuppressed()) {
             return;

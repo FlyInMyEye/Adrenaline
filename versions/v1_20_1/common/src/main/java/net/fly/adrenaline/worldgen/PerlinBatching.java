@@ -73,6 +73,11 @@ public final class PerlinBatching {
         return context == null ? Double.NaN : context.tryGet(noise, x, y, z);
     }
 
+    public static boolean isActive() {
+        BatchContext context = CONTEXT.get();
+        return context != null && context.depth != 0;
+    }
+
     public static void record(NormalNoise noise, double x, double y, double z, double value) {
         BatchContext context = CONTEXT.get();
         if (context != null) {
