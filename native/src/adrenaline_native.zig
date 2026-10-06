@@ -34,6 +34,7 @@ extern fn adrenaline_normal_noise_grid_avx2(first: [*]const u8, first_count: usi
 extern fn adrenaline_normal_noise_grid_approx_avx2(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, x_count: usize, y_count: usize, z_count: usize, values: [*]f64) callconv(.c) void;
 extern fn adrenaline_normal_noise_grid_approx_float_avx2(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, x_count: usize, y_count: usize, z_count: usize, values: [*]f32) callconv(.c) void;
 extern fn adrenaline_prepare_aquifer_cell_avx2(density: [*]const c.jdouble, candidates: [*]c.jlong, packed_locations: [*]const c.jshort, packed_location_count: usize, fluid_levels: [*]const c.jint, fluid_types: [*]const c.jbyte, global_fluid_level: c.jint, global_fluid_type: c.jbyte, min_grid_x: c.jint, min_grid_y: c.jint, min_grid_z: c.jint, grid_size_x: c.jint, grid_size_z: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, deferred_indices: [*]c.jint, materials: [*]c.jbyte) callconv(.c) usize;
+extern fn adrenaline_fused_terrain_avx2(program: [*]const u8, height: usize, output: [*]c.jdouble) callconv(.c) void;
 
 comptime {
     if (!avx_only) {
@@ -1212,6 +1213,132 @@ const DensityRangeFrame = struct {
 };
 
 fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble) bool {
+    if (width == 4 and is_fused_terrain_program(program)) {
+        if (comptime builtin.cpu.arch == .x86_64 and !avx_only) {
+            if (adrenaline_has_avx2() != 0) {
+                adrenaline_fused_terrain_avx2(program.ptr, height, output.ptr);
+                return true;
+            }
+        }
+        evaluate_fused_terrain(program, height, output);
+        return true;
+    }
+    return evaluate_density_program_generic(program, base_x, base_y, base_z, width, height, output);
+}
+
+fn is_fused_terrain_program(program: []const u8) bool {
+    if (program.len != 388) return false;
+    const offsets = [_]usize{ 0, 65, 74, 75, 76, 141, 150, 215, 280, 281, 346, 347, 348, 357, 358, 359, 376, 377, 386, 387 };
+    const opcodes = [_]u8{ 15, 2, 4, 11, 15, 2, 15, 15, 6, 15, 6, 13, 2, 4, 3, 14, 12, 2, 3, 0 };
+    inline for (offsets, opcodes) |offset, opcode| {
+        if (program[offset] != opcode) return false;
+    }
+    inline for (.{ 1, 77, 151, 216, 282 }) |offset| {
+        inline for (0..8) |i| {
+            if (!(@abs(density_program_value(program, offset + i * 8)) <= 1.0e100)) return false;
+        }
+    }
+    inline for (.{ 66, 142, 349, 378 }) |offset| {
+        if (!(@abs(density_program_value(program, offset)) <= 1.0e100)) return false;
+    }
+    return true;
+}
+
+fn density_program_value(program: []const u8, offset: usize) f64 {
+    return @bitCast(std.mem.readInt(u64, program[offset..][0..8], .little));
+}
+
+const DensityCorners = struct {
+    values: [8]f64,
+
+    fn load(program: []const u8, offset: usize) DensityCorners {
+        var result: DensityCorners = undefined;
+        inline for (0..8) |i| result.values[i] = density_program_value(program, offset + i * 8);
+        return result;
+    }
+
+    fn y(self: DensityCorners, fy: f64) [4]f64 {
+        const a = self.values;
+        return .{ a[0] + fy * (a[4] - a[0]), a[2] + fy * (a[6] - a[2]), a[1] + fy * (a[5] - a[1]), a[3] + fy * (a[7] - a[3]) };
+    }
+
+    fn row(corners: [4]f64, fx: f64) [2]f64 {
+        return .{ corners[0] + fx * (corners[1] - corners[0]), corners[2] + fx * (corners[3] - corners[2]) };
+    }
+
+    fn sample(row_values: [2]f64) Vec4 {
+        const z: Vec4 = .{ 0.0, 0.25, 0.5, 0.75 };
+        return @as(Vec4, @splat(row_values[0])) + z * @as(Vec4, @splat(row_values[1] - row_values[0]));
+    }
+};
+
+fn density_min4(left: Vec4, right: Vec4) Vec4 {
+    const zero: Vec4 = @splat(0.0);
+    const signed_zero: Vec4 = @bitCast(@as(@Vector(4, u64), @bitCast(left)) | @as(@Vector(4, u64), @bitCast(right)));
+    const result = @select(f64, (left == zero) & (right == zero), signed_zero, @min(left, right));
+    return @select(f64, left != left, left, @select(f64, right != right, right, result));
+}
+
+fn density_max4(left: Vec4, right: Vec4) Vec4 {
+    const zero: Vec4 = @splat(0.0);
+    const signed_zero: Vec4 = @bitCast(@as(@Vector(4, u64), @bitCast(left)) & @as(@Vector(4, u64), @bitCast(right)));
+    const result = @select(f64, (left == zero) & (right == zero), signed_zero, @max(left, right));
+    return @select(f64, left != left, left, @select(f64, right != right, right, result));
+}
+
+pub fn evaluate_fused_terrain(program: []const u8, height: usize, output: []c.jdouble) void {
+    @setFloatMode(.strict);
+    const terrain = DensityCorners.load(program, 1);
+    const toggle = DensityCorners.load(program, 77);
+    const thickness = DensityCorners.load(program, 151);
+    const ridge_a = DensityCorners.load(program, 216);
+    const ridge_b = DensityCorners.load(program, 282);
+    const terrain_scale: Vec4 = @splat(density_program_value(program, 66));
+    const inside_value: Vec4 = @splat(density_program_value(program, 142));
+    const ridge_scale: Vec4 = @splat(density_program_value(program, 349));
+    const minimum: Vec4 = @splat(density_program_value(program, 360));
+    const maximum: Vec4 = @splat(density_program_value(program, 368));
+    const offset: Vec4 = @splat(density_program_value(program, 378));
+    const low: Vec4 = @splat(-1.0);
+    const high: Vec4 = @splat(1.0);
+    var y: usize = 0;
+    while (y < height) : (y += 1) {
+        const fy = @as(f64, @floatFromInt(y)) / @as(f64, @floatFromInt(height));
+        const terrain_y = terrain.y(fy);
+        const toggle_y = toggle.y(fy);
+        var thickness_y: [4]f64 = undefined;
+        var ridge_a_y: [4]f64 = undefined;
+        var ridge_b_y: [4]f64 = undefined;
+        var outside_ready = false;
+        var x: usize = 0;
+        while (x < 4) : (x += 1) {
+            const fx = @as(f64, @floatFromInt(x)) / 4.0;
+            const raw = DensityCorners.sample(DensityCorners.row(terrain_y, fx)) * terrain_scale;
+            const clamped = @select(f64, raw < low, low, @select(f64, raw > high, high, raw));
+            const squeezed = clamped / @as(Vec4, @splat(2.0)) - clamped * clamped * clamped / @as(Vec4, @splat(24.0));
+            const choice = DensityCorners.sample(DensityCorners.row(toggle_y, fx));
+            const inside = (choice >= minimum) & (choice < maximum);
+            var noodle = inside_value;
+            if (!@reduce(.And, inside)) {
+                if (!outside_ready) {
+                    thickness_y = thickness.y(fy);
+                    ridge_a_y = ridge_a.y(fy);
+                    ridge_b_y = ridge_b.y(fy);
+                    outside_ready = true;
+                }
+                const a = @abs(DensityCorners.sample(DensityCorners.row(ridge_a_y, fx)));
+                const b = @abs(DensityCorners.sample(DensityCorners.row(ridge_b_y, fx)));
+                const outside = DensityCorners.sample(DensityCorners.row(thickness_y, fx)) + density_max4(a, b) * ridge_scale;
+                noodle = @select(f64, inside, inside_value, outside);
+            }
+            const result = density_min4(squeezed, noodle) + offset;
+            const row = ((height - 1 - y) * 4 + x) * 4;
+            output[row..][0..4].* = @bitCast(result);
+        }
+    }
+}
+
+noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble) bool {
     var stack: [max_density_stack][max_density_values]f64 = undefined;
     var interpolation_width: [max_density_values]f64 = undefined;
     var interpolation_height: [max_density_values]f64 = undefined;
