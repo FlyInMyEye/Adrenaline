@@ -5,6 +5,7 @@ import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import net.minecraft.world.level.biome.Climate;
 
@@ -12,11 +13,13 @@ public final class ClimateColumnIndex {
 
     private static final long MAX_PARAMETER = 1_000_000L;
     private static final int COLUMN_COUNT = 16;
+    private static final int MAX_DEPTH_GROUPS = 8;
 
     private final Node root;
     private final Node[] nodes;
     private final IdentityHashMap<Object, Node> leaves;
     private final ThreadLocal<Object> lastResult;
+    private final DepthGroup[] depthGroups;
     private final ThreadLocal<Columns> columns = ThreadLocal.withInitial(Columns::new);
 
     private ClimateColumnIndex(Node root, Node[] nodes, IdentityHashMap<Object, Node> leaves, ThreadLocal<Object> lastResult) {
@@ -24,6 +27,7 @@ public final class ClimateColumnIndex {
         this.nodes = nodes;
         this.leaves = leaves;
         this.lastResult = lastResult;
+        this.depthGroups = depthGroups(root, nodes);
     }
 
     @SuppressWarnings("unchecked")
@@ -73,11 +77,121 @@ public final class ClimateColumnIndex {
     }
 
     public Object search(Climate.TargetPoint target) {
-        Column column = this.columns.get().get(target, this.nodes.length);
+        Column column = this.columns.get().get(target, this.depthGroups == null ? this.nodes.length : 0);
         long depth = target.depth();
-        Node winner = search(this.root, this.leaves.get(this.lastResult.get()), column, depth);
+        Node incumbent = this.leaves.get(this.lastResult.get());
+        Node winner;
+        if (this.depthGroups == null) {
+            winner = search(this.root, incumbent, column, depth);
+        } else {
+            column.prepareGroups(this.depthGroups, incumbent);
+            winner = searchGroups(column, incumbent, depth);
+        }
         this.lastResult.set(winner.original);
         return winner.value;
+    }
+
+    private Node searchGroups(Column column, Node incumbent, long depth) {
+        Node winner = null;
+        long bestDistance = Long.MAX_VALUE;
+        for (int i = 0; i < this.depthGroups.length; i++) {
+            DepthGroup group = this.depthGroups[i];
+            Node candidate = column.groupWinners[i];
+            long delta = delta(depth, group.min, group.max);
+            long distance = column.groupDistances[i] + delta * delta;
+            if (distance < bestDistance || distance == bestDistance && candidate.index < winner.index) {
+                winner = candidate;
+                bestDistance = distance;
+            }
+        }
+        if (incumbent != null && incumbent != winner) {
+            long delta = delta(depth, incumbent.minDepth, incumbent.maxDepth);
+            if (baseDistance(incumbent, column.coordinates) + delta * delta == bestDistance) {
+                return incumbent;
+            }
+        }
+        return winner;
+    }
+
+    private static Node searchBase(Node node, Node incumbent, long[] coordinates) {
+        if (node.children == null) {
+            return node;
+        }
+        Node winner = incumbent;
+        long bestDistance = incumbent == null ? Long.MAX_VALUE : baseDistance(incumbent, coordinates);
+        for (Node child : node.children) {
+            long lowerBound = baseDistance(child, coordinates);
+            if (lowerBound < bestDistance || lowerBound == bestDistance && child.index < winner.index) {
+                Node candidate = searchBase(child, winner, coordinates);
+                long distance = child == candidate ? lowerBound : baseDistance(candidate, coordinates);
+                if (distance < bestDistance || distance == bestDistance && candidate.index < winner.index) {
+                    bestDistance = distance;
+                    winner = candidate;
+                }
+            }
+        }
+        return winner;
+    }
+
+    private static long baseDistance(Node node, long[] coordinates) {
+        long distance = 0L;
+        for (int i = 0; i < 7; i++) {
+            if (i != 4) {
+                long delta = node.parameters[i].distance(coordinates[i]);
+                distance += delta * delta;
+            }
+        }
+        return distance;
+    }
+
+    private static DepthGroup[] depthGroups(Node root, Node[] nodes) {
+        LinkedHashMap<DepthRange, Node> ranges = new LinkedHashMap<>();
+        for (Node node : nodes) {
+            if (node.children == null) {
+                ranges.putIfAbsent(new DepthRange(node.minDepth, node.maxDepth), node);
+                if (ranges.size() > MAX_DEPTH_GROUPS) {
+                    return null;
+                }
+            }
+        }
+        DepthGroup[] groups = new DepthGroup[ranges.size()];
+        int next = 0;
+        for (DepthRange range : ranges.keySet()) {
+            groups[next++] = new DepthGroup(filterDepth(root, range), range.min, range.max);
+        }
+        return groups;
+    }
+
+    private static Node filterDepth(Node node, DepthRange range) {
+        if (node.children == null) {
+            return node.minDepth == range.min && node.maxDepth == range.max ? node : null;
+        }
+        List<Node> children = new ArrayList<>();
+        for (Node child : node.children) {
+            Node filtered = filterDepth(child, range);
+            if (filtered != null) {
+                children.add(filtered);
+            }
+        }
+        if (children.isEmpty()) {
+            return null;
+        }
+        if (children.size() == 1) {
+            return children.get(0);
+        }
+        Climate.Parameter[] parameters = new Climate.Parameter[7];
+        for (int i = 0; i < parameters.length; i++) {
+            long min = Long.MAX_VALUE;
+            long max = Long.MIN_VALUE;
+            for (Node child : children) {
+                min = Math.min(min, child.parameters[i].min());
+                max = Math.max(max, child.parameters[i].max());
+            }
+            parameters[i] = new Climate.Parameter(min, max);
+        }
+        Node filtered = new Node(node.index, node.original, parameters);
+        filtered.children = children.toArray(Node[]::new);
+        return filtered;
     }
 
     private static Node search(Node node, Node incumbent, Column column, long depth) {
@@ -186,6 +300,12 @@ public final class ClimateColumnIndex {
         }
     }
 
+    private record DepthRange(long min, long max) {
+    }
+
+    private record DepthGroup(Node root, long min, long max) {
+    }
+
     private static final class Columns {
         private final Column[] entries = new Column[COLUMN_COUNT];
         private int next;
@@ -213,15 +333,19 @@ public final class ClimateColumnIndex {
         private long[] distances;
         private int[] generations;
         private int generation;
+        private Node[] groupWinners;
+        private long[] groupDistances;
+        private boolean groupsReady;
 
         private void prepare(int nodeCount) {
-            if (this.distances == null) {
+            if (nodeCount != 0 && this.distances == null) {
                 this.distances = new long[nodeCount];
                 this.generations = new int[nodeCount];
             }
         }
 
         private void reset(Climate.TargetPoint target) {
+            this.groupsReady = false;
             this.coordinates[0] = target.temperature();
             this.coordinates[1] = target.humidity();
             this.coordinates[2] = target.continentalness();
@@ -247,18 +371,33 @@ public final class ClimateColumnIndex {
             if (this.distances != null && this.generations[node.index] == this.generation) {
                 return this.distances[node.index];
             }
-            long distance = 0L;
-            for (int i = 0; i < 7; i++) {
-                if (i != 4) {
-                    long delta = node.parameters[i].distance(this.coordinates[i]);
-                    distance += delta * delta;
-                }
-            }
+            long distance = baseDistance(node, this.coordinates);
             if (this.distances != null) {
                 this.distances[node.index] = distance;
                 this.generations[node.index] = this.generation;
             }
             return distance;
+        }
+
+        private void prepareGroups(DepthGroup[] groups, Node incumbent) {
+            if (this.groupsReady) {
+                return;
+            }
+            if (this.groupWinners == null) {
+                this.groupWinners = new Node[groups.length];
+                this.groupDistances = new long[groups.length];
+            }
+            for (int i = 0; i < groups.length; i++) {
+                DepthGroup group = groups[i];
+                Node seed = this.groupWinners[i];
+                if (seed == null && incumbent != null && incumbent.minDepth == group.min && incumbent.maxDepth == group.max) {
+                    seed = incumbent;
+                }
+                Node winner = searchBase(group.root, seed, this.coordinates);
+                this.groupWinners[i] = winner;
+                this.groupDistances[i] = baseDistance(winner, this.coordinates);
+            }
+            this.groupsReady = true;
         }
     }
 }
