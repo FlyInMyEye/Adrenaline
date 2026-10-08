@@ -23,6 +23,7 @@
     "MixinStoringChunkProgressListenerAccessor",
     "MixinStructureCheck",
     "MixinChunkSerializer",
+    "MixinPalettedContainerPacking",
     "MixinChunkAccessAccessor",
     "MixinLevelChunkSectionAccessor",
     "MixinMinecraftServer",
