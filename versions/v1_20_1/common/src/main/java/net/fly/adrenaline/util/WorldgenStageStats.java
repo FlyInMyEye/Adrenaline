@@ -7,8 +7,11 @@ import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import net.fly.adrenaline.BuildConfig;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -193,28 +196,60 @@ public final class WorldgenStageStats {
             return future;
         }
 
-        int index = status.getIndex();
         long epoch = EPOCH.get();
-        future.whenComplete((value, throwable) -> {
-            if (EPOCH.get() == epoch) {
-                long finishedNanos = System.nanoTime();
-                updateAverage(AVERAGE_NANOS, index, finishedNanos - startedNanos);
-                LAST_STAGE_FINISH_NANOS.computeIfAbsent(pos.toLong(), ignored -> new AtomicLong()).accumulateAndGet(finishedNanos, Math::max);
-                if (status == ChunkStatus.FULL) {
-                    ChunkScheduling chunkScheduling = CHUNK_SCHEDULING.remove(pos.toLong());
-                    if (chunkScheduling != null) {
-                        updateAverage(SCHEDULING_AVERAGE_NANOS, chunkScheduling.schedulingNanos.get());
-                        updateAverage(WAITING_AVERAGE_NANOS, chunkScheduling.waitingNanos.get());
-                        for (WaitingReason reason : WAITING_REASONS) {
-                            updateAverage(WAITING_REASON_AVERAGE_NANOS, reason.ordinal(),
-                                chunkScheduling.waitingReasonNanos.get(reason.ordinal()));
-                        }
-                    }
-                    LAST_STAGE_FINISH_NANOS.remove(pos.toLong());
+        future.whenComplete((value, throwable) -> finishStage(status, pos, startedNanos, epoch));
+        return future;
+    }
+
+    public static <T, R> CompletableFuture<R> trackFullConversion(
+        ChunkPos pos,
+        Function<T, R> conversion,
+        Executor executor,
+        BiFunction<Function<T, R>, Executor, CompletableFuture<R>> operation
+    ) {
+        if (!BuildConfig.DEBUG || !STAGE_SCHEDULING.containsKey(new StageKey(pos.toLong(), ChunkStatus.FULL.getIndex()))) {
+            return operation.apply(conversion, executor);
+        }
+        long epoch = EPOCH.get();
+        return operation.apply(value -> {
+            long startedNanos = EPOCH.get() == epoch ? beginStage(pos, ChunkStatus.FULL) : 0L;
+            try {
+                return conversion.apply(value);
+            } finally {
+                finishStage(ChunkStatus.FULL, pos, startedNanos, epoch);
+            }
+        }, task -> {
+            long queuedNanos = System.nanoTime();
+            executor.execute(() -> {
+                if (EPOCH.get() == epoch) {
+                    addWaitingInterval(pos, ChunkStatus.FULL, WaitingReason.EXECUTOR_QUEUE, queuedNanos, System.nanoTime());
+                }
+                task.run();
+            });
+        });
+    }
+
+    private static void finishStage(ChunkStatus status, ChunkPos pos, long startedNanos, long epoch) {
+        if (!BuildConfig.DEBUG || startedNanos == 0L || EPOCH.get() != epoch) {
+            return;
+        }
+        long finishedNanos = System.nanoTime();
+        if (status != ChunkStatus.EMPTY) {
+            updateAverage(AVERAGE_NANOS, status.getIndex(), finishedNanos - startedNanos);
+        }
+        LAST_STAGE_FINISH_NANOS.computeIfAbsent(pos.toLong(), ignored -> new AtomicLong()).accumulateAndGet(finishedNanos, Math::max);
+        if (status == ChunkStatus.FULL) {
+            ChunkScheduling chunkScheduling = CHUNK_SCHEDULING.remove(pos.toLong());
+            if (chunkScheduling != null) {
+                updateAverage(SCHEDULING_AVERAGE_NANOS, chunkScheduling.schedulingNanos.get());
+                updateAverage(WAITING_AVERAGE_NANOS, chunkScheduling.waitingNanos.get());
+                for (WaitingReason reason : WAITING_REASONS) {
+                    updateAverage(WAITING_REASON_AVERAGE_NANOS, reason.ordinal(),
+                        chunkScheduling.waitingReasonNanos.get(reason.ordinal()));
                 }
             }
-        });
-        return future;
+            LAST_STAGE_FINISH_NANOS.remove(pos.toLong());
+        }
     }
 
     public static List<StageTiming> snapshot() {
@@ -224,6 +259,9 @@ public final class WorldgenStageStats {
         List<StageTiming> timings = new ArrayList<>(STATUSES.size() + NOISE_SUBSTAGES.length + 2);
         timings.add(new StageTiming("SCHEDULING", SCHEDULING_AVERAGE_NANOS.get()));
         for (ChunkStatus status : STATUSES) {
+            if (status == ChunkStatus.EMPTY) {
+                continue;
+            }
             int index = status.getIndex();
             String name = status.toString();
             int separator = name.indexOf(':');
