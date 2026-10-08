@@ -206,7 +206,7 @@ public final class PerlinBatching {
         }
 
         private void record(NormalNoise noise, double x, double y, double z, double value, int sampleCount) {
-            if (this.disabled || this.ready) {
+            if (this.disabled | this.ready) {
                 return;
             }
             if (!this.hasFirst) {

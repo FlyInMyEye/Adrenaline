@@ -11,6 +11,8 @@
     "MixinChunkMapMaintenanceInvoker",
     "MixinChunkStorageAccessor",
     "MixinIOWorker",
+    "MixinIOWorkerPendingStoreAccessor",
+    "MixinRegionFileStorageInvoker",
     "MixinClimateParameterList",
     "MixinBiomeManager",
     "MixinBiomeOptimizationTakeoverDetector",
