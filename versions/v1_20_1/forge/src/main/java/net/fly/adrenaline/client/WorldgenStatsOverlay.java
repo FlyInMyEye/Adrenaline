@@ -141,7 +141,6 @@ public final class WorldgenStatsOverlay {
             case "FOOTPRINT CONFLICT" -> "gui.adrenaline.worldgen_stats.footprint_conflict";
             case "EXECUTOR QUEUE" -> "gui.adrenaline.worldgen_stats.executor_queue";
             case "UNCLASSIFIED" -> "gui.adrenaline.worldgen_stats.unclassified";
-            case "EMPTY" -> "gui.adrenaline.chunk_status.empty";
             case "STRUCTURE_STARTS" -> "gui.adrenaline.chunk_status.structure_starts";
             case "STRUCTURE_REFERENCES" -> "gui.adrenaline.chunk_status.structure_references";
             case "BIOMES" -> "gui.adrenaline.chunk_status.biomes";

@@ -107,14 +107,14 @@ public class MixinChunkStatus {
         if ((Object) this == ChunkStatus.FEATURES && AdrenalineConfig.parallelWorldgenEnabled() && AdrenalineConfig.parallelChunkStatusEnabled(status)) {
             return scheduleFeature(original, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
-        long startedNanos = BuildConfig.DEBUG ? WorldgenStageStats.beginStage(centerChunk.getPos(), status) : 0L;
+        long startedNanos = BuildConfig.DEBUG && status != ChunkStatus.FULL ? WorldgenStageStats.beginStage(centerChunk.getPos(), status) : 0L;
         CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = original.call(executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks);
         if (status == ChunkStatus.FULL && WorldgenChunkPreview.isActive()) {
             future.thenAccept(result ->
                 result.left().ifPresent(WorldgenChunkPreview::capture)
             );
         }
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.DEBUG && status != ChunkStatus.FULL) {
             return WorldgenStageStats.track(status, centerChunk.getPos(), startedNanos, future);
         }
         return future;

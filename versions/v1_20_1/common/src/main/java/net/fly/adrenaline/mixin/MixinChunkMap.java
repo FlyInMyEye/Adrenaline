@@ -5,6 +5,7 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.mojang.datafixers.util.Either;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -83,6 +84,28 @@ public class MixinChunkMap {
     )
     private Executor adrenaline$completeAccessibleChunksWithoutStarvation(Executor executor) {
         return this.mainThreadExecutor;
+    }
+
+    @WrapOperation(
+        method = "protoChunkToFullChunk",
+        at = @At(
+            value = "INVOKE",
+            target = "Ljava/util/concurrent/CompletableFuture;thenApplyAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;",
+            remap = false
+        )
+    )
+    private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> adrenaline$measureFullChunkConversion(
+        CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future,
+        Function<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>, Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> conversion,
+        Executor executor,
+        Operation<CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> original,
+        ChunkHolder holder
+    ) {
+        if (!BuildConfig.DEBUG) {
+            return original.call(future, conversion, executor);
+        }
+        return WorldgenStageStats.trackFullConversion(holder.getPos(), conversion, executor,
+            (measuredConversion, measuredExecutor) -> original.call(future, measuredConversion, measuredExecutor));
     }
 
     @WrapMethod(method = "scheduleChunkGeneration")
