@@ -336,13 +336,6 @@ public class AdrenalineConfig {
             value.nativeSettingsVersion = 1;
             changed = true;
         }
-        if (!AdrenalineNatives.isAvailable()) {
-            changed |= value.nativePerlinBatching || value.approximateNativePerlin || value.nativeDensityEvaluation || value.nativeAquiferBatching;
-            value.nativePerlinBatching = false;
-            value.approximateNativePerlin = false;
-            value.nativeDensityEvaluation = false;
-            value.nativeAquiferBatching = false;
-        }
         return changed;
     }
 
