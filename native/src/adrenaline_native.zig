@@ -8,7 +8,7 @@ const max_octaves = 32;
 const max_batch_size = 256;
 const max_grid_size = 4096;
 const max_grid_axis = 256;
-const max_density_program_size = 16 * 1024;
+const max_density_program_size = 256 * 1024;
 const max_density_values = 1024;
 const max_density_stack = 64;
 const normal_noise_input_factor = 1.0181268882175227;
@@ -47,6 +47,7 @@ comptime {
         @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGrid0, .{ .name = "Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGrid0" });
         @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGridFloat0, .{ .name = "Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGridFloat0" });
         @export(&Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0" });
+        @export(&Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateWithInputs0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateWithInputs0" });
         @export(&Java_net_fly_adrenaline_natives_NativeAquiferSampler_evaluate0, .{ .name = "Java_net_fly_adrenaline_natives_NativeAquiferSampler_evaluate0" });
         @export(&Java_net_fly_adrenaline_natives_NativeAquiferSampler_prepare0, .{ .name = "Java_net_fly_adrenaline_natives_NativeAquiferSampler_prepare0" });
         @export(&Java_net_fly_adrenaline_natives_NativeAquiferSampler_locate0, .{ .name = "Java_net_fly_adrenaline_natives_NativeAquiferSampler_locate0" });
@@ -270,8 +271,16 @@ fn Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGridFloa
 }
 
 fn Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) callconv(.c) c.jboolean {
+    return evaluate_density_jni(env, program_buffer, program_length, null, 0, base_x, base_y, base_z, cell_width, cell_height, output);
+}
+
+fn Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateWithInputs0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) callconv(.c) c.jboolean {
+    return evaluate_density_jni(env, program_buffer, program_length, input_buffer, input_count, base_x, base_y, base_z, cell_width, cell_height, output);
+}
+
+fn evaluate_density_jni(env: ?*c.JNIEnv, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) c.jboolean {
     @setFloatMode(.strict);
-    if (program_length <= 0 or program_length > max_density_program_size or cell_width <= 0 or cell_height <= 0) {
+    if (program_length <= 0 or program_length > max_density_program_size or cell_width <= 0 or cell_width > 32 or cell_height <= 0 or cell_height > max_density_values or input_count < 0 or input_count > 8192) {
         return c.JNI_FALSE;
     }
     const width: usize = @intCast(cell_width);
@@ -293,12 +302,20 @@ fn Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0(env: ?*c.JNIEn
         return c.JNI_FALSE;
     }
     const program_address = get_direct_buffer_address(env, program_buffer) orelse return c.JNI_FALSE;
+    var inputs: []const f64 = &.{};
+    if (input_count > 0) {
+        const input_length = @as(usize, @intCast(input_count)) * total;
+        if (input_buffer == null or get_direct_buffer_capacity(env, input_buffer) < @as(c.jlong, @intCast(input_length * @sizeOf(f64)))) return c.JNI_FALSE;
+        const input_address = get_direct_buffer_address(env, input_buffer) orelse return c.JNI_FALSE;
+        const input_values: [*]const f64 = @ptrCast(@alignCast(input_address));
+        inputs = input_values[0..input_length];
+    }
     const output_address = get_primitive_array_critical(env, output, null) orelse return c.JNI_FALSE;
     defer release_primitive_array_critical(env, output, output_address, 0);
 
     const program: [*]const u8 = @ptrCast(@alignCast(program_address));
     const values: [*]c.jdouble = @ptrCast(@alignCast(output_address));
-    return if (evaluate_density_program(program[0..length], base_x, base_y, base_z, width, height, values[0..total])) c.JNI_TRUE else c.JNI_FALSE;
+    return if (evaluate_density_program_with_inputs(program[0..length], base_x, base_y, base_z, width, height, values[0..total], inputs)) c.JNI_TRUE else c.JNI_FALSE;
 }
 
 fn Java_net_fly_adrenaline_natives_NativeAquiferSampler_evaluate0(env: ?*c.JNIEnv, _: c.jclass, density_values: c.jdoubleArray, barrier_values: c.jdoubleArray, candidates: c.jlongArray, fluid_levels: c.jintArray, fluid_types: c.jbyteArray, global_fluid_level: c.jint, global_fluid_type: c.jbyte, base_y: c.jint, cell_width: c.jint, cell_height: c.jint, deferred_indices: c.jintArray, deferred_count: c.jint, output: c.jbyteArray) callconv(.c) c.jboolean {
@@ -1213,6 +1230,10 @@ const DensityRangeFrame = struct {
 };
 
 fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble) bool {
+    return evaluate_density_program_with_inputs(program, base_x, base_y, base_z, width, height, output, &.{});
+}
+
+fn evaluate_density_program_with_inputs(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble, inputs: []const f64) bool {
     if (width == 4 and is_fused_terrain_program(program)) {
         if (comptime builtin.cpu.arch == .x86_64 and !avx_only) {
             if (adrenaline_has_avx2() != 0) {
@@ -1223,7 +1244,7 @@ fn evaluate_density_program(program: []const u8, base_x: c.jint, base_y: c.jint,
         evaluate_fused_terrain(program, height, output);
         return true;
     }
-    return evaluate_density_program_generic(program, base_x, base_y, base_z, width, height, output);
+    return evaluate_density_program_generic(program, base_x, base_y, base_z, width, height, output, inputs);
 }
 
 fn is_fused_terrain_program(program: []const u8) bool {
@@ -1338,7 +1359,37 @@ pub fn evaluate_fused_terrain(program: []const u8, height: usize, output: []c.jd
     }
 }
 
-noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble) bool {
+const DensitySplineFrame = struct {
+    base: usize,
+    knots: usize,
+    count: usize,
+    point: usize,
+};
+
+const DensityNoise = struct {
+    first: [*]const u8,
+    first_octaves: u32,
+    second: [*]const u8,
+    second_octaves: u32,
+    factor: f64,
+
+    fn read(program: []const u8, counter: *usize) ?DensityNoise {
+        const first = read_program_u64(program, counter) orelse return null;
+        const first_octaves = read_program_u32(program, counter) orelse return null;
+        const second = read_program_u64(program, counter) orelse return null;
+        const second_octaves = read_program_u32(program, counter) orelse return null;
+        const factor = read_program_f64(program, counter) orelse return null;
+        if (first == 0 or second == 0 or first_octaves > max_octaves or second_octaves > max_octaves) return null;
+        return .{ .first = @ptrFromInt(@as(usize, @intCast(first))), .first_octaves = first_octaves, .second = @ptrFromInt(@as(usize, @intCast(second))), .second_octaves = second_octaves, .factor = factor };
+    }
+
+    fn sample(self: DensityNoise, x: f64, y: f64, z: f64) f64 {
+        return normal_noise_value(self.first, self.first_octaves, self.second, self.second_octaves, self.factor, x, y, z);
+    }
+};
+
+noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble, inputs: []const f64) bool {
+    @setFloatMode(.strict);
     var stack: [max_density_stack][max_density_values]f64 = undefined;
     var interpolation_width: [max_density_values]f64 = undefined;
     var interpolation_height: [max_density_values]f64 = undefined;
@@ -1347,12 +1398,14 @@ noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint
     var program_counter: usize = 0;
     var range_frames: [max_density_stack]DensityRangeFrame = undefined;
     var range_count: usize = 0;
+    var spline_frames: [max_density_stack]DensitySplineFrame = undefined;
+    var spline_count: usize = 0;
     const total = output.len;
     while (program_counter < program.len) {
         const opcode = read_program_u8(program, &program_counter) orelse return false;
         switch (opcode) {
             0 => {
-                if (stack_size != 1 or range_count != 0 or program_counter != program.len) {
+                if (stack_size != 1 or range_count != 0 or spline_count != 0 or program_counter != program.len) {
                     return false;
                 }
                 var y_index: usize = 0;
@@ -1678,10 +1731,224 @@ noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint
                 }
                 stack_size += 1;
             },
+            21 => {
+                if (stack_size >= max_density_stack) return false;
+                const from_y: i32 = @bitCast(read_program_u32(program, &program_counter) orelse return false);
+                const to_y: i32 = @bitCast(read_program_u32(program, &program_counter) orelse return false);
+                const from = read_program_f64(program, &program_counter) orelse return false;
+                const to = read_program_f64(program, &program_counter) orelse return false;
+                for (0..height) |y| {
+                    const block_y = @as(f64, @floatFromInt(base_y)) + @as(f64, @floatFromInt(y));
+                    const t = (block_y - @as(f64, @floatFromInt(from_y))) / (@as(f64, @floatFromInt(to_y)) - @as(f64, @floatFromInt(from_y)));
+                    const value = if (t < 0.0) from else if (t > 1.0) to else from + t * (to - from);
+                    for (0..width * width) |column| stack[stack_size][column * height + y] = value;
+                }
+                stack_size += 1;
+            },
+            22 => {
+                if (stack_size >= max_density_stack) return false;
+                const kind = read_program_u8(program, &program_counter) orelse return false;
+                const noise = DensityNoise.read(program, &program_counter) orelse return false;
+                if (kind > 2) return false;
+                if (kind != 2) {
+                    density_normal_noise_grid(noise.first, noise.first_octaves, noise.second, noise.second_octaves, noise.factor, @as(f64, @floatFromInt(base_x)) * 0.25, if (kind == 0) @as(f64, @floatFromInt(base_y)) * 0.25 else 0.0, @as(f64, @floatFromInt(base_z)) * 0.25, 0.25, if (kind == 0) 0.25 else 0.0, width, height, stack[stack_size][0..total]);
+                    for (stack[stack_size][0..total]) |*value| value.* *= 4.0;
+                } else {
+                    for (0..width) |x| {
+                        for (0..width) |z| {
+                            const value = noise.sample((@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z))) * 0.25, (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x))) * 0.25, 0.0) * 4.0;
+                            @memset(stack[stack_size][(x * width + z) * height ..][0..height], value);
+                        }
+                    }
+                }
+                stack_size += 1;
+            },
+            23 => {
+                if (stack_size < 3) return false;
+                const height_independent = read_program_u8(program, &program_counter) orelse return false;
+                if (height_independent > 1) return false;
+                const noise = DensityNoise.read(program, &program_counter) orelse return false;
+                const xz_scale = read_program_f64(program, &program_counter) orelse return false;
+                const y_scale = read_program_f64(program, &program_counter) orelse return false;
+                for (0..width) |x| {
+                    for (0..width) |z| {
+                        for (0..if (height_independent == 1) @as(usize, 1) else height) |y| {
+                            const i = (x * width + z) * height + y;
+                            const sx = (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x))) * xz_scale + stack[stack_size - 3][i];
+                            const sy = (@as(f64, @floatFromInt(base_y)) + @as(f64, @floatFromInt(y))) * y_scale + stack[stack_size - 2][i];
+                            const sz = (@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z))) * xz_scale + stack[stack_size - 1][i];
+                            stack[stack_size - 3][i] = noise.sample(sx, sy, sz);
+                        }
+                        if (height_independent == 1) {
+                            const offset = (x * width + z) * height;
+                            @memset(stack[stack_size - 3][offset..][0..height], stack[stack_size - 3][offset]);
+                        }
+                    }
+                }
+                stack_size -= 2;
+            },
+            24 => {
+                if (stack_size == 0) return false;
+                const kind = read_program_u8(program, &program_counter) orelse return false;
+                const noise = DensityNoise.read(program, &program_counter) orelse return false;
+                if (kind > 1) return false;
+                for (0..width) |x| {
+                    for (0..width) |z| {
+                        for (0..height) |y| {
+                            const i = (x * width + z) * height + y;
+                            const value = stack[stack_size - 1][i];
+                            const rarity: f64 = if (kind == 0)
+                                (if (value < -0.5) 0.75 else if (value < 0.0) 1.0 else if (value < 0.5) 1.5 else 2.0)
+                            else
+                                (if (value < -0.75) 0.5 else if (value < -0.5) 0.75 else if (value < 0.5) 1.0 else if (value < 0.75) 2.0 else 3.0);
+                            const nx = (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x))) / rarity;
+                            const ny = (@as(f64, @floatFromInt(base_y)) + @as(f64, @floatFromInt(y))) / rarity;
+                            const nz = (@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z))) / rarity;
+                            stack[stack_size - 1][i] = rarity * @abs(noise.sample(nx, ny, nz));
+                        }
+                    }
+                }
+            },
+            25 => {
+                if (stack_size == 0 or stack_size + 3 > max_density_stack or spline_count >= max_density_stack) return false;
+                const count: usize = read_program_u32(program, &program_counter) orelse return false;
+                if (count == 0 or count > 8192 or count * 8 > program.len - program_counter) return false;
+                const base = stack_size - 1;
+                spline_frames[spline_count] = .{ .base = base, .knots = program_counter, .count = count, .point = 0 };
+                spline_count += 1;
+                for (stack[base][0..total], stack[base + 1][0..total]) |*coordinate, *interval| {
+                    const value: f32 = @floatCast(coordinate.*);
+                    coordinate.* = value;
+                    var low: usize = 0;
+                    var high = count;
+                    while (low < high) {
+                        const middle = low + (high - low) / 2;
+                        const location = density_program_float(program, program_counter + middle * 8);
+                        if (value < location) high = middle else low = middle + 1;
+                    }
+                    interval.* = @as(f64, @floatFromInt(low)) - 1.0;
+                }
+                @memset(stack[base + 2][0..total], 0.0);
+                @memset(stack[base + 3][0..total], 0.0);
+                stack_size += 3;
+                program_counter += count * 8;
+            },
+            26 => {
+                if (spline_count == 0) return false;
+                const point: usize = read_program_u32(program, &program_counter) orelse return false;
+                const end: usize = read_program_u32(program, &program_counter) orelse return false;
+                const frame = &spline_frames[spline_count - 1];
+                if (point >= frame.count or end <= program_counter or end >= program.len or stack_size != frame.base + 4) return false;
+                frame.point = point;
+                var needed = false;
+                for (stack[frame.base + 1][0..total]) |interval| {
+                    if (spline_needs_point(interval, point, frame.count)) {
+                        needed = true;
+                        break;
+                    }
+                }
+                if (!needed) program_counter = end;
+            },
+            27 => {
+                if (spline_count == 0) return false;
+                const frame = spline_frames[spline_count - 1];
+                if (stack_size != frame.base + 5) return false;
+                const point = @as(f64, @floatFromInt(frame.point));
+                for (stack[frame.base + 1][0..total], stack[frame.base + 2][0..total], stack[frame.base + 3][0..total], stack[frame.base + 4][0..total]) |interval, *left, *right, child| {
+                    const value: f32 = @floatCast(child);
+                    if (interval == point or interval < 0.0 and frame.point == 0) left.* = value;
+                    if (interval + 1.0 == point and interval >= 0.0) right.* = value;
+                }
+                stack_size -= 1;
+            },
+            28 => {
+                if (spline_count == 0) return false;
+                const frame = spline_frames[spline_count - 1];
+                if (stack_size != frame.base + 4) return false;
+                for (stack[frame.base][0..total], stack[frame.base + 1][0..total], stack[frame.base + 2][0..total], stack[frame.base + 3][0..total]) |*coordinate, interval, left, right| {
+                    coordinate.* = density_spline_value(program, frame.knots, frame.count, @floatCast(coordinate.*), @intFromFloat(interval), @floatCast(left), @floatCast(right));
+                }
+                stack_size -= 3;
+                spline_count -= 1;
+            },
+            29 => {
+                if (stack_size >= max_density_stack) return false;
+                const slot: usize = read_program_u32(program, &program_counter) orelse return false;
+                if (slot >= inputs.len / total) return false;
+                const values = inputs[slot * total ..][0..total];
+                for (0..width) |x| {
+                    for (0..width) |z| {
+                        for (0..height) |y| {
+                            stack[stack_size][(x * width + z) * height + y] = values[((height - 1 - y) * width + x) * width + z];
+                        }
+                    }
+                }
+                stack_size += 1;
+            },
+            30 => {
+                if (stack_size >= max_density_stack) return false;
+                const min_address = read_program_u64(program, &program_counter) orelse return false;
+                const max_address = read_program_u64(program, &program_counter) orelse return false;
+                const main_address = read_program_u64(program, &program_counter) orelse return false;
+                const config = BlendedNoiseConfig{
+                    .xz_multiplier = read_program_f64(program, &program_counter) orelse return false,
+                    .y_multiplier = read_program_f64(program, &program_counter) orelse return false,
+                    .xz_factor = read_program_f64(program, &program_counter) orelse return false,
+                    .y_factor = read_program_f64(program, &program_counter) orelse return false,
+                    .smear_scale_multiplier = read_program_f64(program, &program_counter) orelse return false,
+                };
+                if (min_address == 0 or max_address == 0 or main_address == 0) return false;
+                const min: [*]const u8 = @ptrFromInt(@as(usize, @intCast(min_address)));
+                const max: [*]const u8 = @ptrFromInt(@as(usize, @intCast(max_address)));
+                const main: [*]const u8 = @ptrFromInt(@as(usize, @intCast(main_address)));
+                if (comptime builtin.cpu.arch == .x86_64 and !avx_only) {
+                    if (adrenaline_has_avx2() != 0) {
+                        adrenaline_blended_noise_grid_avx2(min, max, main, &config, base_x, base_y, base_z, 1, 1, 1, width, height, width, &stack[stack_size]);
+                        stack_size += 1;
+                        continue;
+                    }
+                }
+                blended_noise_grid_impl(false, min, max, main, &config, base_x, base_y, base_z, 1, 1, 1, width, height, width, stack[stack_size][0..total]);
+                stack_size += 1;
+            },
+            31 => {
+                if (stack_size == 0) return false;
+                for (stack[stack_size - 1][0..total]) |*value| value.* = 1.0 / value.*;
+            },
             else => return false,
         }
     }
     return false;
+}
+
+fn spline_needs_point(interval: f64, point: usize, count: usize) bool {
+    const index: isize = @intFromFloat(interval);
+    return if (index < 0) point == 0 else if (index >= count - 1) point == count - 1 else point == index or point == index + 1;
+}
+
+fn density_program_float(program: []const u8, offset: usize) f32 {
+    return @bitCast(std.mem.readInt(u32, program[offset..][0..4], .little));
+}
+
+fn density_spline_value(program: []const u8, knots: usize, count: usize, coordinate: f32, interval: isize, left: f32, right: f32) f32 {
+    @setFloatMode(.strict);
+    if (interval < 0 or interval >= count - 1) {
+        const point: usize = if (interval < 0) 0 else count - 1;
+        const location = density_program_float(program, knots + point * 8);
+        const derivative = density_program_float(program, knots + point * 8 + 4);
+        return if (derivative == 0.0) left else left + derivative * (coordinate - location);
+    }
+    const index: usize = @intCast(interval);
+    const start = density_program_float(program, knots + index * 8);
+    const end = density_program_float(program, knots + (index + 1) * 8);
+    const first_derivative = density_program_float(program, knots + index * 8 + 4);
+    const second_derivative = density_program_float(program, knots + (index + 1) * 8 + 4);
+    const width = end - start;
+    const t = (coordinate - start) / width;
+    const difference = right - left;
+    const first = first_derivative * width - difference;
+    const second = -second_derivative * width + difference;
+    return left + t * difference + t * (1.0 - t) * (first + t * (second - first));
 }
 
 fn density_normal_noise_grid(first: [*]const u8, first_octaves: u32, second: [*]const u8, second_octaves: u32, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, width: usize, height: usize, values: []f64) void {
@@ -1695,7 +1962,11 @@ fn density_normal_noise_grid(first: [*]const u8, first_octaves: u32, second: [*]
 }
 
 fn density_clamp(value: f64, minimum: f64, maximum: f64) f64 {
-    return @max(minimum, @min(maximum, value));
+    if (value < minimum) return minimum;
+    if (std.math.isNan(value)) return value;
+    if (std.math.isNan(maximum)) return maximum;
+    if (value == 0.0 and maximum == 0.0) return @bitCast(@as(u64, @bitCast(value)) | @as(u64, @bitCast(maximum)));
+    return @min(value, maximum);
 }
 
 fn density_lerp3(x: f64, y: f64, z: f64, noise000: f64, noise100: f64, noise010: f64, noise110: f64, noise001: f64, noise101: f64, noise011: f64, noise111: f64) f64 {

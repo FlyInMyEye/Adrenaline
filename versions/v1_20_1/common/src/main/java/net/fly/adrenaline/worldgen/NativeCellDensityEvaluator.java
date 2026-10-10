@@ -18,8 +18,9 @@ public final class NativeCellDensityEvaluator implements CellDensityEvaluator {
         boolean nativeResult = false;
         if (contextProvider instanceof AdrenalineCellGridAccess grid
             && values.length == grid.adrenaline$getCellWidth() * grid.adrenaline$getCellWidth() * grid.adrenaline$getCellHeight()) {
-            this.program.prepare();
-            nativeResult = NativeDensitySampler.evaluate(this.program, grid.adrenaline$getCellStartBlockX(), grid.adrenaline$getCellStartBlockY(), grid.adrenaline$getCellStartBlockZ(), grid.adrenaline$getCellWidth(), grid.adrenaline$getCellHeight(), values);
+            if (this.program.prepare(contextProvider, values.length)) {
+                nativeResult = NativeDensitySampler.evaluate(this.program, grid.adrenaline$getCellStartBlockX(), grid.adrenaline$getCellStartBlockY(), grid.adrenaline$getCellStartBlockZ(), grid.adrenaline$getCellWidth(), grid.adrenaline$getCellHeight(), values);
+            }
         }
         if (!nativeResult) {
             this.fallback.fill(values, contextProvider);

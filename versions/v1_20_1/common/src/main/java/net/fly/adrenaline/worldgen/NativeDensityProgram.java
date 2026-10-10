@@ -1,6 +1,10 @@
 package net.fly.adrenaline.worldgen;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.NoiseChunk;
+import net.minecraft.world.level.levelgen.blending.Blender;
 
 public final class NativeDensityProgram {
 
@@ -25,17 +29,40 @@ public final class NativeDensityProgram {
     public static final byte RANGE_END = 18;
     public static final byte BINARY_GUARD = 19;
     public static final byte SHORT_CIRCUIT_MULTIPLY = 20;
+    public static final byte Y_GRADIENT = 21;
+    public static final byte SHIFT_NOISE = 22;
+    public static final byte SHIFTED_NOISE = 23;
+    public static final byte WEIRD_SCALED_NOISE = 24;
+    public static final byte SPLINE_START = 25;
+    public static final byte SPLINE_VALUE = 26;
+    public static final byte SPLINE_APPLY = 27;
+    public static final byte SPLINE_END = 28;
+    public static final byte INPUT = 29;
+    public static final byte BLENDED_NOISE = 30;
+    public static final byte RECIPROCAL = 31;
 
     private final ByteBuffer bytecode;
     private final int length;
     private final Object[] keepAlive;
     private final InterpolatorBinding[] interpolators;
+    private final InputBinding[] inputs;
+    private final boolean emptyBlender;
+    private ByteBuffer inputValues;
 
     NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators) {
+        this(bytecode, keepAlive, interpolators, new DensityFunction[0], false);
+    }
+
+    NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators, DensityFunction[] inputs, boolean emptyBlender) {
         this.bytecode = bytecode;
         this.length = bytecode.remaining();
         this.keepAlive = keepAlive;
         this.interpolators = interpolators;
+        this.inputs = new InputBinding[inputs.length];
+        for (int i = 0; i < inputs.length; i++) {
+            this.inputs[i] = new InputBinding(inputs[i], inputs[i] instanceof AdrenalineCachedDensityAccess ? CachedDensityOwner.get(inputs[i]) : null);
+        }
+        this.emptyBlender = emptyBlender;
     }
 
     public ByteBuffer bytecode() {
@@ -44,6 +71,39 @@ public final class NativeDensityProgram {
 
     public int length() {
         return this.length;
+    }
+
+    public ByteBuffer inputValues() { return this.inputValues; }
+    public int inputCount() { return this.inputs.length; }
+
+    public boolean prepare(DensityFunction.ContextProvider provider, int count) {
+        if (this.emptyBlender && provider.forIndex(0).getBlender() != Blender.empty()) {
+            return false;
+        }
+        if (this.inputs.length > 0) {
+            if (!(provider instanceof AdrenalineCellGridAccess grid)) {
+                return false;
+            }
+            int bytes = Math.multiplyExact(Math.multiplyExact(this.inputs.length, count), Double.BYTES);
+            if (this.inputValues == null || this.inputValues.capacity() != bytes) {
+                this.inputValues = ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN);
+            }
+            for (int i = 0; i < this.inputs.length; i++) {
+                InputBinding input = this.inputs[i];
+                int offset = i * count * Double.BYTES;
+                if (input.source instanceof AdrenalineCachedDensityAccess cache) {
+                    if (provider != input.owner || !cache.adrenaline$writeNativeInput(this.inputValues, offset, input.owner, grid, count)) {
+                        return false;
+                    }
+                } else {
+                    for (int j = 0; j < count; j++) {
+                        this.inputValues.putDouble(offset + j * Double.BYTES, input.source.compute(provider.forIndex(j)));
+                    }
+                }
+            }
+        }
+        this.prepare();
+        return true;
     }
 
     public void prepare() {
@@ -71,4 +131,6 @@ public final class NativeDensityProgram {
             this.offset = offset;
         }
     }
+
+    private record InputBinding(DensityFunction source, NoiseChunk owner) { }
 }
