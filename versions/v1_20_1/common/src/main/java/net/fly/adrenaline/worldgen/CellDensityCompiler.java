@@ -35,6 +35,16 @@ public final class CellDensityCompiler implements Opcodes {
     }
 
     public static CellDensityEvaluator compile(DensityFunction root) {
+        NativeDensityProgram program = AdrenalineConfig.nativeDensityEvaluationEnabled()
+            ? NativeDensityProgramCompiler.compile(root).program() : null;
+        CellDensityEvaluator evaluator = compileJava(root);
+        if (program != null) {
+            return new NativeCellDensityEvaluator(program, evaluator == null ? root::fillArray : evaluator);
+        }
+        return evaluator;
+    }
+
+    private static CellDensityEvaluator compileJava(DensityFunction root) {
         try {
             Generator generator = new Generator();
             if (!generator.inspect(root)) {
@@ -51,16 +61,7 @@ public final class CellDensityCompiler implements Opcodes {
                     return null;
                 }
             }
-            CellDensityEvaluator evaluator = (CellDensityEvaluator) constructor.newInstance((Object) generator.leaves());
-            if (!AdrenalineConfig.nativeDensityEvaluationEnabled()) {
-                return evaluator;
-            }
-            NativeDensityProgramCompiler.Result result = NativeDensityProgramCompiler.compile(root);
-            NativeDensityProgram program = result.program();
-            if (program == null) {
-                return evaluator;
-            }
-            return new NativeCellDensityEvaluator(program, evaluator);
+            return (CellDensityEvaluator) constructor.newInstance((Object) generator.leaves());
         } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
             return null;
         }

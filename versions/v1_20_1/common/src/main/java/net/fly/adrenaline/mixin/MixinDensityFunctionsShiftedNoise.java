@@ -16,7 +16,16 @@ public abstract class MixinDensityFunctionsShiftedNoise implements AdrenalineShi
     @Shadow @Final private DensityFunction shiftX;
     @Shadow @Final private DensityFunction shiftY;
     @Shadow @Final private DensityFunction shiftZ;
+    @Shadow @Final private double xzScale;
     @Shadow @Final private double yScale;
+    @Shadow @Final private DensityFunction.NoiseHolder noise;
+
+    @Override public DensityFunction adrenaline$getShiftX() { return this.shiftX; }
+    @Override public DensityFunction adrenaline$getShiftY() { return this.shiftY; }
+    @Override public DensityFunction adrenaline$getShiftZ() { return this.shiftZ; }
+    @Override public double adrenaline$getXzScale() { return this.xzScale; }
+    @Override public double adrenaline$getYScale() { return this.yScale; }
+    @Override public DensityFunction.NoiseHolder adrenaline$getShiftedNoise() { return this.noise; }
 
     @Override
     public boolean adrenaline$isHeightIndependent() {

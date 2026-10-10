@@ -59,6 +59,9 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinTectonicInvert") && !FabricLoader.getInstance().isModLoaded("tectonic")) {
+            return false;
+        }
         return (BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName)) && !this.disabledMixins.contains(mixinClassName);
     }
 

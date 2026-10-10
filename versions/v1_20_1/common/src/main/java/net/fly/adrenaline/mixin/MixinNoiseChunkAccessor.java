@@ -10,6 +10,11 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 @Mixin(NoiseChunk.class)
 public interface MixinNoiseChunkAccessor {
 
+    @Accessor("firstNoiseX") int adrenaline$firstNoiseX();
+    @Accessor("firstNoiseZ") int adrenaline$firstNoiseZ();
+    @Accessor("arrayInterpolationCounter") long adrenaline$arrayInterpolationCounter();
+    @Accessor("interpolating") boolean adrenaline$isInterpolating();
+
     @Accessor("interpolators")
     List<?> adrenaline$interpolators();
 
