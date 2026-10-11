@@ -39,8 +39,8 @@ public class MixinMinecraft {
         boolean newWorld,
         CallbackInfo ci
     ) {
-        BackgroundWorldSave.awaitCompletion();
         BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
+        BackgroundWorldSave.awaitCompletion();
         if (BuildConfig.DEBUG) {
             WorldgenBenchmark.beforeWorldLoad(levelId);
         }

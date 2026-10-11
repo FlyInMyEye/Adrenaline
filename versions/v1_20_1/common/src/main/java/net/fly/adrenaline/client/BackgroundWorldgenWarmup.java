@@ -65,11 +65,11 @@ public final class BackgroundWorldgenWarmup {
     }
 
     public static boolean isRunning() {
-        return running || WorldCreationContextWaiter.isPreloading();
+        return running || BackgroundWorldSave.isSaving(levelId) || WorldCreationContextWaiter.isPreloading();
     }
 
     public static boolean isBlocking() {
-        return running && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON;
+        return (running || BackgroundWorldSave.isSaving(levelId)) && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON;
     }
 
     public static String branding() {
@@ -112,7 +112,7 @@ public final class BackgroundWorldgenWarmup {
         boolean pendingLoad = loading != null;
         loading = null;
         if (detachedServer != null) {
-            detachedServer.halt(false);
+            BackgroundWorldSave.detach(detachedServer);
         }
         if (!pendingLoad) {
             WorldDeletion.deleteAsync(minecraft, detachedServer, levelId);

@@ -1,7 +1,12 @@
 package net.fly.adrenaline.client;
 
 import java.nio.file.Path;
+import net.fly.adrenaline.mixin.MixinMinecraftFrameInvoker;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.GenericDirtMessageScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.storage.LevelResource;
 
 public final class BackgroundWorldSave {
@@ -43,7 +48,37 @@ public final class BackgroundWorldSave {
         if (detachedServer == null) {
             return;
         }
-        detachedServer.halt(true);
+        Thread serverThread = detachedServer.getRunningThread();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft != null && minecraft.isSameThread() && minecraft.isRunning() && serverThread.isAlive()) {
+            Screen previous = minecraft.screen;
+            Screen waiting = new GenericDirtMessageScreen(Component.translatable("menu.savingLevel"));
+            minecraft.setScreen(waiting);
+            try {
+                minecraft.managedBlock(() -> {
+                    if (!serverThread.isAlive()) {
+                        return true;
+                    }
+                    ((MixinMinecraftFrameInvoker) minecraft).adrenaline$runTick(false);
+                    return false;
+                });
+            } finally {
+                if (minecraft.screen == waiting) {
+                    minecraft.setScreen(previous);
+                }
+            }
+        }
+        boolean interrupted = false;
+        while (serverThread.isAlive()) {
+            try {
+                serverThread.join();
+            } catch (InterruptedException failure) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
+        }
         if (server == detachedServer) {
             server = null;
             worldPath = null;

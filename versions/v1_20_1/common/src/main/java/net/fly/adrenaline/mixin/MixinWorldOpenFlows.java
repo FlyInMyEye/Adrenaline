@@ -2,6 +2,8 @@ package net.fly.adrenaline.mixin;
 
 import java.util.function.Function;
 import net.fly.adrenaline.client.BackgroundWorldSave;
+import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.WorldOpenFlows;
 import net.minecraft.core.LayeredRegistryAccess;
@@ -23,16 +25,19 @@ public class MixinWorldOpenFlows {
 
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$awaitSaveBeforeLoad(Screen screen, String levelId, CallbackInfo ci) {
+        BackgroundWorldgenWarmup.beforeWorldLoad(Minecraft.getInstance(), levelId);
         BackgroundWorldSave.awaitCompletion();
     }
 
     @Inject(method = "createFreshLevel", at = @At("HEAD"))
     private void adrenaline$awaitSaveBeforeCreate(String levelId, LevelSettings settings, WorldOptions options, Function<RegistryAccess, WorldDimensions> dimensions, CallbackInfo ci) {
+        BackgroundWorldgenWarmup.beforeWorldLoad(Minecraft.getInstance(), levelId);
         BackgroundWorldSave.awaitCompletion();
     }
 
     @Inject(method = "createLevelFromExistingSettings", at = @At("HEAD"))
     private void adrenaline$awaitSaveBeforeRecreate(LevelStorageSource.LevelStorageAccess storageAccess, ReloadableServerResources resources, LayeredRegistryAccess<RegistryLayer> registries, WorldData worldData, CallbackInfo ci) {
+        BackgroundWorldgenWarmup.beforeWorldLoad(Minecraft.getInstance(), storageAccess.getLevelId());
         BackgroundWorldSave.awaitCompletion();
     }
 }
