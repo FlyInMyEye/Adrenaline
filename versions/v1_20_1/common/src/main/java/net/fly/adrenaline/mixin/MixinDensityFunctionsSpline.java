@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.worldgen.DensityMapCache;
 import net.minecraft.util.CubicSpline;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.DensityFunctions;
@@ -16,7 +17,7 @@ public abstract class MixinDensityFunctionsSpline {
     @Overwrite
     public DensityFunction mapAll(DensityFunction.Visitor visitor) {
         CubicSpline<DensityFunctions.Spline.Point, DensityFunctions.Spline.Coordinate> mappedSpline = this.spline.mapAll(
-            coordinate -> coordinate.mapAll(visitor)
+            visitor instanceof DensityMapCache cache ? cache.splineVisitor() : coordinate -> coordinate.mapAll(visitor)
         );
         DensityFunction mappedFunction = mappedSpline == this.spline
             ? (DensityFunction) (Object) this

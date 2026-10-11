@@ -95,6 +95,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Inject(method = "cachedClimateSampler", at = @At("RETURN"), cancellable = true)
     @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$cacheClimateColumns(NoiseRouter router, List<Climate.ParameterPoint> spawnTarget, CallbackInfoReturnable<Climate.Sampler> cir) {
+        this.adrenaline$densityMapCache = null;
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
         }
