@@ -1,14 +1,21 @@
 package net.fly.adrenaline.worldgen;
 
+import java.lang.invoke.MethodHandle;
 import java.lang.reflect.RecordComponent;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
-import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.levelgen.Noises;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextApi;
+import net.minecraft.core.Holder;
 import net.minecraft.util.Mth;
+import net.minecraft.util.random.SimpleWeightedRandomList;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Noises;
 import net.minecraft.world.level.levelgen.SurfaceRules;
 import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.WorldGenerationContext;
@@ -28,12 +35,15 @@ public final class SurfaceRulePlan {
     private static final Class<?> BIOME = SurfaceRules.isBiome(Biomes.PLAINS).getClass();
     private final Rule root;
     private final AdrenalineMixinSurfaceRulesContextApi context;
+    private int x;
     private int y;
+    private int z;
     private int above;
     private int below;
     private int water;
     private int bottom;
     private boolean uncertain;
+    private boolean biomeCertified;
     private SurfaceBiomeCache biomes;
 
     private SurfaceRulePlan(Rule root, AdrenalineMixinSurfaceRulesContextApi context) {
@@ -50,12 +60,15 @@ public final class SurfaceRulePlan {
     }
 
     public BlockState evaluate(int x, int y, int z, int above, int below, int water, int runBottom) {
+        this.x = x;
         this.y = y;
+        this.z = z;
         this.above = above;
         this.below = below;
         this.water = water;
         this.bottom = runBottom;
         this.uncertain = false;
+        this.biomeCertified = false;
         return this.root.apply(this);
     }
 
@@ -116,6 +129,43 @@ public final class SurfaceRulePlan {
             Rule child = rule((SurfaceRules.RuleSource) component(source, 1), context, generation, depth + 1);
             return plan -> condition.test(plan) && !plan.uncertain ? child.apply(plan) : null;
         }
+        if (namespaced(source)) {
+            Rule base = rule((SurfaceRules.RuleSource) component(source, 0), context, generation, depth + 1);
+            Map<?, ?> sources = (Map<?, ?>) component(source, 1);
+            Map<String, Rule> rules = new HashMap<>();
+            for (var entry : sources.entrySet()) {
+                rules.put((String) entry.getKey(), rule((SurfaceRules.RuleSource) entry.getValue(), context, generation, depth + 1));
+            }
+            Map<Holder<Biome>, Rule> selections = new IdentityHashMap<>();
+            return plan -> {
+                plan.certifyBiome();
+                Holder<Biome> biome = plan.context.adrenaline$getBiome().get();
+                Rule selected = selections.get(biome);
+                if (selected == null) {
+                    var key = biome.unwrapKey();
+                    selected = key.isPresent() ? rules.getOrDefault(key.get().location().getNamespace(), base) : base;
+                    if (key.isPresent()) {
+                        selections.put(biome, selected);
+                    }
+                }
+                BlockState result = selected.apply(plan);
+                return result != null || plan.uncertain || selected == base ? result : base.apply(plan);
+            };
+        }
+        if (repeatingNoise(source)) {
+            return rule(repeatingRule(source), context, generation, depth + 1);
+        }
+        if (bands(source) || weighted(source)) {
+            MethodHandle apply = SurfaceRulesContextFactory.createTryApplyHandle(SurfaceRulesContextFactory.apply(source, context));
+            return plan -> {
+                plan.bottom = plan.y;
+                try {
+                    return (BlockState) apply.invokeExact(plan.x, plan.y, plan.z);
+                } catch (Throwable throwable) {
+                    throw new IllegalStateException("Surface rule evaluation failed", throwable);
+                }
+            };
+        }
         return plan -> {
             plan.uncertain = true;
             return null;
@@ -133,7 +183,7 @@ public final class SurfaceRulePlan {
         if (source.getClass() == BIOME) {
             BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
             return plan -> {
-                plan.bottom = Math.max(plan.bottom, plan.biomes == null ? plan.y : plan.biomes.certifiedBottom(plan.y, plan.bottom));
+                plan.certifyBiome();
                 return test.getAsBoolean();
             };
         }
@@ -195,7 +245,7 @@ public final class SurfaceRulePlan {
                 return test.getAsBoolean();
             };
         }
-        if (source.getClass().getEnclosingClass() == SurfaceRules.class) {
+        if (source.getClass().getEnclosingClass() == SurfaceRules.class || spatialNoise(source)) {
             BooleanSupplier test = SurfaceRulesContextFactory.createCondition(source, context);
             return plan -> {
                 plan.bottom = plan.y;
@@ -217,7 +267,36 @@ public final class SurfaceRulePlan {
     }
 
     private static boolean builtInTree(Object node, int depth) throws ReflectiveOperationException {
-        if (depth > 128 || node.getClass().getEnclosingClass() != SurfaceRules.class) {
+        if (depth > 128) {
+            return false;
+        }
+        if (namespaced(node)) {
+            if (!builtInTree(component(node, 0), depth + 1)) {
+                return false;
+            }
+            for (Object child : ((Map<?, ?>) component(node, 1)).values()) {
+                if (!builtInTree(child, depth + 1)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (repeatingNoise(node)) {
+            return builtInTree(repeatingRule(node), depth + 1);
+        }
+        if (bands(node) || spatialNoise(node)) {
+            return true;
+        }
+        if (weighted(node)) {
+            var rules = (SimpleWeightedRandomList<?>) component(node, 0);
+            for (var entry : rules.unwrap()) {
+                if (!builtInTree(entry.getData(), depth + 1)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (node.getClass().getEnclosingClass() != SurfaceRules.class) {
             return false;
         }
         RecordComponent[] components = node.getClass().getRecordComponents();
@@ -240,6 +319,39 @@ public final class SurfaceRulePlan {
             }
         }
         return true;
+    }
+
+    private void certifyBiome() {
+        if (!this.biomeCertified) {
+            this.bottom = Math.max(this.bottom, this.biomes == null ? this.y : this.biomes.certifiedBottom(this.y, this.bottom));
+            this.biomeCertified = true;
+        }
+    }
+
+    private static boolean namespaced(Object source) {
+        return source.getClass().getName().equals("terrablender.worldgen.surface.NamespacedSurfaceRuleSource");
+    }
+
+    private static boolean repeatingNoise(Object source) {
+        return source.getClass().getName().equals("net.potionstudios.biomeswevegone.world.level.levelgen.surfacerules.BetweenRepeatingNoiseRange");
+    }
+
+    private static SurfaceRules.RuleSource repeatingRule(Object source) throws ReflectiveOperationException {
+        var field = source.getClass().getDeclaredField("rule");
+        field.setAccessible(true);
+        return (SurfaceRules.RuleSource) field.get(source);
+    }
+
+    private static boolean bands(Object source) {
+        return source.getClass().getName().equals("net.potionstudios.biomeswevegone.world.level.levelgen.surfacerules.BandsRuleSource");
+    }
+
+    private static boolean weighted(Object source) {
+        return source.getClass().getName().equals("net.potionstudios.biomeswevegone.world.level.levelgen.surfacerules.WeightedRuleSource");
+    }
+
+    private static boolean spatialNoise(Object source) {
+        return source.getClass().getName().equals("com.blackgear.vanillabackport.common.worldgen.surface.SpatialNoiseThresholdConditionSource");
     }
 
     private static Object component(Object record, int index) throws ReflectiveOperationException {

@@ -1,5 +1,8 @@
 package net.fly.adrenaline.mixin.levelgen;
 
+import java.util.function.Supplier;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.biome.Biome;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -21,4 +24,7 @@ public interface AdrenalineMixinSurfaceRulesContextApi {
 
     @Invoker("getSurfaceSecondary")
     double adrenaline$getSurfaceSecondary();
+
+    @Accessor("biome")
+    Supplier<Holder<Biome>> adrenaline$getBiome();
 }
