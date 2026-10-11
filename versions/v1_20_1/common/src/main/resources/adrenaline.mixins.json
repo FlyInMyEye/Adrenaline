@@ -53,6 +53,7 @@
     "MixinCubicSplineMultipoint",
     "MixinPerlinNoise",
     "MixinDensityFunctionsHolderHolder",
+    "MixinDensityFunctionsMapping",
     "MixinDensityFunctionsAp2",
     "MixinDensityFunctionsBlendDensity",
     "MixinDensityFunctionsNoise",
