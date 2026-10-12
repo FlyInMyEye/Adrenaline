@@ -57,6 +57,20 @@ public final class ChunkJobScheduler {
         return this.maxActive;
     }
 
+    public int configuredParallelism() {
+        this.refreshPoolIfNeeded();
+        return this.pool.getParallelism();
+    }
+
+    public synchronized void setWorkerLimit(int workers) {
+        this.refreshPoolIfNeeded();
+        int previous = this.maxActive;
+        this.maxActive = Math.max(1, Math.min(workers, this.pool.getParallelism()));
+        if (!this.cancelling && this.maxActive > previous) {
+            this.drainCapacityQueue();
+        }
+    }
+
     public Executor executor() {
         this.refreshPoolIfNeeded();
         return this.pool;
@@ -79,7 +93,7 @@ public final class ChunkJobScheduler {
         int[] snapshot = new int[processors];
         AtomicIntegerArray states = this.workerStates;
         boolean waitingWork = this.pendingDependencies.get() > 0 || this.yieldedCount > 0 || !this.conflictPending.isEmpty() || !this.capacityQueue.isEmpty();
-        int configuredWorkers = Math.min(this.maxActive, processors);
+        int configuredWorkers = Math.min(this.pool.getParallelism(), processors);
         for (int i = 0; i < configuredWorkers; i++) {
             int state = i < states.length() ? states.get(i) : WORKER_IDLE;
             snapshot[i] = state == WORKER_IDLE && waitingWork ? WORKER_WAITING : state;

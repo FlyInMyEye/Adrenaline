@@ -10,6 +10,7 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
@@ -29,6 +30,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import java.util.function.BooleanSupplier;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
 public class MixinMinecraftServer implements InitialWorldCreationAccess {
@@ -44,6 +46,7 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         MinecraftServer server = (MinecraftServer) (Object) this;
         this.adrenaline$initialWorldCreation = !server.getWorldData().overworldData().isInitialized();
         DeferredSpawnSearch.reset();
+        AdaptiveWorldgenWorkers.start(server);
     }
 
     @Override
@@ -56,6 +59,27 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         MinecraftServer server = (MinecraftServer) (Object) this;
         DeferredSpawnSearch.reset();
         ChunkJobScheduler.get().cancel(server);
+        AdaptiveWorldgenWorkers.stop(server);
+    }
+
+    @Inject(method = "tickServer", at = @At("HEAD"))
+    private void adrenaline$beginAdaptiveWorkerTick(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
+        AdaptiveWorldgenWorkers.beginTick((MinecraftServer) (Object) this);
+    }
+
+    @Inject(method = "tickServer", at = @At("RETURN"))
+    private void adrenaline$finishAdaptiveWorkerTick(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
+        AdaptiveWorldgenWorkers.endTick((MinecraftServer) (Object) this);
+    }
+
+    @Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickServer(Ljava/util/function/BooleanSupplier;)V"))
+    private void adrenaline$advanceAdaptiveWorkerTick(CallbackInfo ci) {
+        AdaptiveWorldgenWorkers.advanceTick((MinecraftServer) (Object) this);
+    }
+
+    @Inject(method = "waitUntilNextTick", at = @At("HEAD"))
+    private void adrenaline$advanceAdaptivePreparationTick(CallbackInfo ci) {
+        AdaptiveWorldgenWorkers.advancePreparationTick((MinecraftServer) (Object) this);
     }
 
     @WrapMethod(method = "stopServer")

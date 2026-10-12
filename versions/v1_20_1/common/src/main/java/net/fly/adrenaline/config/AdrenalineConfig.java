@@ -5,6 +5,7 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import java.nio.file.Path;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
+import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
 import net.fly.configlib.JsonConfigManager;
 import net.minecraft.world.level.chunk.ChunkStatus;
 import org.slf4j.LoggerFactory;
@@ -86,6 +87,7 @@ public class AdrenalineConfig {
         if (manager != null) {
             manager.save(value);
         }
+        AdaptiveWorldgenWorkers.refreshSettings();
     }
 
     public static synchronized void reload() {
@@ -350,6 +352,7 @@ public class AdrenalineConfig {
         public boolean oreVeinOptimizations = true;
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
+        public boolean adaptiveGenerationWorkers = true;
         public int serializationWorkerThreads = 0;
         public boolean saveChunksAfterWorldCreation = true;
         public int incrementalSaveInterval = 128;
@@ -403,6 +406,7 @@ public class AdrenalineConfig {
             this.oreVeinOptimizations = other.oreVeinOptimizations;
             this.initialSpawnOptimization = other.initialSpawnOptimization;
             this.generationWorkerThreads = other.generationWorkerThreads;
+            this.adaptiveGenerationWorkers = other.adaptiveGenerationWorkers;
             this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.saveChunksAfterWorldCreation = other.saveChunksAfterWorldCreation;
             this.incrementalSaveInterval = other.incrementalSaveInterval;
