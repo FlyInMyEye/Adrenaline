@@ -20,6 +20,7 @@ import net.fly.adrenaline.scheduler.PendingChunkStatusAccess;
 import net.fly.adrenaline.util.WorldgenPreparation;
 import net.fly.adrenaline.util.SaveBackpressure;
 import net.fly.adrenaline.util.WorldgenWarmup;
+import net.fly.adrenaline.util.WarmupWorldDiscard;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.SchedulingWork;
 import net.minecraft.core.HolderLookup;
@@ -126,6 +127,9 @@ public class MixinChunkMap {
 
     @WrapMethod(method = "saveAllChunks")
     private void adrenaline$flushSaveQueue(boolean flush, Operation<Void> original) {
+        if (WarmupWorldDiscard.isDiscarding()) {
+            return;
+        }
         if (flush) {
             this.adrenaline$saveFlushDepth++;
         }
@@ -166,8 +170,13 @@ public class MixinChunkMap {
         }
     }
 
-    @Inject(method = "save", at = @At("HEAD"))
+    @Inject(method = "save", at = @At("HEAD"), cancellable = true)
     private void adrenaline$boundFlushSerialization(ChunkAccess chunk, CallbackInfoReturnable<Boolean> cir) {
+        if (WarmupWorldDiscard.isDiscarding()) {
+            chunk.setUnsaved(false);
+            cir.setReturnValue(false);
+            return;
+        }
         if (this.adrenaline$saveFlushDepth > 0 && chunk.isUnsaved()) {
             this.adrenaline$saveBackpressure().adrenaline$awaitSaveCapacity().join();
         }

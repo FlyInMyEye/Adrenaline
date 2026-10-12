@@ -8,6 +8,8 @@
     "MixinWarmupReloadListener",
     "MixinWorldLoader",
     "MixinChunkMap",
+    "MixinSectionStorageWarmup",
+    "MixinPersistentEntitySectionManagerWarmup",
     "MixinChunkMapMaintenanceInvoker",
     "MixinChunkStorageAccessor",
     "MixinIOWorker",
