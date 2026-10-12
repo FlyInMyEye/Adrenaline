@@ -45,6 +45,8 @@
     "MixinNoiseChunkCacheAllInCell",
     "MixinNoiseChunkCacheOnce",
     "MixinNoiseChunk",
+    "MixinRandomStateMapping",
+    "MixinRandomStateVisitor",
     "MixinNoiseInterpolator",
     "MixinNormalNoise",
     "MixinSurfaceNoiseOptimizationTakeoverDetector",
