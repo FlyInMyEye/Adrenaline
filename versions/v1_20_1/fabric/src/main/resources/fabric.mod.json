@@ -31,7 +31,8 @@
   },
   "mixins": [
     "adrenaline.mixins.json",
-    "adrenaline.levelgen.mixins.json"
+    "adrenaline.levelgen.mixins.json",
+    "adrenaline.fabric.mixins.json"
   ],
   "name": "Adrenaline",
   "version": "0.1.2.4"
