@@ -4,6 +4,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.util.WorldgenPreparation;
+import net.fly.adrenaline.util.WarmupResourceLoading;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationContext;
@@ -83,9 +84,9 @@ public final class WorldCreationContextWaiter {
     ) {
         if (future == null || future.isCompletedExceptionally()) {
             future = (CompletableFuture<WorldCreationContext>) (CompletableFuture<?>) CompletableFuture.supplyAsync(
-                () -> WorldLoader.load(initConfig, dataSupplier, resultFactory, backgroundExecutor, gameExecutor),
+                () -> WorldLoader.load(initConfig, dataSupplier, resultFactory, backgroundExecutor, WarmupResourceLoading.applyExecutor()),
                 backgroundExecutor
-            ).thenCompose(current -> current);
+            ).thenCompose(current -> current).thenApplyAsync(context -> context, gameExecutor);
         }
         return (CompletableFuture<R>) (CompletableFuture<?>) future;
     }
