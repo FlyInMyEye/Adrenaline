@@ -6,6 +6,7 @@ import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
 import net.fly.adrenaline.util.WarmupResourceLoading;
+import net.fly.adrenaline.util.WarmupWorldDiscard;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
@@ -112,6 +113,7 @@ public final class BackgroundWorldgenWarmup {
         boolean pendingLoad = loading != null;
         loading = null;
         if (detachedServer != null) {
+            WarmupWorldDiscard.mark(detachedServer);
             BackgroundWorldSave.detach(detachedServer);
         }
         if (!pendingLoad) {

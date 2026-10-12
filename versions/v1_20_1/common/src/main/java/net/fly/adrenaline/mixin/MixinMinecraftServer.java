@@ -1,6 +1,8 @@
 package net.fly.adrenaline.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.AdrenalinePlatform;
 import net.fly.adrenaline.client.InitialWorldCreationAccess;
 import net.fly.adrenaline.compat.ControlsOptimization;
@@ -11,6 +13,7 @@ import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
+import net.fly.adrenaline.util.WarmupWorldDiscard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
@@ -25,6 +28,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
 public class MixinMinecraftServer implements InitialWorldCreationAccess {
@@ -52,6 +56,18 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         MinecraftServer server = (MinecraftServer) (Object) this;
         DeferredSpawnSearch.reset();
         ChunkJobScheduler.get().cancel(server);
+    }
+
+    @WrapMethod(method = "stopServer")
+    private void adrenaline$discardWarmupWorldOnStop(Operation<Void> original) {
+        WarmupWorldDiscard.runShutdown((MinecraftServer) (Object) this, () -> original.call());
+    }
+
+    @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$skipDiscardedWarmupSave(boolean silent, boolean flush, boolean force, CallbackInfoReturnable<Boolean> cir) {
+        if (WarmupWorldDiscard.isDiscarding()) {
+            cir.setReturnValue(false);
+        }
     }
 
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
