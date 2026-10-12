@@ -2,6 +2,8 @@ package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
+import net.minecraft.client.gui.screens.LoadingOverlay;
+import net.minecraft.client.gui.screens.Overlay;
 import net.fly.adrenaline.client.BackgroundWorldSave;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.client.WorldCreationContextWaiter;
@@ -29,6 +31,16 @@ public class MixinMinecraft {
 
     @Shadow
     private IntegratedServer singleplayerServer;
+
+    @Shadow
+    private Overlay overlay;
+
+    @Inject(method = "setOverlay", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$keepBlockingWarmupOverlay(Overlay overlay, CallbackInfo ci) {
+        if (overlay == null && this.overlay instanceof LoadingOverlay && BackgroundWorldgenWarmup.shouldKeepStartupOverlay((Minecraft) (Object) this)) {
+            ci.cancel();
+        }
+    }
 
     @Inject(method = "doWorldLoad", at = @At("HEAD"))
     private void adrenaline$resetWorldLoadCancellation(
