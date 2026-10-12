@@ -73,6 +73,11 @@ public final class BackgroundWorldgenWarmup {
         return (running || BackgroundWorldSave.isSaving(levelId)) && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON;
     }
 
+    public static boolean shouldKeepStartupOverlay(Minecraft minecraft) {
+        return isBlocking() || !started && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON
+            && minecraft.screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null;
+    }
+
     public static String branding() {
         char spinner = SPINNER[(int) (System.currentTimeMillis() / 150L % SPINNER.length)];
         return "Adrenaline warmup " + spinner;
