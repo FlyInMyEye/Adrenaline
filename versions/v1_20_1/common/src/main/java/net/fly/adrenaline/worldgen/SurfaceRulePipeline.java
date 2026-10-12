@@ -16,8 +16,6 @@ import net.minecraft.world.level.levelgen.WorldGenerationContext;
 
 public final class SurfaceRulePipeline {
 
-    private static final long INITIAL_LAST_UPDATE = Long.MIN_VALUE + 1L;
-
     private final SurfaceBiomeCache biomes = new SurfaceBiomeCache();
     private final Object context;
     private final MethodHandle tryApplyHandle;
@@ -59,10 +57,6 @@ public final class SurfaceRulePipeline {
             this.plan.biomes(cacheBiomes ? this.biomes : null);
         }
         this.contextMutable.adrenaline$setLastPreliminarySurfaceCellOrigin(Long.MAX_VALUE);
-        this.contextMutable.adrenaline$setLastUpdateXZ(INITIAL_LAST_UPDATE);
-        this.contextMutable.adrenaline$setLastSurfaceDepth2Update(INITIAL_LAST_UPDATE - 1L);
-        this.contextMutable.adrenaline$setLastMinSurfaceLevelUpdate(INITIAL_LAST_UPDATE - 1L);
-        this.contextMutable.adrenaline$setLastUpdateY(INITIAL_LAST_UPDATE);
         this.contextMutable.adrenaline$setBiome(null);
     }
 
