@@ -58,6 +58,7 @@ public final class WorldgenStatsOverlay {
             graphics.fill(x - 1, y - 1, x + width + 1, y + font.lineHeight - 1, BACKGROUND_COLOR);
             graphics.drawString(font, line, x, y, TEXT_COLOR, false);
         }
+        WorldgenWorkerStats.render(graphics);
     }
 
     private static int setEnabled(FabricClientCommandSource source, boolean enabled) {

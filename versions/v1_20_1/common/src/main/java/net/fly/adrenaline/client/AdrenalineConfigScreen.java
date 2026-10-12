@@ -36,6 +36,7 @@ public class AdrenalineConfigScreen extends Screen {
     private final List<Button> stageParallelButtons = new ArrayList<>();
 
     private ThreadCountSlider generationThreadsSlider;
+    private Button adaptiveGenerationWorkersButton;
     private ThreadCountSlider serializationThreadsSlider;
     private SpawnZoneRadiusSlider spawnZoneRadiusSlider;
     private FeatureSafetyRadiusSlider featureSafetyRadiusSlider;
@@ -102,6 +103,8 @@ public class AdrenalineConfigScreen extends Screen {
         y = this.addSectionHeader("gui.adrenaline.config.section.general", y);
         this.generationThreadsSlider = this.addScrollableWidget(new ThreadCountSlider(leftX, y, 370, 20, Component.translatable("gui.adrenaline.config.generation_threads"), () -> this.config.generationWorkerThreads, value -> this.config.generationWorkerThreads = value, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH)), y, tooltip("tooltip.adrenaline.config.generation_threads", PerformanceImpact.HIGH));
         y += 30;
+        this.adaptiveGenerationWorkersButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.adaptive_generation_workers"), this.config.adaptiveGenerationWorkers, value -> this.config.adaptiveGenerationWorkers = value, tooltip("tooltip.adrenaline.config.adaptive_generation_workers", PerformanceImpact.MEDIUM));
+        y += 24;
         TooltipData spawnZoneTooltip = optimizationTooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW, Optimization.SPAWN_ZONE);
         this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, spawnZoneTooltip), y, spawnZoneTooltip);
         y += 30;
@@ -668,6 +671,7 @@ public class AdrenalineConfigScreen extends Screen {
             this.forceEasterEggButton.active = true;
         }
         this.generationThreadsSlider.active = this.config.parallelWorldgen;
+        this.adaptiveGenerationWorkersButton.active = this.config.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.PARALLEL_WORLDGEN);
         this.serializationThreadsSlider.active = worldgenOptimizations;
         this.spawnZoneRadiusSlider.active = !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE);
     }

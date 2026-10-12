@@ -51,6 +51,9 @@ public final class WorldgenStatsOverlay {
             return;
         }
         event.getLeft().addAll(lines());
+        if (Minecraft.getInstance().getSingleplayerServer() != null) {
+            event.getRight().add(WorldgenWorkerStats.line());
+        }
     }
 
     @SubscribeEvent
@@ -71,6 +74,7 @@ public final class WorldgenStatsOverlay {
             graphics.fill(x - 1, y - 1, x + width + 1, y + font.lineHeight - 1, BACKGROUND_COLOR);
             graphics.drawString(font, line, x, y, TEXT_COLOR, false);
         }
+        WorldgenWorkerStats.render(graphics);
     }
 
     private static int setEnabled(CommandSourceStack source, boolean enabled) {
