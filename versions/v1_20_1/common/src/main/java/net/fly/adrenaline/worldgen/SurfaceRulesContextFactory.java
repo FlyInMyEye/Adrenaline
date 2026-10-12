@@ -2,6 +2,7 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -26,6 +27,20 @@ public final class SurfaceRulesContextFactory {
     private static final Constructor<?> CONSTRUCTOR;
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
     private static final ThreadLocal<Map<PipelineKey, SurfaceRulePipeline>> PIPELINE_CACHE = ThreadLocal.withInitial(HashMap::new);
+    private static final ClassValue<MethodHandle> CONDITION_TESTS = new ClassValue<>() {
+        @Override
+        protected MethodHandle computeValue(Class<?> type) {
+            try {
+                Method method = java.util.Arrays.stream(type.getMethods())
+                    .filter(candidate -> candidate.getParameterCount() == 0 && candidate.getReturnType() == boolean.class)
+                    .findFirst().orElseThrow(() -> new NoSuchMethodException("Surface condition test method"));
+                method.setAccessible(true);
+                return LOOKUP.unreflect(method).asType(MethodType.methodType(boolean.class, Object.class));
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Could not access surface condition", exception);
+            }
+        }
+    };
 
     static {
         try {
@@ -37,6 +52,10 @@ public final class SurfaceRulesContextFactory {
     }
 
     private SurfaceRulesContextFactory() {
+    }
+
+    public static Class<?> contextType() {
+        return CONSTRUCTOR.getDeclaringClass();
     }
 
     public static Object create(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context) {
@@ -63,11 +82,7 @@ public final class SurfaceRulesContextFactory {
 
     public static BooleanSupplier createCondition(SurfaceRules.ConditionSource source, Object context) throws ReflectiveOperationException {
         Object condition = applyUnchecked(source, context);
-        Method method = java.util.Arrays.stream(condition.getClass().getMethods())
-            .filter(candidate -> candidate.getParameterCount() == 0 && candidate.getReturnType() == boolean.class)
-            .findFirst().orElseThrow(() -> new NoSuchMethodException("Surface condition test method"));
-        method.setAccessible(true);
-        MethodHandle test = LOOKUP.unreflect(method).bindTo(condition);
+        MethodHandle test = CONDITION_TESTS.get(condition.getClass()).bindTo(condition);
         return () -> {
             try {
                 return (boolean) test.invokeExact();

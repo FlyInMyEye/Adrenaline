@@ -27,4 +27,13 @@ public interface AdrenalineMixinSurfaceRulesContextApi {
 
     @Accessor("biome")
     Supplier<Holder<Biome>> adrenaline$getBiome();
+
+    @Accessor("stoneDepthAbove")
+    int adrenaline$getStoneDepthAbove();
+
+    @Accessor("stoneDepthBelow")
+    int adrenaline$getStoneDepthBelow();
+
+    @Accessor("waterHeight")
+    int adrenaline$getWaterHeight();
 }

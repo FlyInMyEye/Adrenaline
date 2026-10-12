@@ -1,6 +1,8 @@
 package net.fly.adrenaline.worldgen;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.RecordComponent;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -8,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextApi;
+import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.minecraft.core.Holder;
 import net.minecraft.util.Mth;
 import net.minecraft.util.random.SimpleWeightedRandomList;
@@ -33,6 +36,27 @@ public final class SurfaceRulePlan {
     private static final Class<?> GRADIENT = SurfaceRules.verticalGradient("adrenaline:plan", VerticalAnchor.absolute(0), VerticalAnchor.absolute(1)).getClass();
     private static final Class<?> NOISE = SurfaceRules.noiseCondition(Noises.SURFACE, 0.0D).getClass();
     private static final Class<?> BIOME = SurfaceRules.isBiome(Biomes.PLAINS).getClass();
+    private static final ClassValue<MethodHandle[]> RECORD_ACCESSORS = new ClassValue<>() {
+        @Override
+        protected MethodHandle[] computeValue(Class<?> type) {
+            RecordComponent[] components = type.getRecordComponents();
+            if (components == null) {
+                throw new IllegalArgumentException("Surface rule is not a record");
+            }
+            MethodHandle[] accessors = new MethodHandle[components.length];
+            try {
+                for (int i = 0; i < components.length; i++) {
+                    var accessor = components[i].getAccessor();
+                    accessor.setAccessible(true);
+                    accessors[i] = MethodHandles.lookup().unreflect(accessor)
+                        .asType(MethodType.methodType(Object.class, Object.class));
+                }
+            } catch (IllegalAccessException exception) {
+                throw new IllegalStateException("Could not access surface rule", exception);
+            }
+            return accessors;
+        }
+    };
     private final Rule root;
     private final AdrenalineMixinSurfaceRulesContextApi context;
     private int x;
@@ -53,7 +77,7 @@ public final class SurfaceRulePlan {
 
     public static SurfaceRulePlan compile(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, AdrenalineMixinSurfaceRulesContextApi contextApi) {
         try {
-            return new SurfaceRulePlan(rule(source, context, generation, 0), contextApi);
+            return new SurfaceRulePlan(new Builder(context, generation).rule(source, 0), contextApi);
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return null;
         }
@@ -100,7 +124,7 @@ public final class SurfaceRulePlan {
         return result;
     }
 
-    private static Rule rule(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, int depth) throws ReflectiveOperationException {
+    private static Rule rule(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, int depth, Builder builder) throws ReflectiveOperationException {
         if (depth > 128) {
             throw new IllegalArgumentException("Surface rule depth");
         }
@@ -112,7 +136,7 @@ public final class SurfaceRulePlan {
             List<?> sequence = (List<?>) component(source, 0);
             Rule[] rules = new Rule[sequence.size()];
             for (int i = 0; i < rules.length; i++) {
-                rules[i] = rule((SurfaceRules.RuleSource) sequence.get(i), context, generation, depth + 1);
+                rules[i] = builder.rule((SurfaceRules.RuleSource) sequence.get(i), depth + 1);
             }
             return plan -> {
                 for (Rule child : rules) {
@@ -125,16 +149,16 @@ public final class SurfaceRulePlan {
             };
         }
         if (source.getClass() == TEST) {
-            Condition condition = condition((SurfaceRules.ConditionSource) component(source, 0), context, generation, depth + 1);
-            Rule child = rule((SurfaceRules.RuleSource) component(source, 1), context, generation, depth + 1);
+            Condition condition = builder.condition((SurfaceRules.ConditionSource) component(source, 0), depth + 1);
+            Rule child = builder.rule((SurfaceRules.RuleSource) component(source, 1), depth + 1);
             return plan -> condition.test(plan) && !plan.uncertain ? child.apply(plan) : null;
         }
         if (namespaced(source)) {
-            Rule base = rule((SurfaceRules.RuleSource) component(source, 0), context, generation, depth + 1);
+            Rule base = builder.rule((SurfaceRules.RuleSource) component(source, 0), depth + 1);
             Map<?, ?> sources = (Map<?, ?>) component(source, 1);
             Map<String, Rule> rules = new HashMap<>();
             for (var entry : sources.entrySet()) {
-                rules.put((String) entry.getKey(), rule((SurfaceRules.RuleSource) entry.getValue(), context, generation, depth + 1));
+                rules.put((String) entry.getKey(), builder.rule((SurfaceRules.RuleSource) entry.getValue(), depth + 1));
             }
             Map<Holder<Biome>, Rule> selections = new IdentityHashMap<>();
             return plan -> {
@@ -153,7 +177,7 @@ public final class SurfaceRulePlan {
             };
         }
         if (repeatingNoise(source)) {
-            return rule(repeatingRule(source), context, generation, depth + 1);
+            return builder.rule(repeatingRule(source), depth + 1);
         }
         if (bands(source) || weighted(source)) {
             MethodHandle apply = SurfaceRulesContextFactory.createTryApplyHandle(SurfaceRulesContextFactory.apply(source, context));
@@ -172,7 +196,7 @@ public final class SurfaceRulePlan {
         };
     }
 
-    private static Condition condition(SurfaceRules.ConditionSource source, Object context, WorldGenerationContext generation, int depth) throws ReflectiveOperationException {
+    private static Condition condition(SurfaceRules.ConditionSource source, Object context, WorldGenerationContext generation, int depth, Builder builder) throws ReflectiveOperationException {
         if (depth > 128) {
             throw new IllegalArgumentException("Surface condition depth");
         }
@@ -194,7 +218,7 @@ public final class SurfaceRulePlan {
             return plan -> plan.context.adrenaline$getSurfaceDepth() <= 0;
         }
         if (source.getClass() == NOT) {
-            Condition target = condition((SurfaceRules.ConditionSource) component(source, 0), context, generation, depth + 1);
+            Condition target = builder.condition((SurfaceRules.ConditionSource) component(source, 0), depth + 1);
             return plan -> !target.test(plan);
         }
         if (source.getClass() == Y) {
@@ -260,29 +284,43 @@ public final class SurfaceRulePlan {
 
     public static boolean supportsBufferedWrites(SurfaceRules.RuleSource source) {
         try {
-            return builtInTree(source, 0);
+            return builtInTree(source, 0, new IdentityHashMap<>());
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return false;
         }
     }
 
-    private static boolean builtInTree(Object node, int depth) throws ReflectiveOperationException {
+    private static boolean builtInTree(Object node, int depth, Map<Object, Boolean> known) throws ReflectiveOperationException {
         if (depth > 128) {
             return false;
         }
+        Boolean previous = known.get(node);
+        if (previous != null) {
+            return previous;
+        }
+        known.put(node, false);
+        boolean result = inspectBuiltInTree(node, depth, known);
+        known.put(node, result);
+        return result;
+    }
+
+    private static boolean inspectBuiltInTree(Object node, int depth, Map<Object, Boolean> known) throws ReflectiveOperationException {
+        if (SurfacePipelineCompatibility.hasForeignHooks(node.getClass())) {
+            return false;
+        }
         if (namespaced(node)) {
-            if (!builtInTree(component(node, 0), depth + 1)) {
+            if (!builtInTree(component(node, 0), depth + 1, known)) {
                 return false;
             }
             for (Object child : ((Map<?, ?>) component(node, 1)).values()) {
-                if (!builtInTree(child, depth + 1)) {
+                if (!builtInTree(child, depth + 1, known)) {
                     return false;
                 }
             }
             return true;
         }
         if (repeatingNoise(node)) {
-            return builtInTree(repeatingRule(node), depth + 1);
+            return builtInTree(repeatingRule(node), depth + 1, known);
         }
         if (bands(node) || spatialNoise(node)) {
             return true;
@@ -290,7 +328,7 @@ public final class SurfaceRulePlan {
         if (weighted(node)) {
             var rules = (SimpleWeightedRandomList<?>) component(node, 0);
             for (var entry : rules.unwrap()) {
-                if (!builtInTree(entry.getData(), depth + 1)) {
+                if (!builtInTree(entry.getData(), depth + 1, known)) {
                     return false;
                 }
             }
@@ -299,20 +337,20 @@ public final class SurfaceRulePlan {
         if (node.getClass().getEnclosingClass() != SurfaceRules.class) {
             return false;
         }
-        RecordComponent[] components = node.getClass().getRecordComponents();
-        if (components == null) {
+        if (!node.getClass().isRecord()) {
             return true;
         }
-        for (int i = 0; i < components.length; i++) {
+        int components = RECORD_ACCESSORS.get(node.getClass()).length;
+        for (int i = 0; i < components; i++) {
             Object value = component(node, i);
             if (value instanceof SurfaceRules.RuleSource || value instanceof SurfaceRules.ConditionSource) {
-                if (!builtInTree(value, depth + 1)) {
+                if (!builtInTree(value, depth + 1, known)) {
                     return false;
                 }
             } else if (value instanceof List<?> children) {
                 for (Object child : children) {
                     if ((child instanceof SurfaceRules.RuleSource || child instanceof SurfaceRules.ConditionSource)
-                        && !builtInTree(child, depth + 1)) {
+                        && !builtInTree(child, depth + 1, known)) {
                         return false;
                     }
                 }
@@ -355,10 +393,42 @@ public final class SurfaceRulePlan {
     }
 
     private static Object component(Object record, int index) throws ReflectiveOperationException {
-        RecordComponent component = record.getClass().getRecordComponents()[index];
-        var accessor = component.getAccessor();
-        accessor.setAccessible(true);
-        return accessor.invoke(record);
+        try {
+            return (Object) RECORD_ACCESSORS.get(record.getClass())[index].invokeExact(record);
+        } catch (Throwable failure) {
+            throw new ReflectiveOperationException("Could not read surface rule", failure);
+        }
+    }
+
+    private static final class Builder {
+
+        private final Object context;
+        private final WorldGenerationContext generation;
+        private final Map<SurfaceRules.RuleSource, Rule> rules = new IdentityHashMap<>();
+        private final Map<SurfaceRules.ConditionSource, Condition> conditions = new IdentityHashMap<>();
+
+        private Builder(Object context, WorldGenerationContext generation) {
+            this.context = context;
+            this.generation = generation;
+        }
+
+        private Rule rule(SurfaceRules.RuleSource source, int depth) throws ReflectiveOperationException {
+            Rule known = this.rules.get(source);
+            if (known == null) {
+                known = SurfaceRulePlan.rule(source, this.context, this.generation, depth, this);
+                this.rules.put(source, known);
+            }
+            return known;
+        }
+
+        private Condition condition(SurfaceRules.ConditionSource source, int depth) throws ReflectiveOperationException {
+            Condition known = this.conditions.get(source);
+            if (known == null) {
+                known = SurfaceRulePlan.condition(source, this.context, this.generation, depth, this);
+                this.conditions.put(source, known);
+            }
+            return known;
+        }
     }
 
     @FunctionalInterface

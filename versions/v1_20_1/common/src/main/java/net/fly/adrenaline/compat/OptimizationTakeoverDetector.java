@@ -87,6 +87,14 @@ public final class OptimizationTakeoverDetector {
 
             String controller = externalOwner(targetMethod);
 
+            if (claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.SURFACE)
+                && org.objectweb.asm.Type.getArgumentTypes(targetMethod.desc).length == 8
+                && org.objectweb.asm.Type.getReturnType(targetMethod.desc).getSort() == org.objectweb.asm.Type.VOID
+                && externalDependency(targetClass.name, targetMethod, methods, new HashSet<>()) != null) {
+                SurfacePipelineCompatibility.preserveOriginalTraversal();
+                continue;
+            }
+
             if (controller == null && (claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.BIOME_FIDDLE)
                 || claim.getValue().contains(OptimizationTakeoverRegistry.Optimization.SURFACE_NOISE))) {
                 controller = externalDependency(targetClass.name, targetMethod, methods, new HashSet<>());
