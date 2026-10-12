@@ -50,13 +50,14 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void adrenaline$cancelWorldgenJobsOnStop(CallbackInfo ci) {
         MinecraftServer server = (MinecraftServer) (Object) this;
+        DeferredSpawnSearch.reset();
         ChunkJobScheduler.get().cancel(server);
     }
 
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.INITIAL_SPAWN)
     private static void adrenaline$deferInitialSpawnSearch(ServerLevel level, ServerLevelData levelData, boolean generateBonusChest, boolean debugWorld, CallbackInfo ci) {
-        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
+        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE) || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return;
         }
         if (AdrenalinePlatform.onCreateWorldSpawn(level, levelData)) {
@@ -113,13 +114,27 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         return diameter * diameter;
     }
 
+    @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getTickingGenerated()I"), require = 0)
+    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    private int adrenaline$waitForResolvedSpawn(int generated) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+            return generated;
+        }
+        if (DeferredSpawnSearch.isPending()) {
+            return -1;
+        }
+        return Math.min(generated, this.adrenaline$useConfiguredSpawnZoneChunkCount(441));
+    }
+
     @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V"), cancellable = true)
     private void adrenaline$stopSpawnPreparationAfterCancellation(ChunkProgressListener progressListener, CallbackInfo ci) {
-        DeferredSpawnSearch.advance(progressListener);
         if (!((MinecraftServer) (Object) this).isRunning()) {
+            DeferredSpawnSearch.reset();
             progressListener.stop();
             ci.cancel();
+            return;
         }
+        DeferredSpawnSearch.advance(progressListener);
     }
 
     @Inject(method = "prepareLevels", at = @At("HEAD"))

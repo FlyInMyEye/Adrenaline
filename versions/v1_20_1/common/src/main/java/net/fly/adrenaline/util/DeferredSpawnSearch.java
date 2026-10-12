@@ -1,5 +1,6 @@
 package net.fly.adrenaline.util;
 
+import java.util.Comparator;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -17,16 +18,21 @@ import net.minecraft.world.level.storage.ServerLevelData;
 
 public final class DeferredSpawnSearch {
 
+    private static final TicketType<ChunkPos> SEARCH_TICKET = TicketType.create("adrenaline_spawn_search", Comparator.comparingLong(ChunkPos::toLong));
     private static State state;
 
     private DeferredSpawnSearch() {
     }
 
     public static synchronized void reset() {
+        if (state != null) {
+            state.releaseTicket(state.level.getChunkSource());
+        }
         state = null;
     }
 
     public static synchronized void begin(ServerLevel level, ServerLevelData levelData, ChunkPos candidate, boolean generateBonusChest) {
+        reset();
         state = new State(level, levelData, candidate, generateBonusChest);
     }
 
@@ -39,22 +45,27 @@ public final class DeferredSpawnSearch {
         if (current == null) {
             return;
         }
-        ChunkPos searchPos = current.searchPos();
         ServerChunkCache chunkSource = current.level.getChunkSource();
-        LevelChunk chunk = chunkSource.getChunkNow(searchPos.x, searchPos.z);
-        if (chunk == null) {
-            return;
-        }
-        current.resolveFallback(chunkSource);
-        BlockPos spawnPos = PlayerRespawnLogic.getSpawnPosInChunk(current.level, searchPos);
-        if (spawnPos != null) {
-            current.finish(spawnPos, progressListener);
-            state = null;
-            return;
-        }
-        if (!current.moveNext()) {
-            current.finish(new BlockPos(current.levelData.getXSpawn(), current.levelData.getYSpawn(), current.levelData.getZSpawn()), progressListener);
-            state = null;
+        while (true) {
+            ChunkPos searchPos = current.searchPos();
+            LevelChunk chunk = chunkSource.getChunkNow(searchPos.x, searchPos.z);
+            if (chunk == null) {
+                current.requestChunk(chunkSource, searchPos);
+                return;
+            }
+            current.resolveFallback(chunkSource);
+            BlockPos spawnPos = PlayerRespawnLogic.getSpawnPosInChunk(current.level, searchPos);
+            current.releaseTicket(chunkSource);
+            if (spawnPos != null) {
+                current.finish(spawnPos, progressListener);
+                state = null;
+                return;
+            }
+            if (!current.moveNext()) {
+                current.finish(new BlockPos(current.levelData.getXSpawn(), current.levelData.getYSpawn(), current.levelData.getZSpawn()), progressListener);
+                state = null;
+                return;
+            }
         }
     }
 
@@ -70,6 +81,7 @@ public final class DeferredSpawnSearch {
         private int directionZ = -1;
         private int attempts;
         private boolean fallbackResolved;
+        private ChunkPos requestedChunk;
 
         private State(ServerLevel level, ServerLevelData levelData, ChunkPos candidate, boolean generateBonusChest) {
             this.level = level;
@@ -80,6 +92,21 @@ public final class DeferredSpawnSearch {
 
         private ChunkPos searchPos() {
             return new ChunkPos(this.candidate.x + this.offsetX, this.candidate.z + this.offsetZ);
+        }
+
+        private void requestChunk(ServerChunkCache chunkSource, ChunkPos pos) {
+            if (!pos.equals(this.requestedChunk)) {
+                this.releaseTicket(chunkSource);
+                chunkSource.addRegionTicket(SEARCH_TICKET, pos, 0, pos);
+                this.requestedChunk = pos;
+            }
+        }
+
+        private void releaseTicket(ServerChunkCache chunkSource) {
+            if (this.requestedChunk != null) {
+                chunkSource.removeRegionTicket(SEARCH_TICKET, this.requestedChunk, 0, this.requestedChunk);
+                this.requestedChunk = null;
+            }
         }
 
         private boolean moveNext() {
