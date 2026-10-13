@@ -30,18 +30,6 @@ public interface AdrenalineMixinSurfaceRulesContextMutable {
     @Accessor("lastPreliminarySurfaceCellOrigin")
     void adrenaline$setLastPreliminarySurfaceCellOrigin(long lastPreliminarySurfaceCellOrigin);
 
-    @Accessor("lastUpdateXZ")
-    void adrenaline$setLastUpdateXZ(long lastUpdateXZ);
-
-    @Accessor("lastSurfaceDepth2Update")
-    void adrenaline$setLastSurfaceDepth2Update(long lastSurfaceDepth2Update);
-
-    @Accessor("lastMinSurfaceLevelUpdate")
-    void adrenaline$setLastMinSurfaceLevelUpdate(long lastMinSurfaceLevelUpdate);
-
-    @Accessor("lastUpdateY")
-    void adrenaline$setLastUpdateY(long lastUpdateY);
-
     @Accessor("biome")
     void adrenaline$setBiome(Supplier<Holder<Biome>> biome);
 }

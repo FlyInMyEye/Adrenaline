@@ -4,7 +4,6 @@ import java.util.Arrays;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.dimension.DimensionType;
 
 public final class SurfaceColumnBuffer {
 
@@ -15,8 +14,6 @@ public final class SurfaceColumnBuffer {
     private final boolean[] columnDirty;
     private final boolean[] initiallyAir;
     private final BlockState[] column;
-    private final int[] stoneBottom;
-    private final int[] defaultBottom;
     private final int minY;
     private int columnOffset;
 
@@ -31,8 +28,6 @@ public final class SurfaceColumnBuffer {
             this.initiallyAir[i] = !sections[i].getStates().maybeHas(state -> state != AIR);
         }
         this.column = new BlockState[sections.length * 16];
-        this.stoneBottom = new int[this.column.length];
-        this.defaultBottom = new int[this.column.length];
     }
 
     public void load(int x, int z) {
@@ -76,32 +71,6 @@ public final class SurfaceColumnBuffer {
         if (start < end) {
             Arrays.fill(this.column, start, end, state);
         }
-    }
-
-    public void prepareRuns(BlockState defaultBlock, SurfaceSystemOptimizer.StonePredicate predicate, int top) {
-        int nextStoneBottom = predicate.test(AIR) ? DimensionType.WAY_BELOW_MIN_Y : this.minY;
-        int nextDefaultBottom = this.minY;
-        int end = Math.min(this.column.length, top - this.minY);
-        for (int index = 0; index < end; index++) {
-            int y = this.minY + index;
-            BlockState state = this.column[index];
-            this.stoneBottom[index] = nextStoneBottom;
-            if (!predicate.test(state)) {
-                nextStoneBottom = y + 1;
-            }
-            if (state != defaultBlock) {
-                nextDefaultBottom = y + 1;
-            }
-            this.defaultBottom[index] = nextDefaultBottom;
-        }
-    }
-
-    public int stoneBottom(int y) {
-        return this.stoneBottom[y - this.minY];
-    }
-
-    public int defaultBottom(int y) {
-        return this.defaultBottom[y - this.minY];
     }
 
     public void store() {

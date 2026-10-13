@@ -1,219 +1,160 @@
 package net.fly.adrenaline.worldgen;
 
-import java.util.Set;
-import java.util.function.Predicate;
-import net.minecraft.world.level.levelgen.Heightmap;
-
 import net.minecraft.core.BlockPos.MutableBlockPos;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.BlockColumn;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 public final class FastSurfaceColumn implements BlockColumn {
 
-    private static final Predicate<BlockState> OCEAN_FLOOR = Heightmap.Types.OCEAN_FLOOR_WG.isOpaque();
-    private static final BlockState AIR = Blocks.AIR.defaultBlockState();
-
+    private final BlockColumn original;
     private final ChunkAccess chunk;
     private final LevelChunkSection[] sections;
-    private final MutableBlockPos postProcessPos;
-    private final Set<LevelChunkSection> dirtySections;
+    private final int minSection;
+    private final MutableBlockPos position;
     private final SurfaceColumnBuffer buffer;
-    private final int minBuildHeight;
-    private final int maxBuildHeight;
+    private final Heightmap worldSurface;
+    private final Heightmap oceanFloor;
+    private final int minY;
+    private final int maxY;
+    private int x = Integer.MIN_VALUE;
+    private int z;
+    private int surface;
+    private int floor;
 
-    private int localX;
-    private int localZ;
-    private int blockX;
-    private int blockZ;
-    private int worldSurface;
-    private int oceanFloor;
-
-    public FastSurfaceColumn(ChunkAccess chunk, MutableBlockPos postProcessPos, Set<LevelChunkSection> dirtySections, boolean buffered) {
+    public FastSurfaceColumn(BlockColumn original, ChunkAccess chunk, MutableBlockPos position, boolean buffered) {
+        this.original = original;
         this.chunk = chunk;
         this.sections = chunk.getSections();
-        this.postProcessPos = postProcessPos;
-        this.dirtySections = dirtySections;
-        this.minBuildHeight = chunk.getMinBuildHeight();
-        this.maxBuildHeight = chunk.getMaxBuildHeight();
-        this.buffer = buffered ? new SurfaceColumnBuffer(this.sections, this.minBuildHeight) : null;
+        this.minSection = chunk.getMinSection();
+        this.position = position;
+        this.minY = chunk.getMinBuildHeight();
+        this.maxY = chunk.getMaxBuildHeight();
+        this.buffer = buffered ? new SurfaceColumnBuffer(this.sections, this.minY) : null;
+        this.worldSurface = buffered ? chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG) : null;
+        this.oceanFloor = buffered ? chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG) : null;
     }
 
-    public void resetColumn(int localX, int localZ, int blockX, int blockZ, int worldSurface, int oceanFloor) {
-        this.localX = localX;
-        this.localZ = localZ;
-        this.blockX = blockX;
-        this.blockZ = blockZ;
-        this.worldSurface = worldSurface;
-        this.oceanFloor = oceanFloor;
-        if (this.buffer != null) {
-            this.buffer.load(localX, localZ);
+    public boolean buffered() {
+        return this.buffer != null;
+    }
+
+    private void select() {
+        int nextX = this.position.getX() & 15;
+        int nextZ = this.position.getZ() & 15;
+        if (this.x == nextX && this.z == nextZ) {
+            return;
         }
+        if (this.x != Integer.MIN_VALUE) {
+            this.buffer.store();
+        }
+        this.x = nextX;
+        this.z = nextZ;
+        this.surface = this.worldSurface.getFirstAvailable(this.x, this.z);
+        this.floor = this.oceanFloor.getFirstAvailable(this.x, this.z);
+        this.buffer.load(this.x, this.z);
     }
 
     @Override
     public BlockState getBlock(int y) {
-        if (y < this.minBuildHeight || y >= this.maxBuildHeight) {
-            return AIR;
+        if (this.buffer == null) {
+            this.position.setY(y);
+            if (y < this.minY || y >= this.maxY) {
+                return Blocks.VOID_AIR.defaultBlockState();
+            }
+            LevelChunkSection section = this.sections[(y >> 4) - this.minSection];
+            return section.hasOnlyAir() ? Blocks.AIR.defaultBlockState()
+                : section.getBlockState(this.position.getX() & 15, y & 15, this.position.getZ() & 15);
         }
-        if (this.buffer != null) {
-            return this.buffer.get(y);
-        }
-
-        LevelChunkSection section = this.sections[this.chunk.getSectionIndex(y)];
-        if (section.hasOnlyAir()) {
-            return AIR;
-        }
-
-        return section.getBlockState(this.localX, y & 15, this.localZ);
+        this.select();
+        return this.buffer.get(y);
     }
 
     @Override
     public void setBlock(int y, BlockState state) {
-        if (y < this.minBuildHeight || y >= this.maxBuildHeight) {
+        if (this.buffer == null) {
+            this.original.setBlock(y, state);
             return;
         }
-
-        BlockState previousState = this.getBlock(y);
-        if (this.buffer != null) {
+        if (y < this.minY || y >= this.maxY) {
+            return;
+        }
+        this.select();
+        BlockState previous = this.buffer.get(y);
+        if (previous != state) {
             this.buffer.set(y, state);
-        } else {
-            LevelChunkSection section = this.sections[this.chunk.getSectionIndex(y)];
-            FastSectionAccess.writeUnchecked(section, this.localX, y & 15, this.localZ, state);
-            this.dirtySections.add(section);
-        }
-        this.updateHeights(y, previousState, state);
-
-        if (!state.getFluidState().isEmpty()) {
-            this.postProcessPos.set(this.blockX, y, this.blockZ);
-            this.chunk.markPosForPostprocessing(this.postProcessPos);
-        }
-    }
-
-    public void prepareRuns(BlockState defaultBlock, SurfaceSystemOptimizer.StonePredicate predicate, int top) {
-        if (this.buffer != null) {
-            this.buffer.prepareRuns(defaultBlock, predicate, top);
-        }
-    }
-
-    public int stoneBottom(int y, SurfaceSystemOptimizer.StonePredicate predicate) {
-        if (this.buffer != null) {
-            return this.buffer.stoneBottom(y);
-        }
-        for (int below = y - 1; below >= this.minBuildHeight - 1; below--) {
-            if (!predicate.test(this.getBlock(below))) {
-                return below + 1;
+            if (!state.isAir()) {
+                this.surface = Math.max(this.surface, y + 1);
+            } else if (y + 1 == this.surface) {
+                this.surface = this.findHeight(y - 1, false);
             }
+            if (Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(state)) {
+                this.floor = Math.max(this.floor, y + 1);
+            } else if (y + 1 == this.floor && Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(previous)) {
+                this.floor = this.findHeight(y - 1, true);
+            }
+            FastHeightmap.setRawHeight(this.worldSurface, this.x, this.z, this.surface);
+            FastHeightmap.setRawHeight(this.oceanFloor, this.x, this.z, this.floor);
         }
-        return net.minecraft.world.level.dimension.DimensionType.WAY_BELOW_MIN_Y;
+        if (!state.getFluidState().isEmpty()) {
+            this.chunk.markPosForPostprocessing(this.position.setY(y));
+        }
     }
 
-    public int defaultBottom(int y, BlockState defaultBlock) {
-        if (this.buffer != null) {
-            return this.buffer.defaultBottom(y);
-        }
+    public int defaultBottom(int y, int limit, BlockState defaultBlock) {
+        this.select();
         int bottom = y;
-        while (bottom > this.minBuildHeight && this.getBlock(bottom - 1) == defaultBlock) {
+        while (bottom > limit && this.buffer.get(bottom - 1) == defaultBlock) {
             bottom--;
         }
         return bottom;
     }
 
-    public void setSpan(int bottom, int top, BlockState state) {
-        if (this.buffer == null) {
-            for (int y = top; y >= bottom; y--) {
-                this.setBlock(y, state);
-            }
-            return;
-        }
-        bottom = Math.max(bottom, this.minBuildHeight);
-        top = Math.min(top, this.maxBuildHeight - 1);
+    public void fill(int bottom, int top, BlockState state) {
+        this.select();
+        bottom = Math.max(bottom, this.minY);
+        top = Math.min(top, this.maxY - 1);
         if (bottom > top) {
             return;
         }
         this.buffer.fill(bottom, top, state);
         if (!state.isAir()) {
-            this.worldSurface = Math.max(this.worldSurface, top + 1);
-        } else if (this.worldSurface > bottom && this.worldSurface <= top + 1) {
-            this.worldSurface = this.findWorldSurface(bottom - 1);
+            this.surface = Math.max(this.surface, top + 1);
+        } else if (this.surface > bottom && this.surface <= top + 1) {
+            this.surface = this.findHeight(bottom - 1, false);
         }
-        if (OCEAN_FLOOR.test(state)) {
-            this.oceanFloor = Math.max(this.oceanFloor, top + 1);
-        } else if (this.oceanFloor > bottom && this.oceanFloor <= top + 1) {
-            this.oceanFloor = this.findOceanFloor(bottom - 1);
+        if (Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(state)) {
+            this.floor = Math.max(this.floor, top + 1);
+        } else if (this.floor > bottom && this.floor <= top + 1) {
+            this.floor = this.findHeight(bottom - 1, true);
         }
+        FastHeightmap.setRawHeight(this.worldSurface, this.x, this.z, this.surface);
+        FastHeightmap.setRawHeight(this.oceanFloor, this.x, this.z, this.floor);
         if (!state.getFluidState().isEmpty()) {
             for (int y = top; y >= bottom; y--) {
-                this.chunk.markPosForPostprocessing(this.postProcessPos.set(this.blockX, y, this.blockZ));
+                this.chunk.markPosForPostprocessing(this.position.setY(y));
             }
         }
     }
 
-    public void finishColumn() {
-        if (this.buffer != null) {
-            this.buffer.store();
+    private int findHeight(int y, boolean floor) {
+        for (; y >= this.minY; y--) {
+            BlockState state = this.buffer.get(y);
+            if (floor ? Heightmap.Types.OCEAN_FLOOR_WG.isOpaque().test(state) : !state.isAir()) {
+                return y + 1;
+            }
         }
+        return this.minY;
     }
 
     public void finish() {
-        if (this.buffer != null) {
+        if (this.buffer != null && this.x != Integer.MIN_VALUE) {
+            this.buffer.store();
             this.buffer.commit();
-        } else {
-            for (LevelChunkSection section : this.dirtySections) {
-                section.recalcBlockCounts();
-            }
+            this.chunk.initializeLightSources();
         }
-    }
-
-    public int worldSurface() {
-        return this.worldSurface;
-    }
-
-    public int oceanFloor() {
-        return this.oceanFloor;
-    }
-
-    private void updateHeights(int y, BlockState previousState, BlockState newState) {
-        if (previousState == newState) {
-            return;
-        }
-
-        int height = y + 1;
-        if (!newState.isAir() && height > this.worldSurface) {
-            this.worldSurface = height;
-        } else if (!previousState.isAir() && newState.isAir() && height == this.worldSurface) {
-            this.worldSurface = this.findWorldSurface(y - 1);
-        }
-
-        boolean previousCountsForOceanFloor = OCEAN_FLOOR.test(previousState);
-        boolean newCountsForOceanFloor = OCEAN_FLOOR.test(newState);
-        if (newCountsForOceanFloor && height > this.oceanFloor) {
-            this.oceanFloor = height;
-        } else if (previousCountsForOceanFloor && !newCountsForOceanFloor && height == this.oceanFloor) {
-            this.oceanFloor = this.findOceanFloor(y - 1);
-        }
-    }
-
-    public int findWorldSurface(int fromY) {
-        for (int y = Math.min(fromY, this.maxBuildHeight - 1); y >= this.minBuildHeight; y--) {
-            if (!this.getBlock(y).isAir()) {
-                return y + 1;
-            }
-        }
-
-        return this.minBuildHeight;
-    }
-
-    public int findOceanFloor(int fromY) {
-        for (int y = Math.min(fromY, this.maxBuildHeight - 1); y >= this.minBuildHeight; y--) {
-            BlockState state = this.getBlock(y);
-            if (OCEAN_FLOOR.test(state)) {
-                return y + 1;
-            }
-        }
-
-        return this.minBuildHeight;
     }
 }

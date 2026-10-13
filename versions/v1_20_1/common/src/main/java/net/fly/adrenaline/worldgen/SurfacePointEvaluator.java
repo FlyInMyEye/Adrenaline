@@ -8,14 +8,22 @@ import java.util.Arrays;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextApi;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextMutable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.BlockColumn;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.SurfaceRules;
@@ -28,11 +36,10 @@ import org.objectweb.asm.Type;
 
 public final class SurfacePointEvaluator implements Opcodes {
 
-    private static final String PLAN = Type.getInternalName(SurfaceRulePlan.class);
-    private static final String CONTEXT = Type.getInternalName(AdrenalineMixinSurfaceRulesContextApi.class);
-    private static final String HANDLE = Type.getInternalName(MethodHandle.class);
+    private static final boolean BUFFERED = Boolean.parseBoolean(System.getProperty("adrenaline.bufferedSurface", "true"));
+    private static final String EVALUATOR = Type.getInternalName(Evaluator.class);
     private static final String STATE = Type.getDescriptor(BlockState.class);
-    private static final String ARGUMENTS = "L" + PLAN + ";L" + HANDLE + ";L" + CONTEXT + ";";
+    private static final String ARGUMENTS = "L" + EVALUATOR + ";";
     private static final MethodHandle FACTORY = createFactory();
     private static final ThreadLocal<Cache> CACHE = ThreadLocal.withInitial(Cache::new);
     private static final ThreadLocal<Cache> ACTIVE = new ThreadLocal<>();
@@ -40,9 +47,19 @@ public final class SurfacePointEvaluator implements Opcodes {
     private SurfacePointEvaluator() {
     }
 
-    public static Scope open() {
+    public static Scope suspend() {
         Cache previous = ACTIVE.get();
-        ACTIVE.set(previous == null ? CACHE.get() : new Cache());
+        ACTIVE.remove();
+        return new Scope(previous);
+    }
+
+    public static Scope open(BiomeManager manager) {
+        Cache previous = ACTIVE.get();
+        Cache cache = previous == null ? CACHE.get() : new Cache();
+        cache.manager = manager;
+        cache.spanTop = 0;
+        cache.spanBottom = 0;
+        ACTIVE.set(cache);
         return new Scope(previous);
     }
 
@@ -56,7 +73,7 @@ public final class SurfacePointEvaluator implements Opcodes {
         }
         if (cache.system != system || cache.randomState != randomState || cache.biomes != biomes || cache.source != source
             || cache.minY != generation.getMinGenY() || cache.height != generation.getGenDepth()) {
-            boolean supported = SurfaceRulePlan.supportsBufferedWrites(source);
+            boolean supported = cache.knownRules(source);
             Object nextContext = supported ? factory.get() : null;
             cache.system = system;
             cache.randomState = randomState;
@@ -64,7 +81,9 @@ public final class SurfacePointEvaluator implements Opcodes {
             cache.source = source;
             cache.minY = generation.getMinGenY();
             cache.height = generation.getGenDepth();
-            cache.plan = null;
+            cache.evaluator = null;
+            cache.originalRule = null;
+            cache.originalHandle = null;
             cache.supported = supported;
             cache.context = nextContext;
             if (!cache.supported) {
@@ -77,11 +96,41 @@ public final class SurfacePointEvaluator implements Opcodes {
             AdrenalineMixinSurfaceRulesContextMutable mutable = (AdrenalineMixinSurfaceRulesContextMutable) cache.context;
             mutable.adrenaline$setChunk(chunk);
             mutable.adrenaline$setNoiseChunk(noiseChunk);
-            mutable.adrenaline$setBiomeGetter(biomeGetter);
+            mutable.adrenaline$setBiomeGetter(cache.biomesCache);
             mutable.adrenaline$setLastPreliminarySurfaceCellOrigin(Long.MAX_VALUE);
             mutable.adrenaline$setBiome(null);
         }
+        cache.cacheBiomes = AdrenalineConfig.biomeFiddleOptimizationsEnabled() && cache.manager.getClass() == BiomeManager.class
+            && cache.manager instanceof AdrenalineBiomeManagerSourceAccess
+            && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)
+            && !SurfacePipelineCompatibility.hasForeignHooks(system.getClass());
+        if (cache.cacheBiomes) {
+            cache.resolver = new SurfaceBiomeResolver(cache.manager, chunk);
+            biomeGetter = cache.resolver;
+        }
+        if (cache.cacheBiomes) {
+            cache.biomesCache.rebind(chunk, biomeGetter);
+            biomeGetter = cache.biomesCache;
+        } else {
+            cache.biomesCache.clear();
+        }
+        ((AdrenalineMixinSurfaceRulesContextMutable) cache.context).adrenaline$setBiomeGetter(biomeGetter);
+        if (cache.evaluator != null) {
+            cache.evaluator.plan.biomes(cache.cacheBiomes ? cache.biomesCache : null);
+        }
         return cache.context;
+    }
+
+    public static Object rule(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Supplier<Object> factory) {
+        Cache cache = ACTIVE.get();
+        if (cache == null || cache.context != context || cache.source != source || !cache.supported) {
+            return factory.get();
+        }
+        if (cache.originalRule == null) {
+            cache.originalRule = factory.get();
+            cache.originalHandle = SurfaceRulesContextFactory.createTryApplyHandle(cache.originalRule);
+        }
+        return wrap(source, context, generation, cache.originalRule);
     }
 
     public static Object wrap(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Object original) {
@@ -90,33 +139,206 @@ public final class SurfacePointEvaluator implements Opcodes {
             || !(context instanceof AdrenalineMixinSurfaceRulesContextApi contextApi)) {
             return original;
         }
-        SurfaceRulePlan plan = cache.plan;
-        if (plan == null) {
-            plan = SurfaceRulePlan.compile(source, context, generation, contextApi);
-            cache.plan = plan;
+        Evaluator evaluator = cache.evaluator;
+        if (evaluator == null) {
+            SurfaceRulePlan plan = SurfaceRulePlan.compile(source, context, generation, contextApi);
+            if (plan == null) {
+                return original;
+            }
+            plan.biomes(cache.cacheBiomes ? cache.biomesCache : null);
+            evaluator = new Evaluator(plan, contextApi, cache.biomesCache, generation.getMinGenY());
+            cache.evaluator = evaluator;
         }
-        if (plan == null) {
-            return original;
-        }
-        MethodHandle fallback = SurfaceRulesContextFactory.createTryApplyHandle(original);
+        evaluator.rebind(cache.originalHandle);
         try {
-            return (Object) FACTORY.invokeExact(plan, fallback, contextApi);
+            cache.adapter = (Object) FACTORY.invokeExact(evaluator);
+            return cache.adapter;
         } catch (Throwable failure) {
             throw new IllegalStateException("Could not create surface rule evaluator", failure);
         }
     }
 
-    public static BlockState apply(SurfaceRulePlan plan, MethodHandle original, AdrenalineMixinSurfaceRulesContextApi context,
-                                   int x, int y, int z) {
-        BlockState result = plan.evaluate(x, y, z, context.adrenaline$getStoneDepthAbove(),
-            context.adrenaline$getStoneDepthBelow(), context.adrenaline$getWaterHeight(), y);
-        if (!plan.uncertain()) {
-            return result;
+    public static Holder<Biome> biome(BiomeManager manager, BlockPos position) {
+        Cache cache = ACTIVE.get();
+        return cache != null && cache.manager == manager && cache.resolver != null ? cache.resolver.apply(position) : null;
+    }
+
+    public static BlockColumn column(BlockColumn original, SurfaceSystem system, ChunkAccess chunk, MutableBlockPos position, BlockState defaultBlock, SurfaceRules.RuleSource source) {
+        Cache cache = ACTIVE.get();
+        if (!BUFFERED || cache == null || !cache.knownRules(source) || !SectionPaletteBuilder.available()
+            || chunk.getClass() != ProtoChunk.class || chunk.getStatus().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)
+            || (chunk.getMinBuildHeight() & 15) != 0 || (chunk.getHeight() & 15) != 0
+            || chunk.getHeightAccessorForGeneration().getMinBuildHeight() != chunk.getMinBuildHeight()
+            || chunk.getHeightAccessorForGeneration().getMaxBuildHeight() != chunk.getMaxBuildHeight()
+            || original.getClass().getEnclosingClass() != SurfaceSystem.class
+            || SurfacePipelineCompatibility.hasForeignHooks(original.getClass())
+            || SurfacePipelineCompatibility.hasForeignHooks(system.getClass())
+            || SurfacePipelineCompatibility.hasForeignHooks(SurfaceRulesContextFactory.contextType())
+            || SurfacePipelineCompatibility.hasBlockStorageHooks(chunk.getClass())
+            || SurfacePipelineCompatibility.hasForeignHooks(LevelChunkSection.class)
+            || SurfacePipelineCompatibility.hasForeignHooks(PalettedContainer.class)
+            || SurfacePipelineCompatibility.hasForeignHooks(net.minecraft.world.level.levelgen.Heightmap.class)) {
+            return liveColumn(original, chunk, position, cache);
         }
-        try {
-            return (BlockState) original.invokeExact(x, y, z);
-        } catch (Throwable failure) {
-            throw new IllegalStateException("Surface rule evaluation failed", failure);
+        for (LevelChunkSection section : chunk.getSections()) {
+            if (section.getClass() != LevelChunkSection.class || section.getStates().getClass() != PalettedContainer.class) {
+                return liveColumn(original, chunk, position, cache);
+            }
+        }
+        cache.defaultBlock = defaultBlock;
+        cache.column = new FastSurfaceColumn(original, chunk, position, true);
+        return cache.column;
+    }
+
+    private static BlockColumn liveColumn(BlockColumn original, ChunkAccess chunk, MutableBlockPos position, Cache cache) {
+        if (cache == null || chunk.getClass() != ProtoChunk.class
+            || original.getClass().getEnclosingClass() != SurfaceSystem.class
+            || SurfacePipelineCompatibility.hasForeignHooks(original.getClass())
+            || SurfacePipelineCompatibility.hasBlockReadHooks(chunk.getClass())
+            || SurfacePipelineCompatibility.hasForeignHooks(net.minecraft.world.level.LevelHeightAccessor.class)) {
+            return original;
+        }
+        cache.column = new FastSurfaceColumn(original, chunk, position, false);
+        return cache.column;
+    }
+
+    public static boolean canUpdateDirectly(Object context) {
+        Cache cache = ACTIVE.get();
+        return cache != null && cache.column != null && cache.column.buffered() && cache.context == context;
+    }
+
+    public static boolean canApplyDirectly(Object rule) {
+        Cache cache = ACTIVE.get();
+        return cache != null && cache.column != null && cache.column.buffered() && cache.adapter == rule;
+    }
+
+    public static BlockState applyDirectly(int x, int y, int z) {
+        return ACTIVE.get().evaluator.apply(x, y, z);
+    }
+
+    public static boolean fillSpan(int x, int y, int z, BlockState state) {
+        Cache cache = ACTIVE.get();
+        if (cache == null) {
+            return false;
+        }
+        cache.spanTop = y;
+        cache.spanBottom = y;
+        Evaluator evaluator = cache.evaluator;
+        if (cache.column == null || !cache.column.buffered() || evaluator == null || evaluator.x != x || evaluator.z != z
+            || evaluator.top < y || evaluator.bottom >= y || evaluator.result != state) {
+            return false;
+        }
+        cache.spanBottom = cache.column.defaultBottom(y, evaluator.bottom, cache.defaultBlock);
+        if (cache.spanBottom == y) {
+            return false;
+        }
+        if (state != null) {
+            cache.column.fill(cache.spanBottom, y, state);
+        }
+        return true;
+    }
+
+    public static int spanDepth(int above) {
+        Cache cache = ACTIVE.get();
+        return cache == null ? above : above + cache.spanTop - cache.spanBottom;
+    }
+
+    public static int spanY(int y) {
+        Cache cache = ACTIVE.get();
+        return cache != null && cache.spanTop == y ? cache.spanBottom : y;
+    }
+
+    public static boolean skipContextUpdate(Object context, int above, int below, int water, int x, int y, int z) {
+        Cache cache = ACTIVE.get();
+        if (cache == null || cache.context != context || cache.evaluator == null) {
+            return false;
+        }
+        cache.spanTop = y;
+        cache.spanBottom = y;
+        if (cache.column != null && cache.column.buffered() && cache.column.getBlock(y) != cache.defaultBlock) {
+            return true;
+        }
+        return cache.evaluator.skipContextUpdate(above, below, water, x, y, z);
+    }
+
+    public static boolean canCacheBiome(Object context) {
+        Cache cache = ACTIVE.get();
+        return cache != null && cache.context == context && cache.supported;
+    }
+
+    public static final class Evaluator {
+        private final SurfaceRulePlan plan;
+        private final AdrenalineMixinSurfaceRulesContextApi context;
+        private final SurfaceBiomeCache biomes;
+        private final int minY;
+        private MethodHandle original;
+        private int x;
+        private int z;
+        private int top;
+        private int bottom;
+        private int stoneTop;
+        private int stoneBottom;
+        private int water;
+        private BlockState result;
+        private boolean column;
+        private boolean cachedPoint;
+        private int pointY;
+
+        private Evaluator(SurfaceRulePlan plan, AdrenalineMixinSurfaceRulesContextApi context, SurfaceBiomeCache biomes, int minY) {
+            this.plan = plan;
+            this.context = context;
+            this.biomes = biomes;
+            this.minY = minY;
+        }
+
+        private void rebind(MethodHandle original) {
+            this.original = original;
+            this.column = false;
+            this.cachedPoint = false;
+            this.bottom = Integer.MAX_VALUE;
+        }
+
+        private boolean skipContextUpdate(int above, int below, int water, int x, int y, int z) {
+            this.cachedPoint = this.column && this.x == x && this.z == z && y <= this.top && y >= this.bottom
+                && y + above == this.stoneTop && y - below == this.stoneBottom && water == this.water;
+            this.pointY = y;
+            return this.cachedPoint;
+        }
+
+        public BlockState apply(int x, int y, int z) {
+            if (this.cachedPoint && this.x == x && this.z == z && this.pointY == y) {
+                return this.result;
+            }
+            int above = this.context.adrenaline$getStoneDepthAbove();
+            int below = this.context.adrenaline$getStoneDepthBelow();
+            int water = this.context.adrenaline$getWaterHeight();
+            if (this.column && this.x == x && this.z == z && y <= this.top && y >= this.bottom
+                && y + above == this.stoneTop && y - below == this.stoneBottom && water == this.water) {
+                return this.result;
+            }
+            if (!this.column || this.x != x || this.z != z) {
+                this.biomes.column(x, z);
+                this.column = true;
+            }
+            this.x = x;
+            this.z = z;
+            this.top = y;
+            this.bottom = y;
+            this.stoneTop = y + above;
+            this.stoneBottom = y - below;
+            this.water = water;
+            BlockState value = this.plan.evaluate(x, y, z, above, below, water, Math.max(this.minY, y - below + 1));
+            if (!this.plan.uncertain()) {
+                this.bottom = this.plan.bottom();
+                this.result = value;
+                return value;
+            }
+            try {
+                this.result = (BlockState) this.original.invokeExact(x, y, z);
+                return this.result;
+            } catch (Throwable failure) {
+                throw new IllegalStateException("Surface rule evaluation failed", failure);
+            }
         }
     }
 
@@ -132,9 +354,8 @@ public final class SurfacePointEvaluator implements Opcodes {
                         MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(type, MethodHandles.lookup());
                         Class<?> adapter = lookup.defineClass(adapter(type, method.getName()));
                         return lookup.findConstructor(adapter, MethodType.methodType(void.class,
-                            SurfaceRulePlan.class, MethodHandle.class, AdrenalineMixinSurfaceRulesContextApi.class))
-                            .asType(MethodType.methodType(Object.class, SurfaceRulePlan.class, MethodHandle.class,
-                                AdrenalineMixinSurfaceRulesContextApi.class));
+                            Evaluator.class))
+                            .asType(MethodType.methodType(Object.class, Evaluator.class));
                     }
                 }
             }
@@ -149,34 +370,25 @@ public final class SurfacePointEvaluator implements Opcodes {
             + "AdrenalineSurfacePointRule";
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         writer.visit(V17, ACC_PUBLIC | ACC_FINAL, name, null, "java/lang/Object", new String[]{Type.getInternalName(ruleType)});
-        String[] fields = {"plan", "original", "context"};
-        String[] descriptors = {"L" + PLAN + ";", "L" + HANDLE + ";", "L" + CONTEXT + ";"};
-        for (int i = 0; i < fields.length; i++) {
-            writer.visitField(ACC_PRIVATE | ACC_FINAL, fields[i], descriptors[i], null, null).visitEnd();
-        }
+        writer.visitField(ACC_PRIVATE | ACC_FINAL, "evaluator", ARGUMENTS, null, null).visitEnd();
         MethodVisitor constructor = writer.visitMethod(ACC_PUBLIC, "<init>", "(" + ARGUMENTS + ")V", null, null);
         constructor.visitCode();
         constructor.visitVarInsn(ALOAD, 0);
         constructor.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
-        for (int i = 0; i < fields.length; i++) {
-            constructor.visitVarInsn(ALOAD, 0);
-            constructor.visitVarInsn(ALOAD, i + 1);
-            constructor.visitFieldInsn(PUTFIELD, name, fields[i], descriptors[i]);
-        }
+        constructor.visitVarInsn(ALOAD, 0);
+        constructor.visitVarInsn(ALOAD, 1);
+        constructor.visitFieldInsn(PUTFIELD, name, "evaluator", ARGUMENTS);
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(0, 0);
         constructor.visitEnd();
         MethodVisitor apply = writer.visitMethod(ACC_PUBLIC, methodName, "(III)" + STATE, null, null);
         apply.visitCode();
-        for (int i = 0; i < fields.length; i++) {
-            apply.visitVarInsn(ALOAD, 0);
-            apply.visitFieldInsn(GETFIELD, name, fields[i], descriptors[i]);
-        }
+        apply.visitVarInsn(ALOAD, 0);
+        apply.visitFieldInsn(GETFIELD, name, "evaluator", ARGUMENTS);
         for (int i = 1; i <= 3; i++) {
             apply.visitVarInsn(ILOAD, i);
         }
-        apply.visitMethodInsn(INVOKESTATIC, Type.getInternalName(SurfacePointEvaluator.class), "apply",
-            "(" + ARGUMENTS + "III)" + STATE, false);
+        apply.visitMethodInsn(INVOKEVIRTUAL, EVALUATOR, "apply", "(III)" + STATE, false);
         apply.visitInsn(ARETURN);
         apply.visitMaxs(0, 0);
         apply.visitEnd();
@@ -186,14 +398,35 @@ public final class SurfacePointEvaluator implements Opcodes {
 
     private static final class Cache {
         private SurfaceSystem system;
+        private SurfaceRules.RuleSource checkedSource;
+        private boolean checkedRules;
+        private BiomeManager manager;
+        private SurfaceBiomeResolver resolver;
+        private boolean cacheBiomes;
+        private FastSurfaceColumn column;
+        private BlockState defaultBlock;
+        private int spanTop;
+        private int spanBottom;
         private RandomState randomState;
         private Registry<Biome> biomes;
         private SurfaceRules.RuleSource source;
         private int minY;
         private int height;
         private Object context;
-        private SurfaceRulePlan plan;
+        private final SurfaceBiomeCache biomesCache = new SurfaceBiomeCache();
+        private Evaluator evaluator;
+        private Object originalRule;
+        private Object adapter;
+        private MethodHandle originalHandle;
         private boolean supported;
+
+        private boolean knownRules(SurfaceRules.RuleSource source) {
+            if (this.checkedSource != source) {
+                this.checkedSource = source;
+                this.checkedRules = SurfaceRulePlan.supportsBufferedWrites(source);
+            }
+            return this.checkedRules;
+        }
     }
 
     public static final class Scope implements AutoCloseable {
@@ -206,16 +439,33 @@ public final class SurfacePointEvaluator implements Opcodes {
         @Override
         public void close() {
             Cache current = ACTIVE.get();
-            if (current != null && current.context instanceof AdrenalineMixinSurfaceRulesContextMutable mutable) {
-                mutable.adrenaline$setChunk(null);
-                mutable.adrenaline$setNoiseChunk(null);
-                mutable.adrenaline$setBiomeGetter(null);
-                mutable.adrenaline$setBiome(null);
-            }
-            if (this.previous == null) {
-                ACTIVE.remove();
-            } else {
-                ACTIVE.set(this.previous);
+            try {
+                if (current != null && current.column != null) {
+                    current.column.finish();
+                }
+            } finally {
+                if (current != null) {
+                    current.column = null;
+                    current.adapter = null;
+                    current.manager = null;
+                    current.resolver = null;
+                    if (current.context instanceof AdrenalineMixinSurfaceRulesContextMutable mutable) {
+                        mutable.adrenaline$setChunk(null);
+                        mutable.adrenaline$setNoiseChunk(null);
+                        mutable.adrenaline$setBiomeGetter(null);
+                        mutable.adrenaline$setBiome(null);
+                    }
+                    current.biomesCache.clear();
+                    if (current.evaluator != null) {
+                        current.evaluator.original = null;
+                        current.evaluator.result = null;
+                    }
+                }
+                if (this.previous == null) {
+                    ACTIVE.remove();
+                } else {
+                    ACTIVE.set(this.previous);
+                }
             }
         }
     }
