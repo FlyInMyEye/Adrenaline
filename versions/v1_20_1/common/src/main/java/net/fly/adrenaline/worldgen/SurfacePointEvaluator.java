@@ -57,8 +57,6 @@ public final class SurfacePointEvaluator implements Opcodes {
         Cache previous = ACTIVE.get();
         Cache cache = previous == null ? CACHE.get() : new Cache();
         cache.manager = manager;
-        cache.spanTop = 0;
-        cache.spanBottom = 0;
         ACTIVE.set(cache);
         return new Scope(previous);
     }
@@ -149,7 +147,7 @@ public final class SurfacePointEvaluator implements Opcodes {
             evaluator = new Evaluator(plan, contextApi, cache.biomesCache, generation.getMinGenY());
             cache.evaluator = evaluator;
         }
-        evaluator.rebind(cache.originalHandle);
+        evaluator.rebind(cache.originalHandle, cache.column, cache.defaultBlock);
         try {
             cache.adapter = (Object) FACTORY.invokeExact(evaluator);
             return cache.adapter;
@@ -202,63 +200,10 @@ public final class SurfacePointEvaluator implements Opcodes {
         return cache.column;
     }
 
-    public static boolean canUpdateDirectly(Object context) {
+    public static Evaluator spanEvaluator(Object rule) {
         Cache cache = ACTIVE.get();
-        return cache != null && cache.column != null && cache.column.buffered() && cache.context == context;
-    }
-
-    public static boolean canApplyDirectly(Object rule) {
-        Cache cache = ACTIVE.get();
-        return cache != null && cache.column != null && cache.column.buffered() && cache.adapter == rule;
-    }
-
-    public static BlockState applyDirectly(int x, int y, int z) {
-        return ACTIVE.get().evaluator.apply(x, y, z);
-    }
-
-    public static boolean fillSpan(int x, int y, int z, BlockState state) {
-        Cache cache = ACTIVE.get();
-        if (cache == null) {
-            return false;
-        }
-        cache.spanTop = y;
-        cache.spanBottom = y;
-        Evaluator evaluator = cache.evaluator;
-        if (cache.column == null || !cache.column.buffered() || evaluator == null || evaluator.x != x || evaluator.z != z
-            || evaluator.top < y || evaluator.bottom >= y || evaluator.result != state) {
-            return false;
-        }
-        cache.spanBottom = cache.column.defaultBottom(y, evaluator.bottom, cache.defaultBlock);
-        if (cache.spanBottom == y) {
-            return false;
-        }
-        if (state != null) {
-            cache.column.fill(cache.spanBottom, y, state);
-        }
-        return true;
-    }
-
-    public static int spanDepth(int above) {
-        Cache cache = ACTIVE.get();
-        return cache == null ? above : above + cache.spanTop - cache.spanBottom;
-    }
-
-    public static int spanY(int y) {
-        Cache cache = ACTIVE.get();
-        return cache != null && cache.spanTop == y ? cache.spanBottom : y;
-    }
-
-    public static boolean skipContextUpdate(Object context, int above, int below, int water, int x, int y, int z) {
-        Cache cache = ACTIVE.get();
-        if (cache == null || cache.context != context || cache.evaluator == null) {
-            return false;
-        }
-        cache.spanTop = y;
-        cache.spanBottom = y;
-        if (cache.column != null && cache.column.buffered() && cache.column.getBlock(y) != cache.defaultBlock) {
-            return true;
-        }
-        return cache.evaluator.skipContextUpdate(above, below, water, x, y, z);
+        return cache != null && cache.adapter == rule && cache.evaluator != null && cache.evaluator.blocks != null
+            ? cache.evaluator : null;
     }
 
     public static boolean canCacheBiome(Object context) {
@@ -283,6 +228,10 @@ public final class SurfacePointEvaluator implements Opcodes {
         private boolean column;
         private boolean cachedPoint;
         private int pointY;
+        private FastSurfaceColumn blocks;
+        private BlockState defaultBlock;
+        private int spanTop;
+        private int spanBottom;
 
         private Evaluator(SurfaceRulePlan plan, AdrenalineMixinSurfaceRulesContextApi context, SurfaceBiomeCache biomes, int minY) {
             this.plan = plan;
@@ -291,11 +240,50 @@ public final class SurfacePointEvaluator implements Opcodes {
             this.minY = minY;
         }
 
-        private void rebind(MethodHandle original) {
+        private void rebind(MethodHandle original, FastSurfaceColumn blocks, BlockState defaultBlock) {
             this.original = original;
+            this.blocks = blocks != null && blocks.buffered() ? blocks : null;
+            this.defaultBlock = defaultBlock;
+            this.spanTop = 0;
+            this.spanBottom = 0;
             this.column = false;
             this.cachedPoint = false;
             this.bottom = Integer.MAX_VALUE;
+        }
+
+        public boolean shouldUpdate(int above, int below, int water, int x, int y, int z) {
+            this.spanTop = y;
+            this.spanBottom = y;
+            return this.blocks == null || this.blocks.getBlock(y) == this.defaultBlock
+                && !this.skipContextUpdate(above, below, water, x, y, z);
+        }
+
+        public int spanDepth(int above) {
+            return above + this.spanTop - this.spanBottom;
+        }
+
+        public int spanY(int y) {
+            return this.spanTop == y ? this.spanBottom : y;
+        }
+
+        public BlockState tryApply(int x, int y, int z) {
+            BlockState state = this.apply(x, y, z);
+            if (this.blocks == null) {
+                return state;
+            }
+            this.spanTop = y;
+            this.spanBottom = y;
+            if (this.x != x || this.z != z || this.top < y || this.bottom >= y || this.result != state) {
+                return state;
+            }
+            this.spanBottom = this.blocks.defaultBottom(y, this.bottom, this.defaultBlock);
+            if (this.spanBottom == y) {
+                return state;
+            }
+            if (state != null) {
+                this.blocks.fill(this.spanBottom, y, state);
+            }
+            return null;
         }
 
         private boolean skipContextUpdate(int above, int below, int water, int x, int y, int z) {
@@ -388,7 +376,7 @@ public final class SurfacePointEvaluator implements Opcodes {
         for (int i = 1; i <= 3; i++) {
             apply.visitVarInsn(ILOAD, i);
         }
-        apply.visitMethodInsn(INVOKEVIRTUAL, EVALUATOR, "apply", "(III)" + STATE, false);
+        apply.visitMethodInsn(INVOKEVIRTUAL, EVALUATOR, "tryApply", "(III)" + STATE, false);
         apply.visitInsn(ARETURN);
         apply.visitMaxs(0, 0);
         apply.visitEnd();
@@ -405,8 +393,6 @@ public final class SurfacePointEvaluator implements Opcodes {
         private boolean cacheBiomes;
         private FastSurfaceColumn column;
         private BlockState defaultBlock;
-        private int spanTop;
-        private int spanBottom;
         private RandomState randomState;
         private Registry<Biome> biomes;
         private SurfaceRules.RuleSource source;
@@ -457,6 +443,7 @@ public final class SurfacePointEvaluator implements Opcodes {
                     }
                     current.biomesCache.clear();
                     if (current.evaluator != null) {
+                        current.evaluator.blocks = null;
                         current.evaluator.original = null;
                         current.evaluator.result = null;
                     }
