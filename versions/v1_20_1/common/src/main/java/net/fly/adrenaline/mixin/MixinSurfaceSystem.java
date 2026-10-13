@@ -4,13 +4,15 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.sugar.Share;
+import com.llamalad7.mixinextras.sugar.ref.LocalRef;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import java.util.function.Function;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.BiomeFiddleCache;
-import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextApi;
 import net.fly.adrenaline.worldgen.SurfaceNoiseBatch;
 import net.fly.adrenaline.worldgen.SurfacePointEvaluator;
 import net.minecraft.core.BlockPos.MutableBlockPos;
@@ -92,38 +94,33 @@ public abstract class MixinSurfaceSystem {
 
     @WrapOperation(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$RuleSource;apply(Ljava/lang/Object;)Ljava/lang/Object;"), require = 0)
     private Object adrenaline$compileSurfaceRules(SurfaceRules.RuleSource source, Object context, Operation<Object> original,
-                                                  @Local(argsOnly = true) WorldGenerationContext generation) {
-        return AdrenalineConfig.surfaceOptimizationsEnabled()
-            ? SurfacePointEvaluator.rule(source, context, generation, () -> original.call(source, context))
-            : original.call(source, context);
-    }
-
-    @WrapOperation(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$Context;updateY(IIIIII)V"), require = 0)
-    private void adrenaline$reuseSurfaceSpan(@Coerce Object context, int above, int below, int water, int x, int y, int z, Operation<Void> original) {
-        if (!SurfacePointEvaluator.skipContextUpdate(context, above, below, water, x, y, z)) {
-            if (SurfacePointEvaluator.canUpdateDirectly(context)) {
-                ((AdrenalineMixinSurfaceRulesContextApi) context).adrenaline$updateY(above, below, water, x, y, z);
-            } else {
-                original.call(context, above, below, water, x, y, z);
-            }
+                                                  @Local(argsOnly = true) WorldGenerationContext generation,
+                                                  @Share("surfaceSpans") LocalRef<SurfacePointEvaluator.Evaluator> spans) {
+        if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
+            return original.call(source, context);
         }
+        Object rule = SurfacePointEvaluator.rule(source, context, generation, () -> original.call(source, context));
+        spans.set(SurfacePointEvaluator.spanEvaluator(rule));
+        return rule;
     }
 
-    @WrapOperation(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$SurfaceRule;tryApply(III)Lnet/minecraft/world/level/block/state/BlockState;"), require = 0)
-    private BlockState adrenaline$applySurfaceSpan(@Coerce Object rule, int x, int y, int z, Operation<BlockState> original) {
-        BlockState state = SurfacePointEvaluator.canApplyDirectly(rule)
-            ? SurfacePointEvaluator.applyDirectly(x, y, z) : original.call(rule, x, y, z);
-        return SurfacePointEvaluator.fillSpan(x, y, z, state) ? null : state;
+    @WrapWithCondition(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$Context;updateY(IIIIII)V"), require = 0)
+    private boolean adrenaline$updateSurfaceContext(@Coerce Object context, int above, int below, int water, int x, int y, int z,
+                                                    @Share("surfaceSpans") LocalRef<SurfacePointEvaluator.Evaluator> spans) {
+        SurfacePointEvaluator.Evaluator evaluator = spans.get();
+        return evaluator == null || evaluator.shouldUpdate(above, below, water, x, y, z);
     }
 
     @ModifyVariable(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$SurfaceRule;tryApply(III)Lnet/minecraft/world/level/block/state/BlockState;", shift = At.Shift.AFTER), ordinal = 8, require = 0)
-    private int adrenaline$advanceSurfaceDepth(int above) {
-        return SurfacePointEvaluator.spanDepth(above);
+    private int adrenaline$advanceSurfaceDepth(int above, @Share("surfaceSpans") LocalRef<SurfacePointEvaluator.Evaluator> spans) {
+        SurfacePointEvaluator.Evaluator evaluator = spans.get();
+        return evaluator == null ? above : evaluator.spanDepth(above);
     }
 
     @ModifyVariable(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$SurfaceRule;tryApply(III)Lnet/minecraft/world/level/block/state/BlockState;", shift = At.Shift.AFTER), ordinal = 12, require = 0)
-    private int adrenaline$advanceSurfaceY(int y) {
-        return SurfacePointEvaluator.spanY(y);
+    private int adrenaline$advanceSurfaceY(int y, @Share("surfaceSpans") LocalRef<SurfacePointEvaluator.Evaluator> spans) {
+        SurfacePointEvaluator.Evaluator evaluator = spans.get();
+        return evaluator == null ? y : evaluator.spanY(y);
     }
 
     @Inject(method = "getSurfaceDepth", at = @At("HEAD"), cancellable = true)
