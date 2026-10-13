@@ -40,6 +40,9 @@ public final class NativeDensityProgram {
     public static final byte INPUT = 29;
     public static final byte BLENDED_NOISE = 30;
     public static final byte RECIPROCAL = 31;
+    public static final byte COLUMN_CALL = 32;
+    public static final byte COLUMN_RETURN = 33;
+    public static final byte COLUMN_INPUT = 34;
 
     private final ByteBuffer bytecode;
     private final int length;
@@ -48,12 +51,17 @@ public final class NativeDensityProgram {
     private final InputBinding[] inputs;
     private final boolean emptyBlender;
     private ByteBuffer inputValues;
+    private final int columnCacheCount;
 
     NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators) {
         this(bytecode, keepAlive, interpolators, new DensityFunction[0], false);
     }
 
     NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators, DensityFunction[] inputs, boolean emptyBlender) {
+        this(bytecode, keepAlive, interpolators, inputs, emptyBlender, 0);
+    }
+
+    NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators, DensityFunction[] inputs, boolean emptyBlender, int columnCacheCount) {
         this.bytecode = bytecode;
         this.length = bytecode.remaining();
         this.keepAlive = keepAlive;
@@ -63,6 +71,7 @@ public final class NativeDensityProgram {
             this.inputs[i] = new InputBinding(inputs[i], inputs[i] instanceof AdrenalineCachedDensityAccess ? CachedDensityOwner.get(inputs[i]) : null);
         }
         this.emptyBlender = emptyBlender;
+        this.columnCacheCount = columnCacheCount;
     }
 
     public ByteBuffer bytecode() {
@@ -75,6 +84,29 @@ public final class NativeDensityProgram {
 
     public ByteBuffer inputValues() { return this.inputValues; }
     public int inputCount() { return this.inputs.length; }
+    public int columnCacheCount() { return this.columnCacheCount; }
+
+    public boolean prepareColumn(DensityFunction.FunctionContext context) {
+        if (this.emptyBlender && context.getBlender() != Blender.empty() || this.interpolators.length != 0) {
+            return false;
+        }
+        if (this.inputs.length > 0) {
+            int bytes = this.inputs.length * 2 * Double.BYTES;
+            if (this.inputValues == null || this.inputValues.capacity() != bytes) {
+                this.inputValues = ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN);
+            }
+            for (int i = 0; i < this.inputs.length; i++) {
+                InputBinding input = this.inputs[i];
+                if (!(input.source instanceof AdrenalineCachedDensityAccess cache) || input.owner == null) {
+                    return false;
+                }
+                int offset = i * 2 * Double.BYTES;
+                boolean available = cache.adrenaline$writeNativeColumnInput(this.inputValues, offset, input.owner, context.blockX(), context.blockZ());
+                this.inputValues.putDouble(offset + Double.BYTES, available ? 1.0D : 0.0D);
+            }
+        }
+        return true;
+    }
 
     public boolean prepare(DensityFunction.ContextProvider provider, int count) {
         if (this.emptyBlender && provider.forIndex(0).getBlender() != Blender.empty()) {
