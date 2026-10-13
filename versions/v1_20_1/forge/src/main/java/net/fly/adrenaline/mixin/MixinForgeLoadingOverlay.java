@@ -18,7 +18,7 @@ public class MixinForgeLoadingOverlay {
     private long fadeOutStart;
 
     @SuppressWarnings("target")
-    @Inject(method = {"render", "m_88315_"}, at = @At("HEAD"), remap = false)
+    @Inject(method = "render", at = @At("HEAD"), remap = true)
     private void adrenaline$keepStartupOverlayDuringWarmup(GuiGraphics graphics, int mouseX, int mouseY, float partialTick, CallbackInfo ci) {
         if (this.fadeOutStart >= 0L && BackgroundWorldgenWarmup.shouldKeepStartupOverlay(Minecraft.getInstance())) {
             this.fadeOutStart = Util.getMillis();
