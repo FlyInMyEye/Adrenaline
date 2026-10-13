@@ -15,6 +15,9 @@ import net.fly.adrenaline.worldgen.AdrenalineShiftedNoiseAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NativeCellDensityEvaluator;
+import net.fly.adrenaline.worldgen.NativeDensityProgram;
+import net.fly.adrenaline.worldgen.NativeDensityProgramCompiler;
+import net.fly.adrenaline.natives.NativeDensitySampler;
 import net.fly.adrenaline.worldgen.AdrenalineSectionNoiseAccess;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkCoordinateAccess;
@@ -64,6 +67,8 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Shadow private DensityFunction.ContextProvider sliceFillingContextProvider;
     @Shadow private Long2IntMap preliminarySurfaceLevel;
     @Shadow private DensityFunction initialDensityNoJaggedness;
+    @Unique private NativeDensityProgram adrenaline$surfaceProgram;
+    @Unique private boolean adrenaline$surfaceProgramInitialized;
     @Shadow private NoiseSettings noiseSettings;
     @Shadow private Map<DensityFunction, DensityFunction> wrapped;
 
@@ -486,6 +491,21 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         AdrenalineMutableSinglePointContext context = this.adrenaline$singlePointContext;
         context.adrenaline$setX(x);
         context.adrenaline$setZ(z);
+        if (AdrenalineConfig.noiseChunkOptimizationsEnabled() && AdrenalineConfig.nativeDensityEvaluationEnabled()) {
+            if (!this.adrenaline$surfaceProgramInitialized) {
+                this.adrenaline$surfaceProgramInitialized = true;
+                this.adrenaline$surfaceProgram = NativeDensityProgramCompiler.compileColumn(this.initialDensityNoJaggedness).program();
+            }
+            NativeDensityProgram program = this.adrenaline$surfaceProgram;
+            context.adrenaline$setY(maxY);
+            if (program != null && program.prepareColumn(context)) {
+                int height = NativeDensitySampler.preliminarySurfaceLevel(program, x, z, minY, maxY, this.cellHeight);
+                if (height != Integer.MIN_VALUE) {
+                    this.preliminarySurfaceLevel.put(key, height);
+                    return height;
+                }
+            }
+        }
         for (int y = maxY; y >= minY; y -= this.cellHeight) {
             context.adrenaline$setY(y);
             if (this.initialDensityNoJaggedness.compute(context) > 0.390625D) {

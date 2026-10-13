@@ -14,6 +14,18 @@ public abstract class MixinNoiseChunkFlatCacheAllocation implements AdrenalineCa
     @Shadow @Final private double[][] values;
 
     @Override
+    public boolean adrenaline$writeNativeColumnInput(ByteBuffer target, int offset, NoiseChunk owner, int x, int z) {
+        MixinNoiseChunkAccessor access = (MixinNoiseChunkAccessor) owner;
+        int cacheX = QuartPos.fromBlock(x) - access.adrenaline$firstNoiseX();
+        int cacheZ = QuartPos.fromBlock(z) - access.adrenaline$firstNoiseZ();
+        if (cacheX < 0 || cacheZ < 0 || cacheX >= this.values.length || cacheZ >= this.values[cacheX].length) {
+            return false;
+        }
+        target.putDouble(offset, this.values[cacheX][cacheZ]);
+        return true;
+    }
+
+    @Override
     public boolean adrenaline$writeNativeInput(ByteBuffer target, int offset, NoiseChunk owner, AdrenalineCellGridAccess grid, int count) {
         MixinNoiseChunkAccessor access = (MixinNoiseChunkAccessor) owner;
         int width = grid.adrenaline$getCellWidth();

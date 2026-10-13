@@ -11,6 +11,7 @@ const max_grid_axis = 256;
 const max_density_program_size = 256 * 1024;
 const max_density_values = 1024;
 const max_density_stack = 64;
+const max_column_caches = 1024;
 const normal_noise_input_factor = 1.0181268882175227;
 const Vec2 = @Vector(2, f64);
 const Vec4 = @Vector(4, f64);
@@ -46,6 +47,7 @@ comptime {
         @export(&Java_net_fly_adrenaline_natives_BlendedNativeSampler_sampleGrid0, .{ .name = "Java_net_fly_adrenaline_natives_BlendedNativeSampler_sampleGrid0" });
         @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGrid0, .{ .name = "Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGrid0" });
         @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGridFloat0, .{ .name = "Java_net_fly_adrenaline_natives_PerlinNativeSampler_sampleApproximateGridFloat0" });
+        @export(&Java_net_fly_adrenaline_natives_NativeDensitySampler_preliminarySurfaceLevel0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_preliminarySurfaceLevel0" });
         @export(&Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0" });
         @export(&Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateWithInputs0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateWithInputs0" });
         @export(&Java_net_fly_adrenaline_natives_NativeAquiferSampler_evaluate0, .{ .name = "Java_net_fly_adrenaline_natives_NativeAquiferSampler_evaluate0" });
@@ -276,6 +278,38 @@ fn Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0(env: ?*c.JNIEn
 
 fn Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateWithInputs0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) callconv(.c) c.jboolean {
     return evaluate_density_jni(env, program_buffer, program_length, input_buffer, input_count, base_x, base_y, base_z, cell_width, cell_height, output);
+}
+
+fn Java_net_fly_adrenaline_natives_NativeDensitySampler_preliminarySurfaceLevel0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, cache_count: c.jint, x: c.jint, z: c.jint, min_y: c.jint, max_y: c.jint, step: c.jint) callconv(.c) c.jint {
+    @setFloatMode(.strict);
+    const failed = std.math.minInt(c.jint);
+    if (program_length <= 0 or program_length > max_density_program_size or input_count < 0 or input_count > 128 or cache_count < 0 or cache_count > max_column_caches or step <= 0 or min_y <= failed or max_y < min_y or @as(i64, max_y) - min_y > 65536) return failed;
+    const environment = env orelse return failed;
+    const functions = environment.*.*;
+    const get_address = functions.GetDirectBufferAddress orelse return failed;
+    const get_capacity = functions.GetDirectBufferCapacity orelse return failed;
+    if (get_capacity(env, program_buffer) < program_length) return failed;
+    const address = get_address(env, program_buffer) orelse return failed;
+    const bytes: [*]const u8 = @ptrCast(address);
+    const program = bytes[0..@intCast(program_length)];
+    var inputs: []const f64 = &.{};
+    if (input_count > 0) {
+        if (input_buffer == null or get_capacity(env, input_buffer) < @as(i64, input_count) * 16) return failed;
+        const input_address = get_address(env, input_buffer) orelse return failed;
+        const values: [*]const f64 = @ptrCast(@alignCast(input_address));
+        inputs = values[0..@as(usize, @intCast(input_count)) * 2];
+    }
+    var cache_values: [max_column_caches]f64 = undefined;
+    var cache_ready: [max_column_caches]bool = undefined;
+    const slots: usize = @intCast(cache_count);
+    @memset(cache_ready[0..slots], false);
+    var value: [1]f64 = undefined;
+    var y: i64 = max_y;
+    while (y >= min_y) : (y -= step) {
+        if (!evaluate_density_program_generic(1, program, x, @intCast(y), z, 1, 1, &value, inputs, cache_values[0..slots], cache_ready[0..slots])) return failed;
+        if (value[0] > 0.390625) return @intCast(y);
+    }
+    return std.math.maxInt(c.jint);
 }
 
 fn evaluate_density_jni(env: ?*c.JNIEnv, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) c.jboolean {
@@ -1244,7 +1278,7 @@ fn evaluate_density_program_with_inputs(program: []const u8, base_x: c.jint, bas
         evaluate_fused_terrain(program, height, output);
         return true;
     }
-    return evaluate_density_program_generic(program, base_x, base_y, base_z, width, height, output, inputs);
+    return evaluate_density_program_generic(max_density_values, program, base_x, base_y, base_z, width, height, output, inputs, &.{}, &.{});
 }
 
 fn is_fused_terrain_program(program: []const u8) bool {
@@ -1359,6 +1393,12 @@ pub fn evaluate_fused_terrain(program: []const u8, height: usize, output: []c.jd
     }
 }
 
+const DensityCallFrame = struct {
+    counter: usize,
+    base: usize,
+    slot: usize,
+};
+
 const DensitySplineFrame = struct {
     base: usize,
     knots: usize,
@@ -1388,12 +1428,14 @@ const DensityNoise = struct {
     }
 };
 
-noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble, inputs: []const f64) bool {
+noinline fn evaluate_density_program_generic(comptime capacity: usize, program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble, inputs: []const f64, cache_values: []f64, cache_ready: []bool) bool {
     @setFloatMode(.strict);
-    var stack: [max_density_stack][max_density_values]f64 = undefined;
-    var interpolation_width: [max_density_values]f64 = undefined;
-    var interpolation_height: [max_density_values]f64 = undefined;
+    var stack: [max_density_stack][capacity]f64 = undefined;
+    var interpolation_width: [@max(4, capacity)]f64 = undefined;
+    var interpolation_height: [capacity]f64 = undefined;
     var interpolation_ready = false;
+    var call_frames: [max_density_stack]DensityCallFrame = undefined;
+    var call_count: usize = 0;
     var stack_size: usize = 0;
     var program_counter: usize = 0;
     var range_frames: [max_density_stack]DensityRangeFrame = undefined;
@@ -1405,7 +1447,7 @@ noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint
         const opcode = read_program_u8(program, &program_counter) orelse return false;
         switch (opcode) {
             0 => {
-                if (stack_size != 1 or range_count != 0 or spline_count != 0 or program_counter != program.len) {
+                if (stack_size != 1 or range_count != 0 or spline_count != 0 or call_count != 0 or (program_counter != program.len and (capacity != 1 or cache_ready.len == 0))) {
                     return false;
                 }
                 var y_index: usize = 0;
@@ -1695,7 +1737,7 @@ noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint
                     }
                     return true;
                 }
-                var y_corners: [max_density_values][4]f64 = undefined;
+                var y_corners: [capacity][4]f64 = undefined;
                 var y_index: usize = 0;
                 while (y_index < height) : (y_index += 1) {
                     const y_lerp = interpolation_height[y_index];
@@ -1706,7 +1748,7 @@ noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint
                         noise101 + y_lerp * (noise111 - noise101),
                     };
                 }
-                var x_corners: [max_density_values][2]f64 = undefined;
+                var x_corners: [capacity][2]f64 = undefined;
                 var x_index: usize = 0;
                 while (x_index < width) : (x_index += 1) {
                     const x_lerp = interpolation_width[x_index];
@@ -1914,6 +1956,41 @@ noinline fn evaluate_density_program_generic(program: []const u8, base_x: c.jint
             31 => {
                 if (stack_size == 0) return false;
                 for (stack[stack_size - 1][0..total]) |*value| value.* = 1.0 / value.*;
+            },
+            32 => {
+                if (capacity != 1 or stack_size >= max_density_stack) return false;
+                const slot: usize = read_program_u32(program, &program_counter) orelse return false;
+                const entry: usize = read_program_u32(program, &program_counter) orelse return false;
+                if (slot >= cache_ready.len or entry >= program.len) return false;
+                if (cache_ready[slot]) {
+                    stack[stack_size][0] = cache_values[slot];
+                    stack_size += 1;
+                } else {
+                    if (call_count >= call_frames.len) return false;
+                    call_frames[call_count] = .{ .counter = program_counter, .base = stack_size, .slot = slot };
+                    call_count += 1;
+                    program_counter = entry;
+                }
+            },
+            33 => {
+                if (capacity != 1 or call_count == 0) return false;
+                const frame = call_frames[call_count - 1];
+                if (stack_size != frame.base + 1) return false;
+                cache_values[frame.slot] = stack[stack_size - 1][0];
+                cache_ready[frame.slot] = true;
+                call_count -= 1;
+                program_counter = frame.counter;
+            },
+            34 => {
+                if (capacity != 1 or stack_size >= max_density_stack) return false;
+                const slot: usize = read_program_u32(program, &program_counter) orelse return false;
+                const end: usize = read_program_u32(program, &program_counter) orelse return false;
+                if (slot >= inputs.len / 2 or end <= program_counter or end >= program.len) return false;
+                if (inputs[slot * 2 + 1] == 1.0) {
+                    stack[stack_size][0] = inputs[slot * 2];
+                    stack_size += 1;
+                    program_counter = end;
+                }
             },
             else => return false,
         }

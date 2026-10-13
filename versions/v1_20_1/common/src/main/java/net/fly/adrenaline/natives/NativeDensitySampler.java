@@ -24,6 +24,20 @@ public final class NativeDensitySampler {
         }
     }
 
+    public static int preliminarySurfaceLevel(NativeDensityProgram program, int x, int z, int minY, int maxY, int step) {
+        if (!AdrenalineNatives.isAvailable()) {
+            return Integer.MIN_VALUE;
+        }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
+        try {
+            return preliminarySurfaceLevel0(program.bytecode(), program.length(), program.inputValues(), program.inputCount(), program.columnCacheCount(), x, z, minY, maxY, step);
+        } finally {
+            Reference.reachabilityFence(program);
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
+        }
+    }
+
+    private static native int preliminarySurfaceLevel0(java.nio.ByteBuffer program, int length, java.nio.ByteBuffer inputs, int inputCount, int cacheCount, int x, int z, int minY, int maxY, int step);
     private static native boolean evaluate0(java.nio.ByteBuffer program, int length, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output);
     private static native boolean evaluateWithInputs0(java.nio.ByteBuffer program, int length, java.nio.ByteBuffer inputs, int inputCount, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output);
 }

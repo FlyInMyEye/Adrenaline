@@ -19,23 +19,45 @@ public final class NativeDensityProgramCompiler {
     private static final int MAX_OPERATORS = 8192;
     private static final int MAX_STACK = 64;
     private static final int MAX_INPUTS = 128;
+    private static final int MAX_COLUMN_CACHES = 1024;
     private static final int PROGRAM_CAPACITY = 256 * 1024;
     private static final Class<?> MARKER = DensityFunctions.cacheOnce(DensityFunctions.zero()).getClass();
     private static final Object CACHE_2D = ((DensityFunctions.MarkerOrMarked) DensityFunctions.cache2d(DensityFunctions.zero())).type();
     private static final Object FLAT_CACHE = ((DensityFunctions.MarkerOrMarked) DensityFunctions.flatCache(DensityFunctions.zero())).type();
+    private static final Object CACHE_ONCE = ((DensityFunctions.MarkerOrMarked) DensityFunctions.cacheOnce(DensityFunctions.zero())).type();
+    private static final Object CACHE_ALL = ((DensityFunctions.MarkerOrMarked) DensityFunctions.cacheAllInCell(DensityFunctions.zero())).type();
+    private static final Object INTERPOLATED = ((DensityFunctions.MarkerOrMarked) DensityFunctions.interpolated(DensityFunctions.zero())).type();
     private static final Class<?> END_ISLANDS = DensityFunctions.endIslands(0L).getClass();
 
     private NativeDensityProgramCompiler() {
     }
 
     public static Result compile(DensityFunction root) {
-        Builder builder = new Builder();
+        return compile(root, false);
+    }
+
+    public static Result compileColumn(DensityFunction root) {
+        return compile(root, true);
+    }
+
+    private static Result compile(DensityFunction root, boolean column) {
+        Builder builder = new Builder(column);
         try {
             if (!builder.emit(root, 0)) {
                 return new Result(null, builder.rejection == null ? root.getClass().getName() : builder.rejection);
             }
             builder.code.put(NativeDensityProgram.END);
-            return new Result(new NativeDensityProgram(builder.code.finish(), builder.keepAlive.toArray(), builder.interpolators.toArray(NativeDensityProgram.InterpolatorBinding[]::new), builder.inputs.toArray(DensityFunction[]::new), builder.emptyBlender), null);
+            for (int i = 0; i < builder.columnFunctions.size(); i++) {
+                int entry = builder.code.position();
+                builder.columnEntries.set(i, entry);
+                for (int jump : builder.columnJumps.get(i)) builder.code.putInt(jump, entry);
+                builder.stack = 0;
+                if (!builder.emitFunction(builder.columnFunctions.get(i), 0)) {
+                    return new Result(null, builder.rejection);
+                }
+                builder.code.put(NativeDensityProgram.COLUMN_RETURN);
+            }
+            return new Result(new NativeDensityProgram(builder.code.finish(), builder.keepAlive.toArray(), builder.interpolators.toArray(NativeDensityProgram.InterpolatorBinding[]::new), builder.inputs.toArray(DensityFunction[]::new), builder.emptyBlender, builder.columnCaches.size()), null);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return new Result(null, builder.rejection == null ? root.getClass().getName() : builder.rejection);
         }
@@ -49,11 +71,20 @@ public final class NativeDensityProgramCompiler {
         private final List<DensityFunction> inputs = new ArrayList<>();
         private final Map<DensityFunction, Integer> inputIndices = new IdentityHashMap<>();
         private final Map<DensityFunction, Boolean> heightIndependent = new IdentityHashMap<>();
+        private final Map<DensityFunction, Integer> columnCaches = new IdentityHashMap<>();
+        private final List<DensityFunction> columnFunctions = new ArrayList<>();
+        private final List<Integer> columnEntries = new ArrayList<>();
+        private final List<List<Integer>> columnJumps = new ArrayList<>();
         private int operators;
         private int noiseInspections;
         private int stack;
         private boolean emptyBlender;
         private String rejection;
+        private final boolean column;
+
+        private Builder(boolean column) {
+            this.column = column;
+        }
 
         private boolean emit(DensityFunction function, int depth) throws ReflectiveOperationException {
             if (depth > MAX_DEPTH || ++this.operators > MAX_OPERATORS) {
@@ -61,7 +92,25 @@ public final class NativeDensityProgramCompiler {
                 return false;
             }
             int base = this.stack;
-            if (!this.emitFunction(function, depth)) {
+            if (this.column && !(function instanceof AdrenalineConstantFunctionAccess) && this.heightIndependent(function, 0)) {
+                Integer slot = this.columnCaches.get(function);
+                if (slot == null) {
+                    if (this.columnCaches.size() >= MAX_COLUMN_CACHES) {
+                        this.rejection = "column cache limit";
+                        return false;
+                    }
+                    slot = this.columnCaches.size();
+                    this.columnCaches.put(function, slot);
+                    this.columnFunctions.add(function);
+                    this.columnEntries.add(-1);
+                    this.columnJumps.add(new ArrayList<>());
+                }
+                this.code.put(NativeDensityProgram.COLUMN_CALL).putInt(slot);
+                int jump = this.code.position();
+                int entry = this.columnEntries.get(slot);
+                this.code.putInt(entry);
+                if (entry < 0) this.columnJumps.get(slot).add(jump);
+            } else if (!this.emitFunction(function, depth)) {
                 return false;
             }
             this.stack = base + 1;
@@ -82,11 +131,31 @@ public final class NativeDensityProgramCompiler {
             if (function instanceof DensityFunctions.MarkerOrMarked marker && function.getClass() == MARKER) {
                 return this.emit(marker.wrapped(), depth + 1);
             }
+            if (this.column && function instanceof DensityFunctions.MarkerOrMarked marker
+                && (marker.type() == CACHE_ONCE || marker.type() == CACHE_ALL || marker.type() == INTERPOLATED)) {
+                return this.emit(marker.wrapped(), depth + 1);
+            }
             if (function instanceof DensityFunctions.MarkerOrMarked marker && marker.type() == CACHE_2D
                 && this.heightIndependent(marker.wrapped(), 0)) {
                 return this.emit(marker.wrapped(), depth + 1);
             }
             if (function instanceof AdrenalineCachedDensityAccess) {
+                if (this.column && (!(function instanceof DensityFunctions.MarkerOrMarked marker)
+                    || marker.type() != FLAT_CACHE || !this.heightIndependent(marker.wrapped(), 0))) {
+                    this.rejection = "height dependent column input: " + function.getClass().getName()
+                        + (function instanceof DensityFunctions.MarkerOrMarked marked ? " / " + marked.wrapped().getClass().getName() : "");
+                    return false;
+                }
+                if (this.column) {
+                    int slot = this.inputIndex(function);
+                    if (slot < 0) return false;
+                    this.code.put(NativeDensityProgram.COLUMN_INPUT).putInt(slot);
+                    int jump = this.code.position();
+                    this.code.putInt(0);
+                    if (!this.emit(((DensityFunctions.MarkerOrMarked) function).wrapped(), depth + 1)) return false;
+                    this.code.putInt(jump, this.code.position());
+                    return true;
+                }
                 return this.emitInput(function);
             }
             if (function.getClass() == END_ISLANDS) {
@@ -298,18 +367,24 @@ public final class NativeDensityProgramCompiler {
         }
 
         private boolean emitInput(DensityFunction function) {
+            int index = this.inputIndex(function);
+            if (index < 0) return false;
+            this.code.put(NativeDensityProgram.INPUT).putInt(index);
+            return true;
+        }
+
+        private int inputIndex(DensityFunction function) {
             Integer index = this.inputIndices.get(function);
             if (index == null) {
                 if (this.inputs.size() >= MAX_INPUTS) {
                     this.rejection = "input limit";
-                    return false;
+                    return -1;
                 }
                 index = this.inputs.size();
                 this.inputs.add(function);
                 this.inputIndices.put(function, index);
             }
-            this.code.put(NativeDensityProgram.INPUT).putInt(index);
-            return true;
+            return index;
         }
 
         private boolean heightIndependent(DensityFunction function, int depth) {
@@ -336,7 +411,9 @@ public final class NativeDensityProgramCompiler {
             }
             if (function instanceof DensityFunctions.MarkerOrMarked marker) {
                 return marker.type() == FLAT_CACHE && function instanceof AdrenalineCachedDensityAccess
-                    || (function.getClass() == MARKER || marker.type() == CACHE_2D) && this.heightIndependent(marker.wrapped(), depth + 1);
+                    || (function.getClass() == MARKER || marker.type() == CACHE_2D
+                        || this.column && (marker.type() == CACHE_ONCE || marker.type() == CACHE_ALL || marker.type() == INTERPOLATED))
+                        && this.heightIndependent(marker.wrapped(), depth + 1);
             }
             if (function instanceof AdrenalineNoiseFunctionAccess noise) {
                 return noise.adrenaline$getYScale() == 0.0;
