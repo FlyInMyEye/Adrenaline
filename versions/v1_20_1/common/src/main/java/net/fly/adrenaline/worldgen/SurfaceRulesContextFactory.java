@@ -5,8 +5,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.function.BooleanSupplier;
 
@@ -26,7 +24,6 @@ public final class SurfaceRulesContextFactory {
 
     private static final Constructor<?> CONSTRUCTOR;
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
-    private static final ThreadLocal<Map<PipelineKey, SurfaceRulePipeline>> PIPELINE_CACHE = ThreadLocal.withInitial(HashMap::new);
     private static final ClassValue<MethodHandle> CONDITION_TESTS = new ClassValue<>() {
         @Override
         protected MethodHandle computeValue(Class<?> type) {
@@ -92,25 +89,6 @@ public final class SurfaceRulesContextFactory {
         };
     }
 
-    public static SurfaceRulePipeline createPipeline(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
-        return createPipeline(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context, ruleSource, false);
-    }
-
-    public static SurfaceRulePipeline createPipeline(SurfaceSystem system, RandomState randomState, ChunkAccess chunk, NoiseChunk noiseChunk, Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource, boolean cacheBiomes) {
-        PipelineKey key = new PipelineKey(system, randomState, biomeRegistry, context, ruleSource);
-        Map<PipelineKey, SurfaceRulePipeline> cache = PIPELINE_CACHE.get();
-        SurfaceRulePipeline pipeline = cache.get(key);
-        if (pipeline == null) {
-            Object surfaceContext = create(system, randomState, chunk, noiseChunk, biomeGetter, biomeRegistry, context);
-            Object surfaceRule = apply(ruleSource, surfaceContext);
-            pipeline = new SurfaceRulePipeline(surfaceRule, surfaceContext, ruleSource, context);
-            cache.clear();
-            cache.put(key, pipeline);
-        }
-        pipeline.rebind(chunk, noiseChunk, biomeGetter, cacheBiomes);
-        return pipeline;
-    }
-
     private static Method findTryApplyMethod(Class<?> surfaceRuleType) throws NoSuchMethodException {
         try {
             return surfaceRuleType.getDeclaredMethod("tryApply", int.class, int.class, int.class);
@@ -154,49 +132,4 @@ public final class SurfaceRulesContextFactory {
         return function.apply(context);
     }
 
-    private static final class PipelineKey {
-
-        private final SurfaceSystem system;
-        private final RandomState randomState;
-        private final Registry<Biome> biomeRegistry;
-        private final int minGenY;
-        private final int genDepth;
-        private final SurfaceRules.RuleSource ruleSource;
-
-        private PipelineKey(SurfaceSystem system, RandomState randomState, Registry<Biome> biomeRegistry, WorldGenerationContext context, SurfaceRules.RuleSource ruleSource) {
-            this.system = system;
-            this.randomState = randomState;
-            this.biomeRegistry = biomeRegistry;
-            this.minGenY = context.getMinGenY();
-            this.genDepth = context.getGenDepth();
-            this.ruleSource = ruleSource;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof PipelineKey key)) {
-                return false;
-            }
-            return this.system == key.system
-                && this.randomState == key.randomState
-                && this.biomeRegistry == key.biomeRegistry
-                && this.minGenY == key.minGenY
-                && this.genDepth == key.genDepth
-                && this.ruleSource == key.ruleSource;
-        }
-
-        @Override
-        public int hashCode() {
-            int result = System.identityHashCode(this.system);
-            result = 31 * result + System.identityHashCode(this.randomState);
-            result = 31 * result + System.identityHashCode(this.biomeRegistry);
-            result = 31 * result + this.minGenY;
-            result = 31 * result + this.genDepth;
-            result = 31 * result + System.identityHashCode(this.ruleSource);
-            return result;
-        }
-    }
 }
