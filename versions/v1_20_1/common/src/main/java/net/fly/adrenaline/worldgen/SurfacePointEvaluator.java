@@ -73,7 +73,7 @@ public final class SurfacePointEvaluator implements Opcodes {
                 && cache.manager.getClass() == BiomeManager.class
                 && cache.manager instanceof AdrenalineBiomeManagerSourceAccess
                 && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)) {
-                cache.resolver = new SurfaceBiomeResolver(cache.manager, chunk);
+                cache.bindResolver(chunk);
             }
         }
         if (cache == null || !SurfacePipelineCompatibility.canReuseContext(system)
@@ -114,7 +114,7 @@ public final class SurfacePointEvaluator implements Opcodes {
             && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)
             && !SurfacePipelineCompatibility.hasForeignHooks(system.getClass());
         if (cache.cacheBiomes) {
-            if (cache.resolver == null) cache.resolver = new SurfaceBiomeResolver(cache.manager, chunk);
+            if (cache.resolver == null) cache.bindResolver(chunk);
             biomeGetter = cache.resolver;
         }
         if (cache.cacheBiomes) {
@@ -479,6 +479,7 @@ public final class SurfacePointEvaluator implements Opcodes {
         private boolean checkedRules;
         private BiomeManager manager;
         private SurfaceBiomeResolver resolver;
+        private SurfaceBiomeResolver resolverPool;
         private boolean cacheBiomes;
         private FastSurfaceColumn column;
         private BlockState defaultBlock;
@@ -494,6 +495,15 @@ public final class SurfacePointEvaluator implements Opcodes {
         private Object adapter;
         private MethodHandle originalHandle;
         private boolean supported;
+
+        private void bindResolver(ChunkAccess chunk) {
+            if (this.resolverPool == null) {
+                this.resolverPool = new SurfaceBiomeResolver(this.manager, chunk);
+            } else {
+                this.resolverPool.rebind(this.manager, chunk);
+            }
+            this.resolver = this.resolverPool;
+        }
 
         private boolean knownRules(SurfaceRules.RuleSource source) {
             if (this.checkedSource != source) {
@@ -531,6 +541,9 @@ public final class SurfacePointEvaluator implements Opcodes {
                     current.column = null;
                     current.adapter = null;
                     current.manager = null;
+                    if (current.resolver != null) {
+                        current.resolver.clear();
+                    }
                     current.resolver = null;
                     if (current.context instanceof AdrenalineMixinSurfaceRulesContextMutable mutable) {
                         mutable.adrenaline$setChunk(null);

@@ -1,5 +1,6 @@
 package net.fly.adrenaline.worldgen;
 
+import java.util.Arrays;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -9,32 +10,49 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 
 public final class SurfaceBiomeResolver implements Function<BlockPos, Holder<Biome>> {
 
-    private static final int WIDTH = 4;
-    private final BiomeManager source;
-    private final BiomeManager.NoiseBiomeSource noiseSource;
-    private final long zoomSeed;
-    private final Holder<Biome>[] biomes;
-    private final Holder<Biome>[] uniform;
-    private final boolean[] checked;
-    private final int minX;
-    private final int minY;
-    private final int minZ;
-    private final int height;
+    private static final int WIDTH = 6;
+    private BiomeManager source;
+    private BiomeManager.NoiseBiomeSource noiseSource;
+    private long zoomSeed;
+    private Holder<Biome>[] biomes;
+    private Holder<Biome>[] uniform;
+    private boolean[] checked;
+    private int minX;
+    private int minY;
+    private int minZ;
+    private int height;
+
+    public SurfaceBiomeResolver(BiomeManager source, ChunkAccess chunk) {
+        this.rebind(source, chunk);
+    }
 
     @SuppressWarnings("unchecked")
-    public SurfaceBiomeResolver(BiomeManager source, ChunkAccess chunk) {
+    public void rebind(BiomeManager source, ChunkAccess chunk) {
+        this.clear();
         this.source = source;
-        this.minX = chunk.getPos().getMinBlockX() >> 2;
-        this.minZ = chunk.getPos().getMinBlockZ() >> 2;
+        this.minX = (chunk.getPos().getMinBlockX() >> 2) - 1;
+        this.minZ = (chunk.getPos().getMinBlockZ() >> 2) - 1;
         this.minY = (chunk.getMinBuildHeight() >> 2) - 1;
         this.height = (chunk.getMaxBuildHeight() >> 2) - this.minY + 2;
         int count = WIDTH * WIDTH * this.height;
-        this.biomes = (Holder<Biome>[]) new Holder<?>[count];
-        this.uniform = (Holder<Biome>[]) new Holder<?>[count];
-        this.checked = new boolean[count];
+        if (this.biomes == null || this.biomes.length != count) {
+            this.biomes = (Holder<Biome>[]) new Holder<?>[count];
+            this.uniform = (Holder<Biome>[]) new Holder<?>[count];
+            this.checked = new boolean[count];
+        }
         AdrenalineBiomeManagerSourceAccess access = (AdrenalineBiomeManagerSourceAccess) source;
         this.noiseSource = access.adrenaline$getNoiseBiomeSource();
         this.zoomSeed = access.adrenaline$getBiomeZoomSeed();
+    }
+
+    public void clear() {
+        if (this.source != null) {
+            Arrays.fill(this.biomes, null);
+            Arrays.fill(this.uniform, null);
+            Arrays.fill(this.checked, false);
+            this.source = null;
+            this.noiseSource = null;
+        }
     }
 
     @Override
