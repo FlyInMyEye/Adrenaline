@@ -39,6 +39,11 @@ public final class SurfaceBiomeResolver implements Function<BlockPos, Holder<Bio
 
     @Override
     public Holder<Biome> apply(BlockPos position) {
+        Holder<Biome> result = this.resolve(position);
+        return result == null ? this.source.getBiome(position) : result;
+    }
+
+    public Holder<Biome> resolve(BlockPos position) {
         int x = (position.getX() - 2) >> 2;
         int y = (position.getY() - 2) >> 2;
         int z = (position.getZ() - 2) >> 2;
@@ -70,7 +75,7 @@ public final class SurfaceBiomeResolver implements Function<BlockPos, Holder<Bio
             }
         }
         if (localX < 0 || localX >= WIDTH - 1 || localZ < 0 || localZ >= WIDTH - 1) {
-            return this.source.getBiome(position);
+            return null;
         }
         int corner = BiomeFiddleCache.selectCorner(this.zoomSeed, position.getX(), position.getY(), position.getZ());
         return this.noiseBiome(x + ((corner & 4) == 0 ? 0 : 1), y + ((corner & 2) == 0 ? 0 : 1), z + ((corner & 1) == 0 ? 0 : 1));

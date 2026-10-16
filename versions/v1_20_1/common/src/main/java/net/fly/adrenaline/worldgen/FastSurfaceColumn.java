@@ -15,7 +15,7 @@ public final class FastSurfaceColumn implements BlockColumn {
     private final LevelChunkSection[] sections;
     private final int minSection;
     private final MutableBlockPos position;
-    private final SurfaceColumnBuffer buffer;
+    private SurfaceColumnBuffer buffer;
     private final Heightmap worldSurface;
     private final Heightmap oceanFloor;
     private final int minY;
@@ -36,6 +36,11 @@ public final class FastSurfaceColumn implements BlockColumn {
         this.buffer = buffered ? new SurfaceColumnBuffer(this.sections, this.minY) : null;
         this.worldSurface = buffered ? chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG) : null;
         this.oceanFloor = buffered ? chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR_WG) : null;
+    }
+
+    public void disableBuffering() {
+        this.finish();
+        this.buffer = null;
     }
 
     public boolean buffered() {

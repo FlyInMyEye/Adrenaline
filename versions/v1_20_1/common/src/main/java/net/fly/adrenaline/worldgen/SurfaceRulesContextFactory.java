@@ -77,6 +77,10 @@ public final class SurfaceRulesContextFactory {
         return applyUnchecked(ruleSource, context);
     }
 
+    public static Object applyCondition(SurfaceRules.ConditionSource source, Object context) {
+        return applyUnchecked(source, context);
+    }
+
     public static BooleanSupplier createCondition(SurfaceRules.ConditionSource source, Object context) throws ReflectiveOperationException {
         Object condition = applyUnchecked(source, context);
         MethodHandle test = CONDITION_TESTS.get(condition.getClass()).bindTo(condition);

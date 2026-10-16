@@ -15,6 +15,8 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.BiomeFiddleCache;
 import net.fly.adrenaline.worldgen.SurfaceNoiseBatch;
 import net.fly.adrenaline.worldgen.SurfacePointEvaluator;
+import net.fly.adrenaline.worldgen.NativeSurfacePrograms;
+import net.fly.adrenaline.worldgen.AdrenalineNativeSurfaceProgramsAccess;
 import net.minecraft.core.BlockPos.MutableBlockPos;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -34,6 +36,7 @@ import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -41,7 +44,14 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = SurfaceSystem.class, priority = SurfacePipelineCompatibility.MIXIN_PRIORITY)
-public abstract class MixinSurfaceSystem {
+public abstract class MixinSurfaceSystem implements AdrenalineNativeSurfaceProgramsAccess {
+
+    @Unique private final NativeSurfacePrograms adrenaline$surfacePrograms = new NativeSurfacePrograms();
+
+    @Override
+    public NativeSurfacePrograms adrenaline$getSurfacePrograms() {
+        return this.adrenaline$surfacePrograms;
+    }
 
     @Shadow @Final private BlockState defaultBlock;
     @Shadow @Final private NormalNoise surfaceNoise;
@@ -57,7 +67,7 @@ public abstract class MixinSurfaceSystem {
         }
         try (SurfaceNoiseBatch batch = new SurfaceNoiseBatch(this.surfaceNoise, chunk.getPos().getMinBlockX(), chunk.getPos().getMinBlockZ());
              BiomeFiddleCache.Scope biomeCache = BiomeFiddleCache.open();
-             SurfacePointEvaluator.Scope ruleCache = SurfacePointEvaluator.open(biomeManager)) {
+             SurfacePointEvaluator.Scope ruleCache = SurfacePointEvaluator.open(biomeManager, (SurfaceSystem) (Object) this)) {
             original.call(randomState, biomeManager, biomeRegistry, useLegacyRandomSource, context, chunk, noiseChunk, ruleSource);
         }
     }
@@ -69,12 +79,6 @@ public abstract class MixinSurfaceSystem {
                                                       @Local(ordinal = 0) MutableBlockPos position) {
         return AdrenalineConfig.surfaceOptimizationsEnabled()
             ? SurfacePointEvaluator.column(column, (SurfaceSystem) (Object) this, chunk, position, this.defaultBlock, source) : column;
-    }
-
-    @WrapOperation(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/biome/BiomeManager;getBiome(Lnet/minecraft/core/BlockPos;)Lnet/minecraft/core/Holder;"), require = 0)
-    private Holder<Biome> adrenaline$resolveSurfaceBiome(BiomeManager manager, BlockPos position, Operation<Holder<Biome>> original) {
-        Holder<Biome> cached = SurfacePointEvaluator.biome(manager, position);
-        return cached == null ? original.call(manager, position) : cached;
     }
 
     @WrapOperation(method = "buildSurface", at = @At(value = "NEW", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$Context;"), require = 0)

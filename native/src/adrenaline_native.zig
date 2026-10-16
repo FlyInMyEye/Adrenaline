@@ -39,6 +39,8 @@ extern fn adrenaline_fused_terrain_avx2(program: [*]const u8, height: usize, out
 
 comptime {
     if (!avx_only) {
+        @export(&@import("surface_rules.zig").column, .{ .name = "Java_net_fly_adrenaline_natives_NativeSurfaceSampler_columnAddress5" });
+        @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0, .{ .name = "Java_net_fly_adrenaline_natives_NativeSurfaceSampler_address0" });
         @export(&JNI_OnLoad, .{ .name = "JNI_OnLoad" });
         @export(&Java_net_fly_adrenaline_natives_AdrenalineNatives_capabilities0, .{ .name = "Java_net_fly_adrenaline_natives_AdrenalineNatives_capabilities0" });
         @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0, .{ .name = "Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0" });
@@ -3077,7 +3079,7 @@ fn prepare_grid_axis(base: f64, step: f64, count: usize, coordinate_scale: f64, 
     }
 }
 
-fn normal_noise_value(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64) f64 {
+pub fn normal_noise_value(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64) f64 {
     @setFloatMode(.strict);
     return (perlin_value(first, first_count, x, y, z) + perlin_value(second, second_count, x * normal_noise_input_factor, y * normal_noise_input_factor, z * normal_noise_input_factor)) * value_factor;
 }

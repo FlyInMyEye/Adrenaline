@@ -85,6 +85,7 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+        net.fly.adrenaline.worldgen.SurfaceRuleHooks.capture(targetClass);
         if (mixinClassName.contains("OptimizationTakeoverDetector")) {
             OptimizationTakeoverDetector.captureClaims(targetClass, mixinInfo);
             OptimizationTakeoverDetector.detectTakeovers(targetClass, AdrenalineMixinPlugin::displayName);
