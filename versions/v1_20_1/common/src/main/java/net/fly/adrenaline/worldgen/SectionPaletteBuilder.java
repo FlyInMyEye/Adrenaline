@@ -6,7 +6,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
+import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.fly.adrenaline.util.PalettePacking;
 import net.minecraft.core.IdMap;
 import net.minecraft.util.BitStorage;
@@ -23,7 +25,6 @@ public final class SectionPaletteBuilder {
 
     private static final Access ACCESS = access();
     private static final ThreadLocal<int[]> PACK_IDS = ThreadLocal.withInitial(() -> new int[4096]);
-    private static final ThreadLocal<int[]> UNPACK_IDS = ThreadLocal.withInitial(() -> new int[4096]);
 
     private SectionPaletteBuilder() {
     }
@@ -50,28 +51,67 @@ public final class SectionPaletteBuilder {
         }
     }
 
-    public static BlockState[] unpackColumns(PalettedContainer<BlockState> source) {
-        if (ACCESS == null) {
-            throw new IllegalStateException("Palette access unavailable");
+    public static void unpack(PalettedContainer<BlockState> source, int[] ids, List<BlockState> states) {
+        if (ACCESS == null || ids.length != 4096) {
+            throw new IllegalArgumentException("Section palette access unavailable");
         }
         try {
             Object data = ACCESS.data.get(source);
             BitStorage storage = (BitStorage) ACCESS.storage.invoke(data);
             @SuppressWarnings("unchecked")
             Palette<BlockState> palette = (Palette<BlockState>) ACCESS.palette.invoke(data);
-            BlockState[] states = new BlockState[4096];
-            if (storage.getBits() == 0) {
-                Arrays.fill(states, palette.valueFor(0));
-                return states;
-            }
-            int[] ids = UNPACK_IDS.get();
             storage.unpack(ids);
-            for (int column = 0; column < 256; column++) {
-                for (int y = 0; y < 16; y++) {
-                    states[column * 16 + y] = palette.valueFor(ids[y * 256 + column]);
+            if (palette.getSize() <= 256) {
+                for (int id = 0; id < palette.getSize(); id++) {
+                    states.add(palette.valueFor(id));
+                }
+            } else {
+                IdentityHashMap<BlockState, Integer> remap = new IdentityHashMap<>();
+                for (int index = 0; index < ids.length; index++) {
+                    BlockState state = palette.valueFor(ids[index]);
+                    Integer id = remap.get(state);
+                    if (id == null) {
+                        id = states.size();
+                        states.add(state);
+                        remap.put(state, id);
+                    }
+                    ids[index] = id;
                 }
             }
-            return states;
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    public static BlockState uniformState(PalettedContainer<BlockState> source) {
+        try {
+            Object data = ACCESS.data.get(source);
+            BitStorage storage = (BitStorage) ACCESS.storage.invoke(data);
+            @SuppressWarnings("unchecked")
+            Palette<BlockState> palette = (Palette<BlockState>) ACCESS.palette.invoke(data);
+            int bits = storage.getBits();
+            if (storage.getClass() == ZeroBitStorage.class && !SurfacePipelineCompatibility.hasForeignHooks(ZeroBitStorage.class)) {
+                return palette.valueFor(0);
+            }
+            if (storage.getClass() != SimpleBitStorage.class || bits < 1 || bits > 32
+                || SurfacePipelineCompatibility.hasForeignHooks(SimpleBitStorage.class)) {
+                return null;
+            }
+            int id = storage.get(0);
+            int values = 64 / bits;
+            long pattern = 0L;
+            for (int index = 0; index < values; index++) {
+                pattern |= (long) id << (index * bits);
+            }
+            long[] raw = storage.getRaw();
+            for (int index = 0; index < raw.length - 1; index++) {
+                if (raw[index] != pattern) {
+                    return null;
+                }
+            }
+            int remaining = 4096 - (raw.length - 1) * values;
+            long mask = -1L >>> (64 - remaining * bits);
+            return (raw[raw.length - 1] & mask) == (pattern & mask) ? palette.valueFor(id) : null;
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException(exception);
         }

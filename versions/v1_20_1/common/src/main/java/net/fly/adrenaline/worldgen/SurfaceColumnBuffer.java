@@ -9,10 +9,10 @@ public final class SurfaceColumnBuffer {
 
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
     private final LevelChunkSection[] sections;
-    private final BlockState[][] decoded;
+    private final SectionTerrainBuffer[] decoded;
     private final boolean[] dirty;
     private final boolean[] columnDirty;
-    private final boolean[] initiallyAir;
+    private final BlockState[] uniform;
     private final BlockState[] column;
     private final int minY;
     private int columnOffset;
@@ -20,28 +20,28 @@ public final class SurfaceColumnBuffer {
     public SurfaceColumnBuffer(LevelChunkSection[] sections, int minY) {
         this.sections = sections;
         this.minY = minY;
-        this.decoded = new BlockState[sections.length][];
+        this.decoded = new SectionTerrainBuffer[sections.length];
         this.dirty = new boolean[sections.length];
         this.columnDirty = new boolean[sections.length];
-        this.initiallyAir = new boolean[sections.length];
+        this.uniform = new BlockState[sections.length];
         for (int i = 0; i < sections.length; i++) {
-            this.initiallyAir[i] = !sections[i].getStates().maybeHas(state -> state != AIR);
+            this.uniform[i] = SectionPaletteBuilder.uniformState(sections[i].getStates());
         }
         this.column = new BlockState[sections.length * 16];
     }
 
     public void load(int x, int z) {
-        this.columnOffset = (z * 16 + x) * 16;
+        this.columnOffset = z * 16 + x;
         for (int section = 0; section < this.sections.length; section++) {
-            BlockState[] states = this.decoded[section];
-            if (states == null && !this.initiallyAir[section]) {
-                states = SectionPaletteBuilder.unpackColumns(this.sections[section].getStates());
+            SectionTerrainBuffer states = this.decoded[section];
+            if (states == null && this.uniform[section] == null) {
+                states = new SectionTerrainBuffer(this.sections[section].getStates());
                 this.decoded[section] = states;
             }
             if (states == null) {
-                Arrays.fill(this.column, section * 16, section * 16 + 16, AIR);
+                Arrays.fill(this.column, section * 16, section * 16 + 16, this.uniform[section]);
             } else {
-                System.arraycopy(states, this.columnOffset, this.column, section * 16, 16);
+                states.loadColumn(this.columnOffset, this.column, section * 16);
             }
         }
         Arrays.fill(this.columnDirty, false);
@@ -78,13 +78,13 @@ public final class SurfaceColumnBuffer {
             if (!this.columnDirty[section]) {
                 continue;
             }
-            BlockState[] states = this.decoded[section];
+            SectionTerrainBuffer states = this.decoded[section];
             if (states == null) {
-                states = new BlockState[4096];
-                Arrays.fill(states, AIR);
+                states = SectionTerrainBuffer.filled(this.uniform[section]);
+                this.uniform[section] = null;
                 this.decoded[section] = states;
             }
-            System.arraycopy(this.column, section * 16, states, this.columnOffset, 16);
+            states.storeColumn(this.columnOffset, this.column, section * 16);
             this.dirty[section] = true;
             this.columnDirty[section] = false;
         }
@@ -95,20 +95,7 @@ public final class SurfaceColumnBuffer {
             if (!this.dirty[section]) {
                 continue;
             }
-            BlockState[] states = this.decoded[section];
-            SectionTerrainBuffer packed = new SectionTerrainBuffer(AIR);
-            BlockState previous = null;
-            int id = 0;
-            for (int column = 0; column < 256; column++) {
-                for (int y = 0; y < 16; y++) {
-                    BlockState state = states[column * 16 + y];
-                    if (state != previous) {
-                        id = packed.id(state);
-                        previous = state;
-                    }
-                    packed.set(y * 256 + column, id, false);
-                }
-            }
+            SectionTerrainBuffer packed = this.decoded[section];
             LevelChunkSection target = this.sections[section];
             target.acquire();
             try {

@@ -9,6 +9,7 @@ import net.fly.adrenaline.mixin.MixinLevelChunkSectionAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
 
 public final class SectionTerrainBuffer {
 
@@ -22,6 +23,41 @@ public final class SectionTerrainBuffer {
         this.id(defaultBlock);
         this.id(Blocks.WATER.defaultBlockState());
         this.id(Blocks.LAVA.defaultBlockState());
+    }
+
+    public SectionTerrainBuffer(PalettedContainer<BlockState> source) {
+        SectionPaletteBuilder.unpack(source, this.ids, this.palette);
+        for (int id = 0; id < this.palette.size(); id++) {
+            this.paletteIds.put(this.palette.get(id), id);
+        }
+    }
+
+    public static SectionTerrainBuffer filled(BlockState state) {
+        SectionTerrainBuffer buffer = new SectionTerrainBuffer(state);
+        Arrays.fill(buffer.ids, buffer.id(state));
+        return buffer;
+    }
+
+    public void loadColumn(int column, BlockState[] target, int offset) {
+        for (int y = 0; y < 16; y++) {
+            target[offset + y] = this.palette.get(this.ids[y * 256 + column]);
+        }
+    }
+
+    public void storeColumn(int column, BlockState[] source, int offset) {
+        BlockState previous = null;
+        int id = 0;
+        for (int y = 0; y < 16; y++) {
+            int index = y * 256 + column;
+            BlockState state = source[offset + y];
+            if (this.palette.get(this.ids[index]) != state) {
+                if (state != previous) {
+                    id = this.id(state);
+                    previous = state;
+                }
+                this.set(index, id, false);
+            }
+        }
     }
 
     public int id(BlockState state) {
