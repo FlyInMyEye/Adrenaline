@@ -9,6 +9,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.natives.NativeSurfaceSampler;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextApi;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceRulesContextMutable;
 import net.minecraft.core.BlockPos;
@@ -41,7 +42,6 @@ public final class SurfacePointEvaluator implements Opcodes {
     private static final String STATE = Type.getDescriptor(BlockState.class);
     private static final String ARGUMENTS = "L" + EVALUATOR + ";";
     private static final MethodHandle FACTORY = createFactory();
-    private static final ThreadLocal<Cache> CACHE = ThreadLocal.withInitial(Cache::new);
     private static final ThreadLocal<Cache> ACTIVE = new ThreadLocal<>();
 
     private SurfacePointEvaluator() {
@@ -53,10 +53,11 @@ public final class SurfacePointEvaluator implements Opcodes {
         return new Scope(previous);
     }
 
-    public static Scope open(BiomeManager manager) {
+    public static Scope open(BiomeManager manager, SurfaceSystem system) {
         Cache previous = ACTIVE.get();
-        Cache cache = previous == null ? CACHE.get() : new Cache();
+        Cache cache = previous == null ? (Cache) ((AdrenalineNativeSurfaceProgramsAccess) system).adrenaline$getSurfacePrograms().worker(Cache::new) : new Cache();
         cache.manager = manager;
+        cache.activeSystem = system;
         ACTIVE.set(cache);
         return new Scope(previous);
     }
@@ -65,6 +66,16 @@ public final class SurfacePointEvaluator implements Opcodes {
                                  Function<BlockPos, Holder<Biome>> biomeGetter, Registry<Biome> biomes,
                                  WorldGenerationContext generation, SurfaceRules.RuleSource source, Supplier<Object> factory) {
         Cache cache = ACTIVE.get();
+        if (cache != null) {
+            cache.activeBiomes = biomes;
+            cache.activeBiomeGetter = biomeGetter;
+            if (cache.resolver == null && AdrenalineConfig.biomeFiddleOptimizationsEnabled()
+                && cache.manager.getClass() == BiomeManager.class
+                && cache.manager instanceof AdrenalineBiomeManagerSourceAccess
+                && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)) {
+                cache.resolver = new SurfaceBiomeResolver(cache.manager, chunk);
+            }
+        }
         if (cache == null || !SurfacePipelineCompatibility.canReuseContext(system)
             || SurfacePipelineCompatibility.hasForeignHooks(SurfaceRulesContextFactory.contextType())) {
             return factory.get();
@@ -103,7 +114,7 @@ public final class SurfacePointEvaluator implements Opcodes {
             && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)
             && !SurfacePipelineCompatibility.hasForeignHooks(system.getClass());
         if (cache.cacheBiomes) {
-            cache.resolver = new SurfaceBiomeResolver(cache.manager, chunk);
+            if (cache.resolver == null) cache.resolver = new SurfaceBiomeResolver(cache.manager, chunk);
             biomeGetter = cache.resolver;
         }
         if (cache.cacheBiomes) {
@@ -113,7 +124,7 @@ public final class SurfacePointEvaluator implements Opcodes {
             cache.biomesCache.clear();
         }
         ((AdrenalineMixinSurfaceRulesContextMutable) cache.context).adrenaline$setBiomeGetter(biomeGetter);
-        if (cache.evaluator != null) {
+        if (cache.evaluator != null && cache.evaluator.plan != null) {
             cache.evaluator.plan.biomes(cache.cacheBiomes ? cache.biomesCache : null);
         }
         return cache.context;
@@ -121,8 +132,12 @@ public final class SurfacePointEvaluator implements Opcodes {
 
     public static Object rule(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Supplier<Object> factory) {
         Cache cache = ACTIVE.get();
-        if (cache == null || cache.context != context || cache.source != source || !cache.supported) {
+        if (cache == null) {
             return factory.get();
+        }
+        if (cache.context != context || cache.source != source || !cache.supported) {
+            Object original = factory.get();
+            return nativeRule(cache, source, context, generation, original);
         }
         if (cache.originalRule == null) {
             cache.originalRule = factory.get();
@@ -131,21 +146,70 @@ public final class SurfacePointEvaluator implements Opcodes {
         return wrap(source, context, generation, cache.originalRule);
     }
 
+    private static Object nativeRule(Cache cache, SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Object original) {
+        if (!NativeSurfaceSampler.available() || FACTORY == null || !(context instanceof AdrenalineMixinSurfaceRulesContextApi api)) {
+            return original;
+        }
+        NativeSurfaceProgram program = ((AdrenalineNativeSurfaceProgramsAccess) cache.activeSystem).adrenaline$getSurfacePrograms()
+            .get(source, original, cache.activeBiomes, generation, context);
+        if (program == null) {
+            return original;
+        }
+        NativeSurfaceEvaluator nativePlan = cache.nativePlan;
+        nativePlan.bind(program, api, generation.getMinGenY());
+        Evaluator evaluator = new Evaluator(null, api, cache.biomesCache, generation.getMinGenY());
+        evaluator.nativePlan = nativePlan;
+        evaluator.rebind(SurfaceRulesContextFactory.createTryApplyHandle(original), null, null);
+        cache.transientEvaluator = evaluator;
+        try {
+            return (Object) FACTORY.invokeExact(evaluator);
+        } catch (Throwable failure) {
+            nativePlan.clear();
+            return original;
+        }
+    }
+
     public static Object wrap(SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Object original) {
         Cache cache = ACTIVE.get();
         if (FACTORY == null || cache == null || cache.context != context || cache.source != source || !cache.supported
             || !(context instanceof AdrenalineMixinSurfaceRulesContextApi contextApi)) {
             return original;
         }
+        NativeSurfaceProgram program = NativeSurfaceSampler.available()
+            ? ((AdrenalineNativeSurfaceProgramsAccess) cache.activeSystem).adrenaline$getSurfacePrograms().get(source, original, cache.activeBiomes, generation, context) : null;
+        if (program != null && !program.contextReusable()) {
+            cache.supported = false;
+            cache.cacheBiomes = false;
+            ((AdrenalineMixinSurfaceRulesContextMutable) context).adrenaline$setBiomeGetter(cache.activeBiomeGetter);
+            cache.context = null;
+            cache.originalRule = null;
+            cache.originalHandle = null;
+            cache.evaluator = null;
+            cache.biomesCache.clear();
+            if (cache.column != null) {
+                cache.column.disableBuffering();
+            }
+            return nativeRule(cache, source, context, generation, original);
+        }
         Evaluator evaluator = cache.evaluator;
         if (evaluator == null) {
-            SurfaceRulePlan plan = SurfaceRulePlan.compile(source, context, generation, contextApi);
-            if (plan == null) {
+            evaluator = new Evaluator(null, contextApi, cache.biomesCache, generation.getMinGenY());
+            cache.evaluator = evaluator;
+        }
+        evaluator.nativePlan = null;
+        if (program != null) {
+            cache.nativePlan.bind(program, contextApi, generation.getMinGenY(), cache.column != null && cache.column.buffered());
+            evaluator.nativePlan = cache.nativePlan;
+        } else if (!NativeSurfaceSampler.available()) {
+            if (evaluator.plan == null) {
+                evaluator.plan = SurfaceRulePlan.compile(source, context, generation, contextApi);
+            }
+            if (evaluator.plan == null) {
                 return original;
             }
-            plan.biomes(cache.cacheBiomes ? cache.biomesCache : null);
-            evaluator = new Evaluator(plan, contextApi, cache.biomesCache, generation.getMinGenY());
-            cache.evaluator = evaluator;
+            evaluator.plan.biomes(cache.cacheBiomes ? cache.biomesCache : null);
+        } else {
+            return original;
         }
         evaluator.rebind(cache.originalHandle, cache.column, cache.defaultBlock);
         try {
@@ -158,7 +222,7 @@ public final class SurfacePointEvaluator implements Opcodes {
 
     public static Holder<Biome> biome(BiomeManager manager, BlockPos position) {
         Cache cache = ACTIVE.get();
-        return cache != null && cache.manager == manager && cache.resolver != null ? cache.resolver.apply(position) : null;
+        return cache != null && cache.manager == manager && cache.resolver != null ? cache.resolver.resolve(position) : null;
     }
 
     public static BlockColumn column(BlockColumn original, SurfaceSystem system, ChunkAccess chunk, MutableBlockPos position, BlockState defaultBlock, SurfaceRules.RuleSource source) {
@@ -212,7 +276,8 @@ public final class SurfacePointEvaluator implements Opcodes {
     }
 
     public static final class Evaluator {
-        private final SurfaceRulePlan plan;
+        private SurfaceRulePlan plan;
+        private NativeSurfaceEvaluator nativePlan;
         private final AdrenalineMixinSurfaceRulesContextApi context;
         private final SurfaceBiomeCache biomes;
         private final int minY;
@@ -300,7 +365,7 @@ public final class SurfacePointEvaluator implements Opcodes {
             int above = this.context.adrenaline$getStoneDepthAbove();
             int below = this.context.adrenaline$getStoneDepthBelow();
             int water = this.context.adrenaline$getWaterHeight();
-            if (this.column && this.x == x && this.z == z && y <= this.top && y >= this.bottom
+            if (this.blocks != null && this.column && this.x == x && this.z == z && y <= this.top && y >= this.bottom
                 && y + above == this.stoneTop && y - below == this.stoneBottom && water == this.water) {
                 return this.result;
             }
@@ -315,11 +380,30 @@ public final class SurfacePointEvaluator implements Opcodes {
             this.stoneTop = y + above;
             this.stoneBottom = y - below;
             this.water = water;
-            BlockState value = this.plan.evaluate(x, y, z, above, below, water, Math.max(this.minY, y - below + 1));
-            if (!this.plan.uncertain()) {
-                this.bottom = this.plan.bottom();
-                this.result = value;
-                return value;
+            if (this.nativePlan != null) {
+                int index = this.nativePlan.evaluate(x, y, z);
+                if (this.nativePlan.unsafe() && this.blocks != null) {
+                    this.blocks.disableBuffering();
+                    this.blocks = null;
+                }
+                if (index >= -1) {
+                    this.result = this.nativePlan.state(index);
+                    if (this.blocks != null) {
+                        this.bottom = this.nativePlan.bottom(y);
+                        if (this.nativePlan.usesBiome()) {
+                            Cache cache = ACTIVE.get();
+                            this.bottom = cache != null && cache.cacheBiomes ? Math.max(this.bottom, this.biomes.certifiedBottom(y, this.bottom)) : y;
+                        }
+                    }
+                    return this.result;
+                }
+            } else if (this.plan != null) {
+                BlockState value = this.plan.evaluate(x, y, z, above, below, water, Math.max(this.minY, y - below + 1));
+                if (!this.plan.uncertain()) {
+                    this.bottom = this.plan.bottom();
+                    this.result = value;
+                    return value;
+                }
             }
             try {
                 this.result = (BlockState) this.original.invokeExact(x, y, z);
@@ -385,6 +469,11 @@ public final class SurfacePointEvaluator implements Opcodes {
     }
 
     private static final class Cache {
+        private SurfaceSystem activeSystem;
+        private Registry<Biome> activeBiomes;
+        private Function<BlockPos, Holder<Biome>> activeBiomeGetter;
+        private final NativeSurfaceEvaluator nativePlan = new NativeSurfaceEvaluator();
+        private Evaluator transientEvaluator;
         private SurfaceSystem system;
         private SurfaceRules.RuleSource checkedSource;
         private boolean checkedRules;
@@ -431,6 +520,14 @@ public final class SurfacePointEvaluator implements Opcodes {
                 }
             } finally {
                 if (current != null) {
+                    current.nativePlan.clear();
+                    if (current.transientEvaluator != null) {
+                        current.transientEvaluator.nativePlan = null;
+                    }
+                    current.transientEvaluator = null;
+                    current.activeSystem = null;
+                    current.activeBiomes = null;
+                    current.activeBiomeGetter = null;
                     current.column = null;
                     current.adapter = null;
                     current.manager = null;

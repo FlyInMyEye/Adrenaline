@@ -1,6 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8",
+  "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin",
   "package": "net.fly.adrenaline.mixin.levelgen",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
@@ -9,7 +10,20 @@
     "AdrenalineMixinNoiseInterpolatorView",
     "AdrenalineMixinSurfaceRulesContext",
     "AdrenalineMixinSurfaceRulesContextApi",
-    "AdrenalineMixinSurfaceRulesContextMutable"
+    "AdrenalineMixinSurfaceRulesContextMutable",
+    "AdrenalineMixinSurfaceBiomeConditionSource",
+    "AdrenalineMixinSurfaceBiomeCondition",
+    "AdrenalineMixinXoroshiroPositionalFactoryAccess",
+    "AdrenalineMixinLegacyPositionalFactoryAccess",
+    "AdrenalineMixinSurfaceConditions",
+    "AdrenalineMixinSurfaceHolders",
+    "AdrenalineMixinSurfaceSystemAccess",
+    "AdrenalineMixinBiomeTemperatureAccess",
+    "AdrenalineMixinPerlinSimplexNoiseAccess",
+    "AdrenalineMixinSimplexNoiseAccess",
+    "AdrenalineMixinSurfacePositionAccess",
+    "AdrenalineMixinSurfaceVectorAccess",
+    "AdrenalineMixinFrozenTemperatureAccess"
   ],
   "client": [],
   "server": [],

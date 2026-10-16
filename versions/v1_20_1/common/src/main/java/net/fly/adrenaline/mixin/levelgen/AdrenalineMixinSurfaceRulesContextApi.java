@@ -19,6 +19,12 @@ public interface AdrenalineMixinSurfaceRulesContextApi {
     @Invoker("getMinSurfaceLevel")
     int adrenaline$getMinSurfaceLevel();
 
+    @Accessor("system")
+    net.minecraft.world.level.levelgen.SurfaceSystem adrenaline$getSystem();
+
+    @Accessor("pos")
+    net.minecraft.core.BlockPos.MutableBlockPos adrenaline$getPosition();
+
     @Accessor("surfaceDepth")
     int adrenaline$getSurfaceDepth();
 

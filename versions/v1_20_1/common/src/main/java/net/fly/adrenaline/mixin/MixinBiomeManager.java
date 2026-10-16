@@ -2,8 +2,10 @@ package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
+import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.BiomeFiddleCache;
+import net.fly.adrenaline.worldgen.SurfacePointEvaluator;
 import net.fly.adrenaline.worldgen.AdrenalineBiomeManagerSourceAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -34,7 +36,13 @@ public abstract class MixinBiomeManager implements AdrenalineBiomeManagerSourceA
     @Inject(method = "getBiome", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.BIOME_FIDDLE)
     private void adrenaline$reuseCornerOffsets(BlockPos position, CallbackInfoReturnable<Holder<Biome>> cir) {
-        if (!AdrenalineConfig.biomeFiddleOptimizationsEnabled()) {
+        if (!AdrenalineConfig.biomeFiddleOptimizationsEnabled()
+            || SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)) {
+            return;
+        }
+        Holder<Biome> cached = SurfacePointEvaluator.biome((BiomeManager) (Object) this, position);
+        if (cached != null) {
+            cir.setReturnValue(cached);
             return;
         }
         int corner = BiomeFiddleCache.selectCornerIfActive(this.biomeZoomSeed, position.getX(), position.getY(), position.getZ());
