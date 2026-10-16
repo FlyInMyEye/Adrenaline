@@ -27,6 +27,7 @@
     "MixinChunkSerializer",
     "MixinPalettedContainerPacking",
     "MixinChunkAccessAccessor",
+    "MixinProtoChunkHeightmaps",
     "MixinLevelChunkSectionAccessor",
     "MixinMinecraftServer",
     "MixinMinecraftServerSpawnTicket",
