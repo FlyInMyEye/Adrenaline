@@ -2578,6 +2578,13 @@ pub fn normal_noise_grid_avx2(first: [*]const u8, first_count: usize, second: [*
 }
 
 fn normal_noise_grid_impl(comptime avx2: bool, first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
+    if (avx2 and x_count == 1 and y_count == 1 and z_count == 1) {
+        var value: f64 = 0.0;
+        perlin_grid_point(first, first_count, x, y, z, x_step, y_step, z_step, 1.0, &value);
+        perlin_grid_point(second, second_count, x, y, z, x_step, y_step, z_step, normal_noise_input_factor, &value);
+        values[0] = value * value_factor;
+        return;
+    }
     if (y_step == 0.0 and y_count > 1) {
         const columns = x_count * z_count;
         normal_noise_grid_impl(avx2, first, first_count, second, second_count, value_factor, x, y, z, x_step, y_step, z_step, x_count, 1, z_count, values[0..columns]);
@@ -2593,6 +2600,44 @@ fn normal_noise_grid_impl(comptime avx2: bool, first: [*]const u8, first_count: 
     perlin_value_grid(avx2, first, first_count, x, y, z, x_step, y_step, z_step, 1.0, x_count, y_count, z_count, values);
     perlin_value_grid(avx2, second, second_count, x, y, z, x_step, y_step, z_step, normal_noise_input_factor, x_count, y_count, z_count, values);
     scale_f64_values(avx2, values, value_factor);
+}
+
+fn perlin_grid_point(data: [*]const u8, octaves: usize, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, coordinate_scale: f64, result: *f64) void {
+    @setFloatMode(.strict);
+    const origin_offset = 16 + octaves * 8;
+    const active_offset = origin_offset + octaves * 24;
+    const permutation_offset = active_offset + octaves;
+    const bases: Vec4 = .{ x, y, z, 0.0 };
+    const steps: Vec4 = .{ x_step, y_step, z_step, 0.0 };
+    const samples = bases + @as(Vec4, @splat(0.0)) * steps;
+    const scale: Vec4 = @splat(coordinate_scale);
+    const wrap_size: Vec4 = @splat(33554432.0);
+    const limit: Vec4 = @splat(16777216.0);
+    var input_factor = read_f64(data, 8);
+    var value_factor = read_f64(data, 0);
+    var value = result.*;
+    for (0..octaves) |octave| {
+        if (data[active_offset + octave] != 0) {
+            const factor: Vec4 = @splat(input_factor);
+            const first_scaled = bases * scale * factor;
+            const scaled = samples * scale * factor;
+            const no_wrap = (@abs(first_scaled) < limit) & (@abs(scaled) < limit);
+            const wrapped = scaled - @floor(scaled / wrap_size + @as(Vec4, @splat(0.5))) * wrap_size;
+            const origin = origin_offset + octave * 24;
+            const origins: Vec4 = .{ read_f64(data, origin), read_f64(data, origin + 8), read_f64(data, origin + 16), 0.0 };
+            const shifted = @select(f64, no_wrap, scaled - @as(Vec4, @splat(0.0)), wrapped) + origins;
+            const integers: Vec4i = @intFromFloat(@floor(shifted));
+            const fractions = shifted - @as(Vec4, @floatFromInt(integers));
+            const smooth = fractions * fractions * fractions * (fractions * (fractions * @as(Vec4, @splat(6.0)) - @as(Vec4, @splat(15.0))) + @as(Vec4, @splat(10.0)));
+            const permutation = data + permutation_offset + octave * 256;
+            const gradients = GradientCell.init(permutation, permutation_value(permutation, integers[0]), permutation_value(permutation, integers[0] + 1), integers[1], integers[2]);
+            const sampled = gradients.sample_packed(fractions[0], fractions[1], fractions[2], smooth[0], smooth[1], smooth[2]);
+            value += read_f64(data, 16 + octave * 8) * sampled * value_factor;
+        }
+        input_factor *= 2.0;
+        value_factor /= 2.0;
+    }
+    result.* = value;
 }
 
 fn normal_noise_grid_approx(first: [*]const u8, first_count: usize, second: [*]const u8, second_count: usize, value_factor: f64, x: f64, y: f64, z: f64, x_step: f64, y_step: f64, z_step: f64, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
@@ -2888,7 +2933,7 @@ pub fn blended_noise_grid_avx2(min: [*]const u8, max: [*]const u8, main: [*]cons
     blended_noise_grid_impl(true, min, max, main, config, base_x, base_y, base_z, step_x, step_y, step_z, x_count, y_count, z_count, values);
 }
 
-fn blended_noise_grid_impl(comptime avx2: bool, min: [*]const u8, max: [*]const u8, main: [*]const u8, config: *const BlendedNoiseConfig, base_x: c.jint, base_y: c.jint, base_z: c.jint, step_x: c.jint, step_y: c.jint, step_z: c.jint, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
+noinline fn blended_noise_grid_impl(comptime avx2: bool, min: [*]const u8, max: [*]const u8, main: [*]const u8, config: *const BlendedNoiseConfig, base_x: c.jint, base_y: c.jint, base_z: c.jint, step_x: c.jint, step_y: c.jint, step_z: c.jint, x_count: usize, y_count: usize, z_count: usize, values: []f64) void {
     @setFloatMode(.strict);
     var limit_y: [max_grid_axis]f64 = undefined;
     var main_y: [max_grid_axis]f64 = undefined;
@@ -2939,7 +2984,39 @@ fn blended_active(comptime kind: BlendedStack, selector: []const f64, index: usi
 }
 
 fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]const u8, octaves: usize, raw_x: []const f64, raw_z: []const f64, raw_y: []const f64, smear: f64, selectors: []const f64, outputs: []f64) void {
+    if (avx2 and kind != .all and raw_y.len >= 4 and raw_y.len <= 64) {
+        return blended_octaves_impl(avx2, kind, true, data, octaves, raw_x, raw_z, raw_y, smear, selectors, outputs);
+    }
+    return blended_octaves_impl(avx2, kind, false, data, octaves, raw_x, raw_z, raw_y, smear, selectors, outputs);
+}
+
+fn blended_column_active(comptime cached: bool, comptime kind: BlendedStack, mask: u64, selector: []const f64, index: usize) bool {
+    if (cached) return (mask >> @as(u6, @intCast(index))) & 1 != 0;
+    return blended_active(kind, selector, index);
+}
+
+fn blended_octaves_impl(comptime avx2: bool, comptime kind: BlendedStack, comptime cached: bool, data: [*]const u8, octaves: usize, raw_x: []const f64, raw_z: []const f64, raw_y: []const f64, smear: f64, selectors: []const f64, outputs: []f64) void {
     @setFloatMode(.strict);
+    var active_masks: [if (cached) max_grid_size else 1]u64 = undefined;
+    if (cached) {
+        var any_active = false;
+        for (0..raw_x.len * raw_z.len) |column| {
+            const values = selectors[column * raw_y.len ..][0..raw_y.len];
+            var mask: u64 = 0;
+            var index: usize = 0;
+            while (index + 3 < values.len) : (index += 4) {
+                const q: Vec4 = @bitCast(values[index..][0..4].*);
+                const inactive = if (kind == .lower) q >= @as(Vec4, @splat(1.0)) else q <= @as(Vec4, @splat(0.0));
+                mask |= @as(u64, ~@as(u4, @bitCast(inactive))) << @as(u6, @intCast(index));
+            }
+            while (index < values.len) : (index += 1) {
+                if (blended_active(kind, values, index)) mask |= @as(u64, 1) << @as(u6, @intCast(index));
+            }
+            active_masks[column] = mask;
+            any_active = any_active or mask != 0;
+        }
+        if (!any_active) return;
+    }
     const origin_offset = 16 + octaves * 8;
     const active_offset = origin_offset + octaves * 24;
     const permutation_offset = active_offset + octaves;
@@ -2949,6 +3026,7 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
     var fade_y: [max_grid_axis]f64 = undefined;
     for (0..octaves) |level| {
         const octave = octaves - 1 - level;
+        const output_factor: f64 = @floatFromInt(@as(u32, 1) << @as(u5, @intCast(level)));
         defer input_factor /= 2.0;
         if (data[active_offset + octave] == 0) continue;
         const origin = origin_offset + octave * 24;
@@ -2999,16 +3077,21 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
                 const offset = (ix * raw_z.len + iz_index) * raw_y.len;
                 const selector = selectors[offset..][0..raw_y.len];
                 const output = outputs[offset..][0..raw_y.len];
+                const column_mask: u64 = if (cached) active_masks[ix * raw_z.len + iz_index] else 0;
                 var previous_y: i32 = std.math.minInt(i32);
                 var line: GradientLine = undefined;
                 var i: usize = 0;
                 while (i < output.len) {
-                    if (!blended_active(kind, selector, i)) {
+                    if (cached) {
+                        const remaining = column_mask >> @as(u6, @intCast(i));
+                        if (remaining == 0) break;
+                        i += @as(usize, @ctz(remaining));
+                    } else if (!blended_active(kind, selector, i)) {
                         i += 1;
                         continue;
                     }
                     if (comptime avx2) {
-                        if (i + 3 < output.len and blended_active(kind, selector, i + 1) and blended_active(kind, selector, i + 2) and blended_active(kind, selector, i + 3)) {
+                        if (i + 3 < output.len and (if (cached) (column_mask >> @as(u6, @intCast(i))) & 15 == 15 else blended_column_active(cached, kind, column_mask, selector, i + 1) and blended_active(kind, selector, i + 2) and blended_active(kind, selector, i + 3))) {
                             const ys: Vec4i = @bitCast(integer_y[i..][0..4].*);
                             const y4: Vec4 = @bitCast(adjusted_y[i..][0..4].*);
                             const fade4: Vec4 = @bitCast(fade_y[i..][0..4].*);
@@ -3020,17 +3103,17 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
                                 break :block line.sample_smoothed_shifted4(y4, sx, fade4, sz);
                             } else blended_sample(4, permutation, @bitCast(xy0[i..][0..4].*), @bitCast(xy1[i..][0..4].*), @bitCast(xn0[i..][0..4].*), @bitCast(xn1[i..][0..4].*), iz, fx, y4, fz, sx, fade4, sz);
                             const current: Vec4 = @bitCast(output[i..][0..4].*);
-                            output[i..][0..4].* = @bitCast(current + sampled / @as(Vec4, @splat(input_factor)));
+                            output[i..][0..4].* = @bitCast(current + (if (avx2) sampled * @as(Vec4, @splat(output_factor)) else sampled / @as(Vec4, @splat(input_factor))));
                             i += 4;
                             continue;
                         }
                     }
-                    if (i + 1 < output.len and blended_active(kind, selector, i + 1) and integer_y[i] != integer_y[i + 1]) {
+                    if (i + 1 < output.len and blended_column_active(cached, kind, column_mask, selector, i + 1) and integer_y[i] != integer_y[i + 1]) {
                         const y2: Vec2 = @bitCast(adjusted_y[i..][0..2].*);
                         const fade2: Vec2 = @bitCast(fade_y[i..][0..2].*);
                         const sampled = blended_sample(2, permutation, @bitCast(xy0[i..][0..2].*), @bitCast(xy1[i..][0..2].*), @bitCast(xn0[i..][0..2].*), @bitCast(xn1[i..][0..2].*), iz, fx, y2, fz, sx, fade2, sz);
                         const current: Vec2 = @bitCast(output[i..][0..2].*);
-                        output[i..][0..2].* = @bitCast(current + sampled / @as(Vec2, @splat(input_factor)));
+                        output[i..][0..2].* = @bitCast(current + (if (avx2) sampled * @as(Vec2, @splat(output_factor)) else sampled / @as(Vec2, @splat(input_factor))));
                         i += 2;
                         continue;
                     }
@@ -3040,16 +3123,17 @@ fn blended_octaves(comptime avx2: bool, comptime kind: BlendedStack, data: [*]co
                         previous_y = iy;
                     }
                     var end = i + 1;
-                    while (end < output.len and blended_active(kind, selector, end) and integer_y[end] == iy) : (end += 1) {}
+                    while (end < output.len and blended_column_active(cached, kind, column_mask, selector, end) and integer_y[end] == iy) : (end += 1) {}
                     while (i + 1 < end) : (i += 2) {
                         const y2: Vec2 = @bitCast(adjusted_y[i..][0..2].*);
                         const fade2: Vec2 = @bitCast(fade_y[i..][0..2].*);
                         const sampled = line.sample_smoothed_shifted2(y2, sx, fade2, sz);
                         const current: Vec2 = @bitCast(output[i..][0..2].*);
-                        output[i..][0..2].* = @bitCast(current + sampled / @as(Vec2, @splat(input_factor)));
+                        output[i..][0..2].* = @bitCast(current + (if (avx2) sampled * @as(Vec2, @splat(output_factor)) else sampled / @as(Vec2, @splat(input_factor))));
                     }
                     while (i < end) : (i += 1) {
-                        output[i] += line.sample_smoothed_shifted(adjusted_y[i], sx, fade_y[i], sz) / input_factor;
+                        const sampled = line.sample_smoothed_shifted(adjusted_y[i], sx, fade_y[i], sz);
+                        output[i] += if (avx2) sampled * output_factor else sampled / input_factor;
                     }
                 }
             }
@@ -3092,7 +3176,13 @@ fn blended_gradient(comptime lanes: usize, hash: @Vector(lanes, i32), x: @Vector
     const h = hash & @as(I, @splat(15));
     const u = @select(f64, h < @as(I, @splat(8)), x, y);
     const v = @select(f64, h < @as(I, @splat(4)), y, @select(f64, (h == @as(I, @splat(12))) | (h == @as(I, @splat(14))), x, z));
-    return @select(f64, (h & @as(I, @splat(1))) == @as(I, @splat(0)), u, -u) + @select(f64, (h & @as(I, @splat(2))) == @as(I, @splat(0)), v, -v);
+    const Bits = @Vector(lanes, u64);
+    const Shift = @Vector(lanes, u6);
+    const sign_u = @as(Bits, @intCast(h & @as(I, @splat(1)))) << @as(Shift, @splat(63));
+    const sign_v = @as(Bits, @intCast(h & @as(I, @splat(2)))) << @as(Shift, @splat(62));
+    const signed_u: @Vector(lanes, f64) = @bitCast(@as(Bits, @bitCast(u)) ^ sign_u);
+    const signed_v: @Vector(lanes, f64) = @bitCast(@as(Bits, @bitCast(v)) ^ sign_v);
+    return signed_u + signed_v;
 }
 
 fn sample_distinct_y(comptime lanes: usize, permutation: [*]const u8, x_hash: i32, next_x_hash: i32, y: @Vector(lanes, i32), z: i32, fx: f64, fy: @Vector(lanes, f64), fz: f64, sx: f64, sy: @Vector(lanes, f64), sz: f64) @Vector(lanes, f64) {
@@ -3402,6 +3492,23 @@ fn perlin_value_grid_impl(comptime avx2: bool, comptime packed_corners: bool, co
                     while (z_end < z_count and integer_z[z_end] == integer_z[z_start]) : (z_end += 1) {}
                     var y_start: usize = 0;
                     while (y_start < y_count) {
+                        if (comptime avx2 and packed_corners) {
+                            if (y_start + 3 < y_count and integer_y[y_start] != integer_y[y_start + 1] and integer_y[y_start + 1] != integer_y[y_start + 2] and integer_y[y_start + 2] != integer_y[y_start + 3]) {
+                                const ys: Vec4i = @bitCast(integer_y[y_start..][0..4].*);
+                                const fy: Vec4 = @bitCast(fraction_y[y_start..][0..4].*);
+                                const sy: Vec4 = @bitCast(smooth_y[y_start..][0..4].*);
+                                for (x_start..x_end) |xi| {
+                                    for (z_start..z_end) |zi| {
+                                        const sampled = sample_distinct_y(4, permutation, x_hash, next_x_hash, ys, integer_z[zi], fraction_x[xi], fy, fraction_z[zi], smooth_x[xi], sy, smooth_z[zi]);
+                                        const offset = (xi * z_count + zi) * y_count + y_start;
+                                        const current: Vec4 = @bitCast(values[offset..][0..4].*);
+                                        values[offset..][0..4].* = @bitCast(current + @as(Vec4, @splat(amplitude)) * sampled * @as(Vec4, @splat(value_factor)));
+                                    }
+                                }
+                                y_start += 4;
+                                continue;
+                            }
+                        }
                         var y_end = y_start + 1;
                         while (y_end < y_count and integer_y[y_end] == integer_y[y_start]) : (y_end += 1) {}
                         const gradients = GradientCell.init(permutation, x_hash, next_x_hash, integer_y[y_start], integer_z[z_start]);
@@ -3714,7 +3821,7 @@ const GradientCell = struct {
         const fx0: Vec4 = @splat(fraction_x);
         const fx1: Vec4 = @splat(fraction_x - 1.0);
         const fz1 = fraction_z - @as(Vec4, @splat(1.0));
-        return .{ .values = .{
+        const terms = [_]GradientTermZ4{
             gradient_term_z4(self.values[0], fx0, fraction_z),
             gradient_term_z4(self.values[1], fx1, fraction_z),
             gradient_term_z4(self.values[2], fx0, fraction_z),
@@ -3723,7 +3830,13 @@ const GradientCell = struct {
             gradient_term_z4(self.values[5], fx1, fz1),
             gradient_term_z4(self.values[6], fx0, fz1),
             gradient_term_z4(self.values[7], fx1, fz1),
-        } };
+        };
+        var result: GradientLineZ4 = .{ .bases = undefined, .modes = 0 };
+        inline for (terms, 0..) |term, index| {
+            result.bases[index] = term.base;
+            result.modes |= @as(u16, @intFromEnum(term.mode)) << @as(u4, @intCast(index * 2));
+        }
+        return result;
     }
 
     inline fn line(self: GradientCell, fraction_x: f64, fraction_z: f64) GradientLine {
@@ -3860,34 +3973,36 @@ const GradientTermZ4 = struct {
 };
 
 const GradientLineZ4 = struct {
-    values: [8]GradientTermZ4,
+    bases: [8]Vec4,
+    modes: u16,
+
+    inline fn term(self: GradientLineZ4, comptime index: usize, shifted: Vec4) Vec4 {
+        const value: GradientTermZ4 = .{ .base = self.bases[index], .mode = @enumFromInt((self.modes >> @as(u4, @intCast(index * 2))) & 3) };
+        return value.sample(shifted);
+    }
 
     fn sample(self: GradientLineZ4, y: f64, sx: f64, sy: f64, sz: Vec4) Vec4 {
         const y0: Vec4 = @splat(y + 0.0);
         const y1: Vec4 = @splat(y + -1.0);
-        return lerp3_4(@splat(sx), @splat(sy), sz, self.values[0].sample(y0), self.values[1].sample(y0), self.values[2].sample(y1), self.values[3].sample(y1), self.values[4].sample(y0), self.values[5].sample(y0), self.values[6].sample(y1), self.values[7].sample(y1));
+        return lerp3_4(@splat(sx), @splat(sy), sz, self.term(0, y0), self.term(1, y0), self.term(2, y1), self.term(3, y1), self.term(4, y0), self.term(5, y0), self.term(6, y1), self.term(7, y1));
     }
 };
 
 fn gradient_term_z4(value: i32, x: Vec4, z: Vec4) GradientTermZ4 {
-    return switch (value & 15) {
-        0 => .{ .base = x, .mode = .add },
-        1 => .{ .base = -x, .mode = .add },
-        2 => .{ .base = x, .mode = .subtract },
-        3 => .{ .base = -x, .mode = .subtract },
-        4 => .{ .base = x + z, .mode = .none },
-        5 => .{ .base = -x + z, .mode = .none },
-        6 => .{ .base = x - z, .mode = .none },
-        7 => .{ .base = -x - z, .mode = .none },
-        8 => .{ .base = z, .mode = .add },
-        9 => .{ .base = z, .mode = .subtract },
-        10 => .{ .base = -z, .mode = .add },
-        11 => .{ .base = -z, .mode = .subtract },
-        12 => .{ .base = x, .mode = .add },
-        13 => .{ .base = z, .mode = .subtract },
-        14 => .{ .base = -x, .mode = .add },
-        else => .{ .base = -z, .mode = .subtract },
-    };
+    @setFloatMode(.strict);
+    const descriptors = [16]u8{ 8, 9, 16, 17, 2, 3, 4, 5, 14, 22, 15, 23, 8, 22, 9, 23 };
+    const descriptor = descriptors[@as(usize, @intCast(value & 15))];
+    const index: u3 = @truncate(descriptor);
+    const Bits = @Vector(4, u64);
+    const sign_x: Bits = @splat(@as(u64, index & 1) << 63);
+    const negative_z: u8 = 0xb0;
+    const sign_z: Bits = @splat(@as(u64, (negative_z >> index) & 1) << 63);
+    const xb = @as(Bits, @bitCast(x)) ^ sign_x;
+    const zb = @as(Bits, @bitCast(z)) ^ sign_z;
+    const sum: Bits = @bitCast(@as(Vec4, @bitCast(xb)) + @as(Vec4, @bitCast(zb)));
+    const only_x: Bits = @splat(@as(u64, 0) -% @as(u64, @intFromBool(index < 2)));
+    const only_z: Bits = @splat(@as(u64, 0) -% @as(u64, @intFromBool(index >= 6)));
+    return .{ .base = @bitCast((xb & only_x) | (zb & only_z) | (sum & ~(only_x | only_z))), .mode = @enumFromInt(descriptor >> 3) };
 }
 
 fn gradient_term(value: i32, x: f64, z: f64, y_offset: f64) GradientTerm {
