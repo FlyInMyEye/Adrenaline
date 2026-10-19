@@ -15,11 +15,13 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 public final class ChunkJob implements Runnable {
 
     private static final ConcurrentHashMap<ServerLevel, long[]> PRIORITY_FOCI = new ConcurrentHashMap<>();
+    private static final ThreadLocal<ChunkJob> CURRENT_JOB = new ThreadLocal<>();
 
     private final Set<Long> footprint;
     private final Supplier<CompletableFuture<?>> work;
@@ -27,6 +29,7 @@ public final class ChunkJob implements Runnable {
     private final ClassLoader contextClassLoader;
     private final String debugLabel;
     private final AtomicBoolean cancellationHandled = new AtomicBoolean();
+    private final AtomicInteger executingTasks = new AtomicInteger();
     private long schedulerEpoch = Long.MIN_VALUE;
     private volatile boolean started;
     private ChunkPos waitingPos;
@@ -86,6 +89,31 @@ public final class ChunkJob implements Runnable {
     long trackedPosition() {
         ChunkPos pos = this.waitingPos;
         return pos == null ? Long.MIN_VALUE : pos.toLong();
+    }
+
+    boolean isExecuting() {
+        return this.executingTasks.get() > 0;
+    }
+
+    public static <T> Supplier<T> trackExecution(Supplier<T> work) {
+        ChunkJob job = CURRENT_JOB.get();
+        return job == null ? work : () -> job.execute(work);
+    }
+
+    private <T> T execute(Supplier<T> work) {
+        ChunkJob previous = CURRENT_JOB.get();
+        CURRENT_JOB.set(this);
+        this.executingTasks.incrementAndGet();
+        try {
+            return work.get();
+        } finally {
+            this.executingTasks.decrementAndGet();
+            if (previous == null) {
+                CURRENT_JOB.remove();
+            } else {
+                CURRENT_JOB.set(previous);
+            }
+        }
     }
 
     public ChunkJob trackWaiting(ChunkPos pos, ChunkStatus status) {
@@ -237,7 +265,7 @@ public final class ChunkJob implements Runnable {
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
             }
-            CompletableFuture<?> completion = this.work.get();
+            CompletableFuture<?> completion = this.execute(this.work);
             DeferredNotificationBuffer.flush();
             ChunkJobScheduler.get().releaseWorker(this);
             if (completion == null) {

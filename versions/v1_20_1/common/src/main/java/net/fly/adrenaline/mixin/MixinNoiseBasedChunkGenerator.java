@@ -2,6 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import net.fly.adrenaline.scheduler.ChunkJob;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
@@ -74,7 +75,7 @@ public class MixinNoiseBasedChunkGenerator {
         if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
-        return CompletableFuture.supplyAsync(supplier, executor);
+        return CompletableFuture.supplyAsync(ChunkJob.trackExecution(supplier), executor);
     }
 
     @Redirect(
@@ -88,7 +89,7 @@ public class MixinNoiseBasedChunkGenerator {
         if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
-        return CompletableFuture.supplyAsync(supplier, executor);
+        return CompletableFuture.supplyAsync(ChunkJob.trackExecution(supplier), executor);
     }
 
     @Redirect(

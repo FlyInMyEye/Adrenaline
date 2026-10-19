@@ -108,6 +108,9 @@ public final class ChunkJobScheduler {
         long[] snapshot = new long[this.activeJobs.size()];
         int count = 0;
         for (ChunkJob job : this.activeJobs) {
+            if (!job.isExecuting()) {
+                continue;
+            }
             long position = job.trackedPosition();
             if (position != Long.MIN_VALUE) {
                 snapshot[count++] = position;
