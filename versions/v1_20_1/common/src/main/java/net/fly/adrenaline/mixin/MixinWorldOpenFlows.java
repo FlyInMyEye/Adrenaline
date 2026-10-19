@@ -10,6 +10,7 @@ import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.server.RegistryLayer;
 import net.minecraft.server.ReloadableServerResources;
+import net.minecraft.server.WorldLoader;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.levelgen.WorldDimensions;
 import net.minecraft.world.level.levelgen.WorldOptions;
@@ -19,9 +20,15 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(WorldOpenFlows.class)
 public class MixinWorldOpenFlows {
+
+    @Inject(method = "loadWorldDataBlocking", at = @At("HEAD"))
+    private <D, R> void adrenaline$awaitWarmupBeforeReload(WorldLoader.PackConfig packs, WorldLoader.WorldDataSupplier<D> supplier, WorldLoader.ResultFactory<D, R> factory, CallbackInfoReturnable<R> cir) {
+        BackgroundWorldgenWarmup.beforeContextLoad(Minecraft.getInstance());
+    }
 
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$awaitSaveBeforeLoad(Screen screen, String levelId, CallbackInfo ci) {

@@ -5,6 +5,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import net.fly.adrenaline.client.AdrenalineConfigScreen;
+import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
 import net.fly.adrenaline.client.WorldCreationContextWaiter;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.client.Minecraft;
@@ -64,6 +65,9 @@ public abstract class MixinCreateWorldScreen extends Screen {
 
     @Inject(method = "openFresh", at = @At("HEAD"), cancellable = true)
     private static void adrenaline$useCachedContext(Minecraft minecraft, Screen parent, CallbackInfo ci) {
+        if (!WorldCreationContextWaiter.isCapturingPreload()) {
+            BackgroundWorldgenWarmup.beforeContextLoad(minecraft);
+        }
         WorldCreationContext context = AdrenalineConfig.prepareWorldCreationContext() ? WorldCreationContextWaiter.get() : null;
         if (context != null) {
             minecraft.setScreen(MixinCreateWorldScreenInvoker.adrenaline$create(minecraft, parent, context, Optional.of(WorldPresets.NORMAL), OptionalLong.empty()));
