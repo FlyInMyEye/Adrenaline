@@ -67,7 +67,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
     private int adrenaline$chunkPreviewTextureDiameter;
 
     @Unique
-    private boolean[] adrenaline$uploadedChunkPreviews;
+    private int[][] adrenaline$uploadedChunkPreviews;
 
     protected MixinLevelLoadingScreen(Component title) {
         super(title);
@@ -238,15 +238,12 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
                     continue;
                 }
                 int gridIndex = z * diameter + x;
-                if (this.adrenaline$uploadedChunkPreviews[gridIndex]) {
-                    continue;
-                }
                 ChunkPos chunkPos = new ChunkPos(
                     spawnPos.x + x - radius,
                     spawnPos.z + z - radius
                 );
                 int[] preview = WorldgenChunkPreview.get(chunkPos);
-                if (preview == null) {
+                if (preview == null || preview == this.adrenaline$uploadedChunkPreviews[gridIndex]) {
                     continue;
                 }
 
@@ -263,7 +260,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
                         );
                     }
                 }
-                this.adrenaline$uploadedChunkPreviews[gridIndex] = true;
+                this.adrenaline$uploadedChunkPreviews[gridIndex] = preview;
                 dirty = true;
             }
         }
@@ -347,7 +344,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
             texture
         );
         this.adrenaline$chunkPreviewTextureDiameter = diameter;
-        this.adrenaline$uploadedChunkPreviews = new boolean[diameter * diameter];
+        this.adrenaline$uploadedChunkPreviews = new int[diameter * diameter][];
         texture.upload();
         return true;
     }

@@ -111,7 +111,7 @@ public class MixinChunkStatus {
         CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = original.call(executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks);
         if (status == ChunkStatus.FULL && WorldgenChunkPreview.isActive()) {
             future.thenAccept(result ->
-                result.left().ifPresent(WorldgenChunkPreview::capture)
+                result.left().ifPresent(chunk -> WorldgenChunkPreview.capture(level, chunk))
             );
         }
         if (BuildConfig.DEBUG && status != ChunkStatus.FULL) {
