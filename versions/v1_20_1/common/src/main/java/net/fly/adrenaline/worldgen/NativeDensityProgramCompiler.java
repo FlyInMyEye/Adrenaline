@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.natives.PerlinNativeSampler;
 import net.fly.adrenaline.natives.BlendedNativeSampler;
 import net.minecraft.util.CubicSpline;
@@ -230,7 +231,7 @@ public final class NativeDensityProgramCompiler {
                 return this.putConstant(0.0D);
             }
             if (function instanceof AdrenalineEmptyBeardifierAccess beardifier) {
-                if (beardifier.adrenaline$isEmpty()) {
+                if (AdrenalineConfig.beardifierOptimizationsEnabled() && beardifier.adrenaline$isEmpty()) {
                     return this.putConstant(0.0D);
                 }
                 return this.emitInput(function);

@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
@@ -27,14 +29,12 @@ import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(ChunkSerializer.class)
 public abstract class MixinChunkSerializer {
 
-    private static final ThreadLocal<Deque<SerializationContext>> adrenaline$serializationContexts = ThreadLocal.withInitial(ArrayDeque::new);
+    private static final ThreadLocal<Deque<SerializationContext>> adrenaline$serializationContexts = new ThreadLocal<>();
 
     @Shadow
     private static Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC;
@@ -44,15 +44,36 @@ public abstract class MixinChunkSerializer {
         return null;
     }
 
-    @Inject(method = "write", at = @At("HEAD"))
-    private static void adrenaline$beginWrite(ServerLevel level, ChunkAccess chunk, CallbackInfoReturnable<CompoundTag> cir) {
-        adrenaline$serializationContexts.get().push(new SerializationContext(chunk.getPos(), chunk.getSections()));
+    @WrapMethod(method = "write")
+    private static CompoundTag adrenaline$writeSections(ServerLevel level, ChunkAccess chunk, Operation<CompoundTag> original) {
+        if (!AdrenalineConfig.parallelChunkSerializationEnabled()) {
+            return original.call(level, chunk);
+        }
+        Deque<SerializationContext> stack = adrenaline$serializationContexts.get();
+        if (stack == null) {
+            stack = new ArrayDeque<>();
+            adrenaline$serializationContexts.set(stack);
+        }
+        stack.push(new SerializationContext(chunk.getPos(), chunk.getSections()));
+        try {
+            return original.call(level, chunk);
+        } finally {
+            stack.pop();
+            if (stack.isEmpty()) {
+                adrenaline$serializationContexts.remove();
+            }
+        }
+    }
+
+    private static SerializationContext adrenaline$currentContext() {
+        Deque<SerializationContext> stack = adrenaline$serializationContexts.get();
+        return stack == null ? null : stack.peek();
     }
 
     @Redirect(method = "write", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/storage/ChunkSerializer;makeBiomeCodec(Lnet/minecraft/core/Registry;)Lcom/mojang/serialization/Codec;"))
     private static Codec<PalettedContainerRO<Holder<Biome>>> adrenaline$cacheBiomeCodec(Registry<Biome> biomeRegistry) {
         Codec<PalettedContainerRO<Holder<Biome>>> codec = ChunkSerializationSupport.biomeCodec(biomeRegistry, MixinChunkSerializer::makeBiomeCodec);
-        SerializationContext context = adrenaline$serializationContexts.get().peek();
+        SerializationContext context = adrenaline$currentContext();
         if (context != null && AdrenalineConfig.parallelChunkSerializationEnabled()) {
             context.prepare(codec);
         }
@@ -61,23 +82,14 @@ public abstract class MixinChunkSerializer {
 
     @Redirect(method = "write", at = @At(value = "INVOKE", target = "Lcom/mojang/serialization/Codec;encodeStart(Lcom/mojang/serialization/DynamicOps;Ljava/lang/Object;)Lcom/mojang/serialization/DataResult;", ordinal = 2, remap = false))
     private static DataResult<?> adrenaline$encodeBlockStates(Codec<?> codec, DynamicOps<?> ops, Object value) {
-        SerializationContext context = adrenaline$serializationContexts.get().peek();
+        SerializationContext context = adrenaline$currentContext();
         return context != null ? context.encode(codec, ops, value) : ChunkSerializationSupport.encodeStart(codec, ops, value);
     }
 
     @Redirect(method = "write", at = @At(value = "INVOKE", target = "Lcom/mojang/serialization/Codec;encodeStart(Lcom/mojang/serialization/DynamicOps;Ljava/lang/Object;)Lcom/mojang/serialization/DataResult;", ordinal = 3, remap = false))
     private static DataResult<?> adrenaline$encodeBiomes(Codec<?> codec, DynamicOps<?> ops, Object value) {
-        SerializationContext context = adrenaline$serializationContexts.get().peek();
+        SerializationContext context = adrenaline$currentContext();
         return context != null ? context.encode(codec, ops, value) : ChunkSerializationSupport.encodeStart(codec, ops, value);
-    }
-
-    @Inject(method = "write", at = @At("RETURN"))
-    private static void adrenaline$endWrite(ServerLevel level, ChunkAccess chunk, CallbackInfoReturnable<CompoundTag> cir) {
-        Deque<SerializationContext> stack = adrenaline$serializationContexts.get();
-        stack.pop();
-        if (stack.isEmpty()) {
-            adrenaline$serializationContexts.remove();
-        }
     }
 
     private static final class SerializationContext {

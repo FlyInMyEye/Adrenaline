@@ -34,7 +34,8 @@ import net.minecraft.world.level.levelgen.NoiseRouter;
 import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -45,6 +46,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(NoiseChunk.class)
 public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateAccess, AdrenalineCellGridAccess, AdrenalineSectionNoiseAccess {
+
+    @Shadow protected abstract DensityFunction wrap(DensityFunction function);
 
     @Shadow private int cellCountXZ;
     @Shadow private int cellCountY;
@@ -239,7 +242,8 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.inCellX = 0;
         AdrenalineMixinNoiseInterpolatorView[] interpolatorArray = this.adrenaline$interpolatorArray();
         CellDensityEvaluator[] sliceEvaluators = this.adrenaline$sliceDensityEvaluators(interpolatorArray);
-        if (this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
+        boolean nativePerlin = AdrenalineConfig.nativePerlinBatchingEnabled();
+        if (nativePerlin && this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
             this.adrenaline$perlinSectionBaseCellX = cellX;
             this.adrenaline$perlinSections = new PerlinSectionCache(
                 cellX * this.cellWidth,
@@ -261,21 +265,29 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             for (int i = 0; i < interpolatorArray.length; i++) {
                 AdrenalineMixinNoiseInterpolatorView interpolator = interpolatorArray[i];
                 double[] slice = (useFirstSlice ? interpolator.adrenaline$getSlice0() : interpolator.adrenaline$getSlice1())[cellZ];
-                PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
+                if (nativePerlin) {
+                    PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
+                }
                 try {
                     CellDensityEvaluator evaluator = sliceEvaluators[i];
                     if (evaluator == null) {
                         interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
                     } else {
-                        PerlinBatching.begin(slice.length);
+                        if (nativePerlin) {
+                            PerlinBatching.begin(slice.length);
+                        }
                         try {
                             evaluator.fill(slice, this.sliceFillingContextProvider);
                         } finally {
-                            PerlinBatching.end();
+                            if (nativePerlin) {
+                                PerlinBatching.end();
+                            }
                         }
                     }
                 } finally {
-                    PerlinBatching.exitSection();
+                    if (nativePerlin) {
+                        PerlinBatching.exitSection();
+                    }
                 }
             }
         }
@@ -362,8 +374,11 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.interpolationCounter++;
     }
 
-    @Overwrite
-    protected DensityFunction wrap(DensityFunction densityFunction) {
+    @WrapMethod(method = "wrap")
+    private DensityFunction adrenaline$reuseWrapperFunction(DensityFunction densityFunction, Operation<DensityFunction> original) {
+        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
+            return original.call(densityFunction);
+        }
         return this.wrapped.computeIfAbsent(densityFunction, this.adrenaline$wrapNewFunction);
     }
 
@@ -475,9 +490,12 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         ci.cancel();
     }
 
-    @Overwrite
+    @WrapMethod(method = "preliminarySurfaceLevel")
     @ControlsOptimization(Optimization.NOISE_CHUNK)
-    public int preliminarySurfaceLevel(int blockX, int blockZ) {
+    private int adrenaline$preliminarySurfaceLevel(int blockX, int blockZ, Operation<Integer> original) {
+        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+            return original.call(blockX, blockZ);
+        }
         int x = QuartPos.toBlock(QuartPos.fromBlock(blockX));
         int z = QuartPos.toBlock(QuartPos.fromBlock(blockZ));
         long key = ColumnPos.asLong(x, z);
