@@ -40,6 +40,7 @@ extern fn adrenaline_prepare_aquifer_cell_avx2(density: [*]const c.jdouble, cand
 extern fn adrenaline_fused_terrain_avx2(program: [*]const u8, height: usize, output: [*]c.jdouble) callconv(.c) void;
 extern fn adrenaline_fused_ridge_avx2(program: [*]const u8, height: usize, output: [*]c.jdouble) callconv(.c) void;
 extern fn adrenaline_terrain_prefix_avx2(program: [*]const u8, height: usize, terrain: [*]c.jdouble, noodle: [*]c.jdouble) callconv(.c) void;
+extern fn adrenaline_preliminary_height_avx2(program: [*]const u8, program_length: usize, inputs: [*]const f64, input_length: usize, slots: usize, x: c.jint, z: c.jint, min_y: c.jint, max_y: c.jint, step: c.jint) callconv(.c) c.jint;
 
 comptime {
     if (!avx_only) {
@@ -304,20 +305,111 @@ fn Java_net_fly_adrenaline_natives_NativeDensitySampler_preliminarySurfaceLevel0
         if (input_buffer == null or get_capacity(env, input_buffer) < @as(i64, input_count) * 16) return failed;
         const input_address = get_address(env, input_buffer) orelse return failed;
         const values: [*]const f64 = @ptrCast(@alignCast(input_address));
-        inputs = values[0..@as(usize, @intCast(input_count)) * 2];
+        inputs = values[0 .. @as(usize, @intCast(input_count)) * 2];
     }
+    const slots: usize = @intCast(cache_count);
+    if (comptime builtin.cpu.arch == .x86_64 and !avx_only) {
+        if (adrenaline_has_avx2() != 0) return adrenaline_preliminary_height_avx2(program.ptr, program.len, inputs.ptr, inputs.len, slots, x, z, min_y, max_y, step);
+    }
+    return preliminary_surface_level(program, inputs, slots, x, z, min_y, max_y, step);
+}
+
+pub fn preliminary_surface_level(program: []const u8, inputs: []const f64, slots: usize, x: c.jint, z: c.jint, min_y: c.jint, max_y: c.jint, step: c.jint) c.jint {
+    @setFloatMode(.strict);
     var cache_values: [max_column_caches]f64 = undefined;
     var cache_ready: [max_column_caches]bool = undefined;
-    const slots: usize = @intCast(cache_count);
     @memset(cache_ready[0..slots], false);
     var value: [1]f64 = undefined;
+    const slide: ?HeightSlide = if (avx_only) HeightSlide.parse(program, slots) else null;
     var y: i64 = max_y;
     while (y >= min_y) : (y -= step) {
-        if (!evaluate_density_program_generic(1, false, program, x, @intCast(y), z, 1, 1, &value, inputs, cache_values[0..slots], cache_ready[0..slots])) return failed;
+        const sampled = if (slide) |*pattern| pattern.sample(@intCast(y), cache_values[0..slots], cache_ready[0..slots]) else null;
+        if (sampled) |v| {
+            value[0] = v;
+        } else {
+            if (!evaluate_density_program_generic(1, false, program, x, @intCast(y), z, 1, 1, &value, inputs, cache_values[0..slots], cache_ready[0..slots])) return std.math.minInt(c.jint);
+        }
         if (value[0] > 0.390625) return @intCast(y);
     }
     return std.math.maxInt(c.jint);
 }
+
+const HeightSlide = struct {
+    gradients: [3][4]f64,
+    parameters: [8]f64,
+    slots: [2]usize,
+
+    fn parse(program: []const u8, slots: usize) ?HeightSlide {
+        @setFloatMode(.strict);
+        if (program.len < 218) return null;
+        const offsets = [_]usize{ 0, 25, 39, 64, 78, 103, 112, 113, 127, 136, 137, 138, 147, 148, 157, 158, 175, 184, 185, 186, 195, 196, 205, 206, 207, 216, 217 };
+        const opcodes = [_]u8{ 21, 19, 21, 19, 21, 32, 3, 19, 32, 20, 10, 2, 4, 2, 3, 5, 2, 3, 20, 2, 3, 2, 3, 20, 2, 3, 0 };
+        inline for (offsets, opcodes) |offset, opcode| if (program[offset] != opcode) return null;
+        inline for (.{ 26, 65, 114 }) |offset| if (program[offset] != 1) return null;
+        inline for (.{ 35, 74, 123 }, .{ 207, 186, 137 }) |offset, target| {
+            if (std.mem.readInt(u32, program[offset..][0..4], .little) != target) return null;
+        }
+        var result: HeightSlide = undefined;
+        result.slots = .{ std.mem.readInt(u32, program[104..][0..4], .little), std.mem.readInt(u32, program[128..][0..4], .little) };
+        if (result.slots[0] >= slots or result.slots[1] >= slots) return null;
+        if (std.mem.readInt(u32, program[108..][0..4], .little) >= program.len or std.mem.readInt(u32, program[132..][0..4], .little) >= program.len) return null;
+        inline for (.{ 1, 40, 79 }, 0..) |offset, i| {
+            const from_y: i32 = @bitCast(std.mem.readInt(u32, program[offset..][0..4], .little));
+            const to_y: i32 = @bitCast(std.mem.readInt(u32, program[offset + 4 ..][0..4], .little));
+            const first: f64 = @floatFromInt(from_y);
+            const last: f64 = @floatFromInt(to_y);
+            result.gradients[i] = .{ first, last - first, density_program_value(program, offset + 8), density_program_value(program, offset + 16) };
+        }
+        inline for (.{ 139, 149, 159, 167, 176, 187, 197, 208 }, 0..) |offset, i| result.parameters[i] = density_program_value(program, offset);
+        return result;
+    }
+
+    fn sample_gradient(data: [4]f64, y: f64) f64 {
+        @setFloatMode(.strict);
+        if (data[1] > 0.0) {
+            if (y < data[0]) return data[2];
+            if (y > data[0] + data[1]) return data[3];
+        } else if (data[1] < 0.0) {
+            if (y > data[0]) return data[2];
+            if (y < data[0] + data[1]) return data[3];
+        }
+        const t = (y - data[0]) / data[1];
+        return if (t < 0.0) data[2] else if (t > 1.0) data[3] else data[2] + t * (data[3] - data[2]);
+    }
+
+    fn sample(self: *const HeightSlide, y: c.jint, values: []const f64, ready: []const bool) ?f64 {
+        @setFloatMode(.strict);
+        const block_y = @as(f64, @floatFromInt(y)) + 0.0;
+        var bottom = sample_gradient(self.gradients[0], block_y);
+        if (bottom == 0.0) {
+            bottom = 0.0;
+        } else {
+            var top = sample_gradient(self.gradients[1], block_y);
+            if (top == 0.0) {
+                top = 0.0;
+            } else {
+                if (!ready[self.slots[0]]) return null;
+                var terrain = sample_gradient(self.gradients[2], block_y) + values[self.slots[0]];
+                if (terrain == 0.0) {
+                    terrain = 0.0;
+                } else {
+                    if (!ready[self.slots[1]]) return null;
+                    terrain *= values[self.slots[1]];
+                }
+                if (terrain <= 0.0) terrain *= 0.25;
+                terrain *= self.parameters[0];
+                terrain += self.parameters[1];
+                terrain = density_clamp(terrain, self.parameters[2], self.parameters[3]);
+                terrain += self.parameters[4];
+                top *= terrain;
+            }
+            top += self.parameters[5];
+            top += self.parameters[6];
+            bottom *= top;
+        }
+        return bottom + self.parameters[7];
+    }
+};
 
 fn evaluate_density_jni(env: ?*c.JNIEnv, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) c.jboolean {
     @setFloatMode(.strict);
