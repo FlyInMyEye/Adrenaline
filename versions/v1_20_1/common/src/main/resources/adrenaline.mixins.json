@@ -18,7 +18,6 @@
     "MixinClimateParameterList",
     "MixinBiomeManager",
     "MixinBiomeOptimizationTakeoverDetector",
-    "MixinChunkHolderPendingStatus",
     "MixinChunkTaskPriorityQueueSorter",
     "MixinChunkStatus",
     "MixinLoggerChunkProgressListener",

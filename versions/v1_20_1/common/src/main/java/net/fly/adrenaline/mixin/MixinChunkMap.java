@@ -7,6 +7,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.Queue;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
@@ -16,7 +17,6 @@ import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
-import net.fly.adrenaline.scheduler.PendingChunkStatusAccess;
 import net.fly.adrenaline.util.WorldgenPreparation;
 import net.fly.adrenaline.util.SaveBackpressure;
 import net.fly.adrenaline.util.WorldgenWarmup;
@@ -64,6 +64,9 @@ public class MixinChunkMap {
     private ThreadLocal<ChunkHolder> adrenaline$currentHolder;
 
     @Unique
+    private ThreadLocal<ChunkStatus> adrenaline$dispatchStatus;
+
+    @Unique
     private int adrenaline$saveFlushDepth;
 
     @Unique
@@ -72,6 +75,7 @@ public class MixinChunkMap {
     @Inject(method = "<init>", at = @At("RETURN"))
     private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
         this.adrenaline$currentHolder = new ThreadLocal<>();
+        this.adrenaline$dispatchStatus = new ThreadLocal<>();
     }
 
     @ModifyArg(
@@ -204,7 +208,6 @@ public class MixinChunkMap {
         at = @At("HEAD")
     )
     private void captureStatus(ChunkHolder holder, ChunkStatus status, CallbackInfoReturnable<CompletableFuture<?>> cir) {
-        ((PendingChunkStatusAccess) holder).adrenaline$enqueuePendingStatus(status);
         ChunkJobScheduler.get().dependencyScheduled();
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.beginScheduling(holder.getPos(), status);
@@ -219,6 +222,38 @@ public class MixinChunkMap {
         if (BuildConfig.DEBUG) {
             WorldgenStageStats.finishInitialScheduling(holder.getPos(), status);
         }
+    }
+
+    @WrapOperation(
+        method = "scheduleChunkGeneration",
+        at = @At(
+            value = "INVOKE",
+            target = "Ljava/util/concurrent/CompletableFuture;thenComposeAsync(Ljava/util/function/Function;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;",
+            remap = false
+        )
+    )
+    private CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> adrenaline$bindGenerationDispatch(
+        CompletableFuture<Either<List<ChunkAccess>, ChunkHolder.ChunkLoadingFailure>> dependencies,
+        Function<Either<List<ChunkAccess>, ChunkHolder.ChunkLoadingFailure>, CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> generation,
+        Executor executor,
+        Operation<CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> original,
+        ChunkHolder holder,
+        ChunkStatus status
+    ) {
+        Executor dispatch = task -> {
+            ChunkStatus previous = this.adrenaline$dispatchStatus.get();
+            this.adrenaline$dispatchStatus.set(status);
+            try {
+                executor.execute(task);
+            } finally {
+                if (previous == null) {
+                    this.adrenaline$dispatchStatus.remove();
+                } else {
+                    this.adrenaline$dispatchStatus.set(previous);
+                }
+            }
+        };
+        return original.call(dependencies, generation, dispatch);
     }
 
     @Inject(
@@ -239,7 +274,8 @@ public class MixinChunkMap {
     @ControlsOptimization(Optimization.PARALLEL_WORLDGEN)
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
         ChunkHolder holder = this.adrenaline$currentHolder.get();
-        ChunkStatus nextStatus = holder == null ? null : ((PendingChunkStatusAccess) holder).adrenaline$pollPendingStatus();
+        ChunkStatus nextStatus = this.adrenaline$dispatchStatus.get();
+        this.adrenaline$dispatchStatus.remove();
         if (nextStatus != null) {
             ChunkJobScheduler.get().dependencyReady();
         }
