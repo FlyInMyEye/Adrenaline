@@ -113,6 +113,9 @@ tasks.named('sourcesJar', Jar).configure {
     dependsOn tasks.named('generateBuildConfig')
 }
 jar {
+    from('../../../LICENSE') {
+        into 'META-INF'
+    }
     def effectiveVersion = projectModVersion.toString()
     def versionedName = "adrenaline-fabric-1.20.1-${effectiveVersion}.jar"
     if (delegate.hasProperty('archiveFileName')) {
