@@ -6,6 +6,18 @@ const c = @cImport({
 const std = @import("std");
 const native = @import("adrenaline_native.zig");
 
+pub export fn adrenaline_density_cell_avx2(program: [*]const u8, program_length: usize, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: [*]f64) callconv(.c) c_int {
+    return if (native.evaluate_density_cell(program[0..program_length], base_x, base_y, base_z, width, height, output[0 .. width * width * height], &.{})) 1 else 0;
+}
+
+pub export fn adrenaline_terrain_prefix_avx2(program: [*]const u8, height: usize, terrain: [*]f64, noodle: [*]f64) callconv(.c) void {
+    native.evaluate_terrain_prefix(program[0..376], height, terrain[0 .. 16 * height], noodle[0 .. 16 * height]);
+}
+
+pub export fn adrenaline_fused_ridge_avx2(program: [*]const u8, height: usize, output: [*]f64) callconv(.c) void {
+    native.evaluate_fused_ridge(program[0..144], height, output[0 .. 16 * height]);
+}
+
 pub export fn adrenaline_fused_terrain_avx2(program: [*]const u8, height: usize, output: [*]f64) callconv(.c) void {
     native.evaluate_fused_terrain(program[0..388], height, output[0 .. 16 * height]);
 }
