@@ -760,6 +760,18 @@ fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, density: 
         }
         return 0;
     }
+    if (comptime avx2) {
+        var solid: usize = 0;
+        while (solid + 7 < density.len) : (solid += 8) {
+            const block: Vec8d = @bitCast(density[solid..][0..8].*);
+            if (!@reduce(.And, block > @as(Vec8d, @splat(0.0)))) break;
+        }
+        while (solid < density.len and density[solid] > 0.0) : (solid += 1) {}
+        if (solid == density.len) {
+            @memset(materials, 0);
+            return 0;
+        }
+    }
     if (@as(i64, base_y) >= @as(i64, global_fluid_level) + 5 and
         height > 0 and width > 0 and fluid_levels.len > 0 and fluid_levels.len <= max_density_values and
         (global_fluid_type == 2 or global_fluid_type == 3) and grid_size_x > 1 and grid_size_z > 1)
