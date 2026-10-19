@@ -1,5 +1,7 @@
 package net.fly.adrenaline.worldgen;
 
+import static org.objectweb.asm.Opcodes.*;
+
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
@@ -13,10 +15,9 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-public final class CellDensityCompiler implements Opcodes {
+public final class CellDensityCompiler {
 
     private static final String GENERATED_NAME = "net/fly/adrenaline/worldgen/GeneratedCellDensityEvaluator";
     private static final String EVALUATOR_NAME = Type.getInternalName(CellDensityEvaluator.class);

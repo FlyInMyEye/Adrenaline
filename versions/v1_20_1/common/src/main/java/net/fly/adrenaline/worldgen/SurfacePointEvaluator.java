@@ -1,5 +1,7 @@
 package net.fly.adrenaline.worldgen;
 
+import static org.objectweb.asm.Opcodes.*;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -32,10 +34,9 @@ import net.minecraft.world.level.levelgen.SurfaceSystem;
 import net.minecraft.world.level.levelgen.WorldGenerationContext;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
-public final class SurfacePointEvaluator implements Opcodes {
+public final class SurfacePointEvaluator {
 
     private static final boolean BUFFERED = Boolean.parseBoolean(System.getProperty("adrenaline.bufferedSurface", "true"));
     private static final String EVALUATOR = Type.getInternalName(Evaluator.class);

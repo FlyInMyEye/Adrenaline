@@ -2,6 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
+import java.lang.invoke.MethodType;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -29,7 +30,8 @@ public abstract class MixinProtoChunkHeightmaps {
         for (var method : Heightmap.class.getDeclaredMethods()) {
             if (method.getReturnType() == boolean.class
                 && java.util.Arrays.equals(method.getParameterTypes(), new Class<?>[]{int.class, int.class, int.class, BlockState.class})) {
-                if (SurfaceRuleHooks.hooked(Heightmap.class, method.getName() + org.objectweb.asm.Type.getMethodDescriptor(method))) {
+                String descriptor = MethodType.methodType(method.getReturnType(), method.getParameterTypes()).descriptorString();
+                if (SurfaceRuleHooks.hooked(Heightmap.class, method.getName() + descriptor)) {
                     return false;
                 }
                 found = true;
