@@ -20,7 +20,7 @@ public class MixinBlender {
 
     @Inject(method = "of", at = @At("HEAD"), cancellable = true)
     private static void adrenaline$reuseBlender(WorldGenRegion region, CallbackInfoReturnable<Blender> cir) {
-        if (!AdrenalineConfig.get().worldgenOptimizations) {
+        if (!AdrenalineConfig.blendingOptimizationsEnabled()) {
             return;
         }
 
@@ -34,7 +34,7 @@ public class MixinBlender {
 
     @Inject(method = "of", at = @At("RETURN"))
     private static void adrenaline$cacheBlender(WorldGenRegion region, CallbackInfoReturnable<Blender> cir) {
-        if (!AdrenalineConfig.get().worldgenOptimizations) {
+        if (!AdrenalineConfig.blendingOptimizationsEnabled()) {
             ADRENALINE_LAST_REGION.remove();
             ADRENALINE_LAST_BLENDER.remove();
             return;

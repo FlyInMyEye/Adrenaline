@@ -147,7 +147,7 @@ public final class SurfacePointEvaluator implements Opcodes {
     }
 
     private static Object nativeRule(Cache cache, SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Object original) {
-        if (!NativeSurfaceSampler.available() || FACTORY == null || !(context instanceof AdrenalineMixinSurfaceRulesContextApi api)) {
+        if (!(AdrenalineConfig.nativeSurfaceRulesEnabled() && NativeSurfaceSampler.available()) || FACTORY == null || !(context instanceof AdrenalineMixinSurfaceRulesContextApi api)) {
             return original;
         }
         NativeSurfaceProgram program = ((AdrenalineNativeSurfaceProgramsAccess) cache.activeSystem).adrenaline$getSurfacePrograms()
@@ -175,7 +175,7 @@ public final class SurfacePointEvaluator implements Opcodes {
             || !(context instanceof AdrenalineMixinSurfaceRulesContextApi contextApi)) {
             return original;
         }
-        NativeSurfaceProgram program = NativeSurfaceSampler.available()
+        NativeSurfaceProgram program = AdrenalineConfig.nativeSurfaceRulesEnabled() && NativeSurfaceSampler.available()
             ? ((AdrenalineNativeSurfaceProgramsAccess) cache.activeSystem).adrenaline$getSurfacePrograms().get(source, original, cache.activeBiomes, generation, context) : null;
         if (program != null && !program.contextReusable()) {
             cache.supported = false;
@@ -200,7 +200,7 @@ public final class SurfacePointEvaluator implements Opcodes {
         if (program != null) {
             cache.nativePlan.bind(program, contextApi, generation.getMinGenY(), cache.column != null && cache.column.buffered());
             evaluator.nativePlan = cache.nativePlan;
-        } else if (!NativeSurfaceSampler.available()) {
+        } else if (!(AdrenalineConfig.nativeSurfaceRulesEnabled() && NativeSurfaceSampler.available())) {
             if (evaluator.plan == null) {
                 evaluator.plan = SurfaceRulePlan.compile(source, context, generation, contextApi);
             }
@@ -227,6 +227,9 @@ public final class SurfacePointEvaluator implements Opcodes {
 
     public static BlockColumn column(BlockColumn original, SurfaceSystem system, ChunkAccess chunk, MutableBlockPos position, BlockState defaultBlock, SurfaceRules.RuleSource source) {
         Cache cache = ACTIVE.get();
+        if (!AdrenalineConfig.get().surfaceColumnOptimizations) {
+            return original;
+        }
         if (!BUFFERED || cache == null || !cache.knownRules(source) || !SectionPaletteBuilder.available()
             || chunk.getClass() != ProtoChunk.class || chunk.getStatus().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)
             || (chunk.getMinBuildHeight() & 15) != 0 || (chunk.getHeight() & 15) != 0

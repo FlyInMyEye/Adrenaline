@@ -59,7 +59,7 @@ public abstract class MixinSurfaceSystem implements AdrenalineNativeSurfaceProgr
 
     @WrapMethod(method = "buildSurface")
     private void adrenaline$batchSurfaceSampling(RandomState randomState, BiomeManager biomeManager, Registry<Biome> biomeRegistry, boolean useLegacyRandomSource, WorldGenerationContext context, ChunkAccess chunk, NoiseChunk noiseChunk, SurfaceRules.RuleSource ruleSource, Operation<Void> original) {
-        if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
+        if (!AdrenalineConfig.surfaceOptimizationsEnabled() && !AdrenalineConfig.surfaceNoiseOptimizationsEnabled()) {
             try (SurfacePointEvaluator.Scope scope = SurfacePointEvaluator.suspend()) {
                 original.call(randomState, biomeManager, biomeRegistry, useLegacyRandomSource, context, chunk, noiseChunk, ruleSource);
             }
@@ -130,7 +130,7 @@ public abstract class MixinSurfaceSystem implements AdrenalineNativeSurfaceProgr
     @Inject(method = "getSurfaceDepth", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.SURFACE_NOISE)
     private void adrenaline$getSurfaceDepth(int blockX, int blockZ, CallbackInfoReturnable<Integer> cir) {
-        if (!AdrenalineConfig.surfaceOptimizationsEnabled() || !AdrenalineConfig.surfaceNoiseOptimizationsEnabled()) {
+        if (!AdrenalineConfig.surfaceNoiseOptimizationsEnabled()) {
             return;
         }
 

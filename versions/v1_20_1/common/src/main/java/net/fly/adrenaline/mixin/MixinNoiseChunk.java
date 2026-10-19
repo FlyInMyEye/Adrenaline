@@ -88,7 +88,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
 
     @Unique
     private DensityFunction.Visitor adrenaline$mappingVisitor(DensityFunction.Visitor visitor) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
             return visitor;
         }
         if (this.adrenaline$densityMapCache == null) {
@@ -101,7 +101,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @ControlsOptimization(Optimization.NOISE_CHUNK)
     private void adrenaline$cacheClimateColumns(NoiseRouter router, List<Climate.ParameterPoint> spawnTarget, CallbackInfoReturnable<Climate.Sampler> cir) {
         this.adrenaline$densityMapCache = null;
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.biomeClimateOptimizationsEnabled()) {
             return;
         }
         Climate.Sampler sampler = cir.getReturnValue();

@@ -47,7 +47,7 @@ public class AdrenalineConfig {
             loaded.fastTerrainLoadingMode = loaded.fastTerrainLoading ? FastTerrainLoadingMode.ON : FastTerrainLoadingMode.OFF;
             changed = true;
         }
-        if (normalizeNativeSettings(loaded)) {
+        if (normalizeSettings(loaded)) {
             changed = true;
         }
         data = loaded;
@@ -82,7 +82,7 @@ public class AdrenalineConfig {
     }
 
     public static synchronized void save(Data value) {
-        normalizeNativeSettings(value);
+        normalizeSettings(value);
         data = value;
         if (manager != null) {
             manager.save(value);
@@ -96,7 +96,7 @@ public class AdrenalineConfig {
         }
         Data loaded = manager.get();
         if (loaded != null) {
-            if (normalizeNativeSettings(loaded)) {
+            if (normalizeSettings(loaded)) {
                 manager.save(loaded);
             }
             data = loaded;
@@ -221,11 +221,11 @@ public class AdrenalineConfig {
     }
 
     public static boolean initialSpawnOptimizationEnabled() {
-        return get().worldgenOptimizations && get().initialSpawnOptimization && !OptimizationTakeoverRegistry.isControlled(Optimization.INITIAL_SPAWN);
+        return get().initialSpawnOptimization && !OptimizationTakeoverRegistry.isControlled(Optimization.INITIAL_SPAWN);
     }
 
     public static boolean terrainFillOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().terrainFillOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
+        return get().terrainFillOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
     }
 
     public static boolean inlineTerrainFillTasks() {
@@ -234,38 +234,38 @@ public class AdrenalineConfig {
     }
 
     public static boolean surfaceOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().surfaceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
+        return get().surfaceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
     }
 
     public static boolean surfaceNoiseOptimizationsEnabled() {
         Data data = get();
-        return data.worldgenOptimizations && data.surfaceOptimizations && !approximateNativePerlinEnabled()
+        return data.surfaceNoiseOptimizations && !approximateNativePerlinEnabled()
             && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE_NOISE);
     }
 
     public static boolean noiseChunkOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
+        return get().noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
     }
 
     public static boolean biomeFiddleOptimizationsEnabled() {
         Data data = get();
-        return data.worldgenOptimizations && data.noiseChunkOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BIOME_FIDDLE);
+        return data.biomeFiddleOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BIOME_FIDDLE);
     }
 
     public static boolean materialRuleOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().materialRuleOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
+        return get().materialRuleOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
     }
 
     public static boolean aquiferOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
+        return get().aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
     }
 
     public static boolean beardifierOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().beardifierOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BEARDIFIER);
+        return get().beardifierOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BEARDIFIER);
     }
 
     public static boolean oreVeinOptimizationsEnabled() {
-        return get().worldgenOptimizations && get().oreVeinOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
+        return get().oreVeinOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
     }
 
     public static boolean nativePerlinBatchingEnabled() {
@@ -285,7 +285,39 @@ public class AdrenalineConfig {
     }
 
     public static boolean parallelChunkSerializationEnabled() {
-        return get().worldgenOptimizations;
+        return get().parallelChunkSerialization;
+    }
+
+    public static boolean biomeSearchOptimizationsEnabled() {
+        return get().biomeSearchOptimizations;
+    }
+
+    public static boolean biomeClimateOptimizationsEnabled() {
+        return get().biomeClimateOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
+    }
+
+    public static boolean densityMappingOptimizationsEnabled() {
+        return get().densityMappingOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
+    }
+
+    public static boolean blendingOptimizationsEnabled() {
+        return get().blendingOptimizations;
+    }
+
+    public static boolean heightmapOptimizationsEnabled() {
+        return get().heightmapOptimizations;
+    }
+
+    public static boolean palettePackingOptimizationsEnabled() {
+        return get().palettePackingOptimizations;
+    }
+
+    public static boolean shapeCacheOptimizationsEnabled() {
+        return get().shapeCacheOptimizations;
+    }
+
+    public static boolean nativeSurfaceRulesEnabled() {
+        return surfaceOptimizationsEnabled() && AdrenalineNatives.isAvailable() && get().nativeSurfaceRules;
     }
 
     public static boolean fastLegacyRandomEnabled() {
@@ -328,8 +360,39 @@ public class AdrenalineConfig {
         return BuildConfig.DEBUG && get().forceEasterEgg;
     }
 
-    private static boolean normalizeNativeSettings(Data value) {
+    private static boolean normalizeSettings(Data value) {
         boolean changed = false;
+        if (value.settingsVersion == 0) {
+            value.surfaceNoiseOptimizations = value.surfaceOptimizations;
+            value.biomeSearchOptimizations = value.noiseChunkOptimizations;
+            value.biomeFiddleOptimizations = value.noiseChunkOptimizations;
+            value.biomeClimateOptimizations = value.noiseChunkOptimizations;
+            value.densityMappingOptimizations = value.noiseChunkOptimizations;
+            value.settingsVersion = 1;
+            changed = true;
+        }
+        if (value.worldgenOptimizations != null) {
+            if (!value.worldgenOptimizations) {
+                value.terrainFillOptimizations = false;
+                value.surfaceOptimizations = false;
+                value.noiseChunkOptimizations = false;
+                value.materialRuleOptimizations = false;
+                value.aquiferOptimizations = false;
+                value.beardifierOptimizations = false;
+                value.oreVeinOptimizations = false;
+                value.initialSpawnOptimization = false;
+                value.parallelChunkSerialization = false;
+                value.blendingOptimizations = false;
+                value.heightmapOptimizations = false;
+                value.surfaceNoiseOptimizations = false;
+                value.biomeSearchOptimizations = false;
+                value.biomeFiddleOptimizations = false;
+                value.biomeClimateOptimizations = false;
+                value.densityMappingOptimizations = false;
+            }
+            value.worldgenOptimizations = null;
+            changed = true;
+        }
         if (value.nativeSettingsVersion == 0) {
             value.nativePerlinBatching = true;
             value.approximateNativePerlin = false;
@@ -342,7 +405,23 @@ public class AdrenalineConfig {
     }
 
     public static class Data {
-        public boolean worldgenOptimizations = true;
+        public Boolean worldgenOptimizations;
+        public boolean flatCacheOptimizations = true;
+        public boolean regionScanOptimizations = true;
+        public boolean biomeCodecCache = true;
+        public boolean sectionTerrainOptimizations = true;
+        public boolean surfaceNoiseOptimizations = true;
+        public boolean biomeSearchOptimizations = true;
+        public boolean biomeFiddleOptimizations = true;
+        public boolean biomeClimateOptimizations = true;
+        public boolean densityMappingOptimizations = true;
+        public boolean blendingOptimizations = true;
+        public boolean heightmapOptimizations = true;
+        public boolean parallelChunkSerialization = true;
+        public boolean palettePackingOptimizations = true;
+        public boolean shapeCacheOptimizations = true;
+        public boolean nativeSurfaceRules = true;
+        public boolean surfaceColumnOptimizations = true;
         public boolean terrainFillOptimizations = true;
         public boolean surfaceOptimizations = true;
         public boolean noiseChunkOptimizations = true;
@@ -380,6 +459,7 @@ public class AdrenalineConfig {
         public boolean nativeDensityEvaluation = true;
         public boolean nativeAquiferBatching = true;
         public int nativeSettingsVersion = 1;
+        public int settingsVersion;
         public boolean showCancelButton = true;
         public boolean showChunkPreview = true;
         public boolean showThreadVisualizer;
@@ -397,6 +477,22 @@ public class AdrenalineConfig {
 
         public Data(Data other) {
             this.worldgenOptimizations = other.worldgenOptimizations;
+            this.flatCacheOptimizations = other.flatCacheOptimizations;
+            this.regionScanOptimizations = other.regionScanOptimizations;
+            this.biomeCodecCache = other.biomeCodecCache;
+            this.sectionTerrainOptimizations = other.sectionTerrainOptimizations;
+            this.surfaceNoiseOptimizations = other.surfaceNoiseOptimizations;
+            this.biomeSearchOptimizations = other.biomeSearchOptimizations;
+            this.biomeFiddleOptimizations = other.biomeFiddleOptimizations;
+            this.biomeClimateOptimizations = other.biomeClimateOptimizations;
+            this.densityMappingOptimizations = other.densityMappingOptimizations;
+            this.blendingOptimizations = other.blendingOptimizations;
+            this.heightmapOptimizations = other.heightmapOptimizations;
+            this.parallelChunkSerialization = other.parallelChunkSerialization;
+            this.palettePackingOptimizations = other.palettePackingOptimizations;
+            this.shapeCacheOptimizations = other.shapeCacheOptimizations;
+            this.nativeSurfaceRules = other.nativeSurfaceRules;
+            this.surfaceColumnOptimizations = other.surfaceColumnOptimizations;
             this.terrainFillOptimizations = other.terrainFillOptimizations;
             this.surfaceOptimizations = other.surfaceOptimizations;
             this.noiseChunkOptimizations = other.noiseChunkOptimizations;
@@ -434,6 +530,7 @@ public class AdrenalineConfig {
             this.nativeDensityEvaluation = other.nativeDensityEvaluation;
             this.nativeAquiferBatching = other.nativeAquiferBatching;
             this.nativeSettingsVersion = other.nativeSettingsVersion;
+            this.settingsVersion = other.settingsVersion;
             this.showCancelButton = other.showCancelButton;
             this.showChunkPreview = other.showChunkPreview;
             this.showThreadVisualizer = other.showThreadVisualizer;
@@ -445,6 +542,37 @@ public class AdrenalineConfig {
             this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
             this.forceEasterEgg = other.forceEasterEgg;
+        }
+
+        public void disableWorldgenOptimizations() {
+            this.biomeCodecCache = false;
+            this.regionScanOptimizations = false;
+            this.flatCacheOptimizations = false;
+            this.sectionTerrainOptimizations = false;
+            this.terrainFillOptimizations = false;
+            this.surfaceOptimizations = false;
+            this.noiseChunkOptimizations = false;
+            this.materialRuleOptimizations = false;
+            this.aquiferOptimizations = false;
+            this.beardifierOptimizations = false;
+            this.oreVeinOptimizations = false;
+            this.initialSpawnOptimization = false;
+            this.parallelChunkSerialization = false;
+            this.blendingOptimizations = false;
+            this.heightmapOptimizations = false;
+            this.surfaceNoiseOptimizations = false;
+            this.biomeSearchOptimizations = false;
+            this.biomeFiddleOptimizations = false;
+            this.biomeClimateOptimizations = false;
+            this.densityMappingOptimizations = false;
+            this.palettePackingOptimizations = false;
+            this.shapeCacheOptimizations = false;
+            this.nativeSurfaceRules = false;
+            this.surfaceColumnOptimizations = false;
+            this.nativePerlinBatching = false;
+            this.nativeDensityEvaluation = false;
+            this.nativeAquiferBatching = false;
+            this.fastLegacyRandom = false;
         }
 
         public WarmupMode warmupMode() {

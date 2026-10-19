@@ -32,7 +32,7 @@ public class MixinRandomStateMapping {
 
     @Unique
     private DensityFunction.Visitor adrenaline$mappingVisitor(DensityFunction.Visitor visitor) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
             return visitor;
         }
         if (this.adrenaline$originalVisitor != visitor) {

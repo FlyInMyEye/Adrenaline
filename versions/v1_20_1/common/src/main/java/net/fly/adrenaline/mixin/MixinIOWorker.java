@@ -5,6 +5,7 @@ import java.util.BitSet;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.ChunkSaveQueue;
 import net.fly.adrenaline.util.SaveBackpressure;
 import net.minecraft.nbt.CompoundTag;
@@ -50,7 +51,7 @@ public class MixinIOWorker implements SaveBackpressure {
 
     @Inject(method = "createOldDataForRegion", at = @At("HEAD"), cancellable = true)
     private void adrenaline$batchBlendingScan(int regionX, int regionZ, CallbackInfoReturnable<CompletableFuture<BitSet>> cir) {
-        if (((Object) this).getClass() != IOWorker.class) {
+        if (!AdrenalineConfig.get().regionScanOptimizations || ((Object) this).getClass() != IOWorker.class) {
             return;
         }
         cir.setReturnValue(this.submitTask(() -> {

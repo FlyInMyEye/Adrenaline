@@ -40,7 +40,6 @@ public class AdrenalineConfigScreen extends Screen {
     private ThreadCountSlider serializationThreadsSlider;
     private SpawnZoneRadiusSlider spawnZoneRadiusSlider;
     private FeatureSafetyRadiusSlider featureSafetyRadiusSlider;
-    private Button worldgenOptimizationsButton;
     private Button terrainFillOptimizationsButton;
     private Button surfaceOptimizationsButton;
     private Button noiseChunkOptimizationsButton;
@@ -108,8 +107,6 @@ public class AdrenalineConfigScreen extends Screen {
         TooltipData spawnZoneTooltip = optimizationTooltip("tooltip.adrenaline.config.spawn_zone_radius", PerformanceImpact.LOW, Optimization.SPAWN_ZONE);
         this.spawnZoneRadiusSlider = this.addScrollableWidget(new SpawnZoneRadiusSlider(leftX, y, 370, 20, spawnZoneTooltip), y, spawnZoneTooltip);
         y += 30;
-        this.worldgenOptimizationsButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.worldgen_optimization"), this.config.worldgenOptimizations, value -> this.config.worldgenOptimizations = value, tooltip("tooltip.adrenaline.config.worldgen_optimization", PerformanceImpact.EXTREME));
-        y += 24;
         this.parallelWorldgenButton = this.addToggleRow(labelX, buttonX, y, buttonWidth, Component.translatable("gui.adrenaline.config.parallel_worldgen"), this.config.parallelWorldgen, value -> this.config.parallelWorldgen = value, optimizationTooltip("tooltip.adrenaline.config.parallel_worldgen", PerformanceImpact.HIGH, Optimization.PARALLEL_WORLDGEN));
         y += 24;
         this.stagePriorityButton = this.addStagePriorityRow(labelX, buttonX, y, buttonWidth, tooltip("tooltip.adrenaline.config.stage_priority", PerformanceImpact.MEDIUM));
@@ -632,17 +629,14 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     private void updateButtonStates() {
-        boolean worldgenOptimizations = this.config.worldgenOptimizations;
-
-        this.worldgenOptimizationsButton.active = true;
-        this.terrainFillOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
-        this.surfaceOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
-        this.noiseChunkOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
-        this.materialRuleOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
-        this.aquiferOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
-        this.beardifierOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BEARDIFIER);
-        this.oreVeinOptimizationsButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
-        this.initialSpawnOptimizationButton.active = worldgenOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.INITIAL_SPAWN);
+        this.terrainFillOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL);
+        this.surfaceOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.SURFACE);
+        this.noiseChunkOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_CHUNK);
+        this.materialRuleOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.MATERIAL_RULE);
+        this.aquiferOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
+        this.beardifierOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.BEARDIFIER);
+        this.oreVeinOptimizationsButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.ORE_VEIN);
+        this.initialSpawnOptimizationButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.INITIAL_SPAWN);
         this.parallelWorldgenButton.active = !OptimizationTakeoverRegistry.isControlled(Optimization.PARALLEL_WORLDGEN);
         this.stagePriorityButton.active = this.config.parallelWorldgen;
         this.saveChunksAfterWorldCreationButton.active = true;
@@ -656,7 +650,7 @@ public class AdrenalineConfigScreen extends Screen {
         this.nativePerlinBatchingButton.active = AdrenalineNatives.isAvailable();
         this.approximateNativePerlinButton.active = AdrenalineNatives.isAvailable() && this.config.nativePerlinBatching;
         this.nativeDensityEvaluationButton.active = AdrenalineNatives.isAvailable();
-        this.nativeAquiferBatchingButton.active = AdrenalineNatives.isAvailable() && worldgenOptimizations && this.config.aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
+        this.nativeAquiferBatchingButton.active = AdrenalineNatives.isAvailable() && this.config.aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER);
         this.showCancelButton.active = true;
         this.showChunkPreviewButton.active = true;
         this.startBeforehandButton.active = true;
@@ -672,7 +666,7 @@ public class AdrenalineConfigScreen extends Screen {
         }
         this.generationThreadsSlider.active = this.config.parallelWorldgen;
         this.adaptiveGenerationWorkersButton.active = this.config.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.PARALLEL_WORLDGEN);
-        this.serializationThreadsSlider.active = worldgenOptimizations;
+        this.serializationThreadsSlider.active = this.config.parallelChunkSerialization;
         this.spawnZoneRadiusSlider.active = !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE);
     }
 

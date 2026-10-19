@@ -495,9 +495,8 @@ public final class WorldgenBenchmark {
 
     private static AdrenalineConfig.Data vanillaConfig(AdrenalineConfig.Data source) {
         AdrenalineConfig.Data vanilla = new AdrenalineConfig.Data(source);
-        vanilla.worldgenOptimizations = false;
+        vanilla.disableWorldgenOptimizations();
         vanilla.parallelWorldgen = false;
-        vanilla.fastLegacyRandom = false;
         vanilla.saveChunksAfterWorldCreation = false;
         return vanilla;
     }

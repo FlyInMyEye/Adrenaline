@@ -17,7 +17,7 @@ public class MixinClimateParameterList<T> {
     @WrapMethod(method = "findValueIndex(Lnet/minecraft/world/level/biome/Climate$TargetPoint;)Ljava/lang/Object;")
     @SuppressWarnings("unchecked")
     private T adrenaline$searchColumn(Climate.TargetPoint target, Operation<T> original) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.biomeSearchOptimizationsEnabled()) {
             return original.call(target);
         }
         if (!this.adrenaline$columnIndexInitialized) {

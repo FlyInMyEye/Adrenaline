@@ -24,6 +24,9 @@ public final class ChunkSerializationSupport {
     }
 
     public static Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec(Registry<Biome> biomeRegistry, CodecFactory codecFactory) {
+        if (!AdrenalineConfig.get().biomeCodecCache) {
+            return codecFactory.create(biomeRegistry);
+        }
         Codec<PalettedContainerRO<Holder<Biome>>> codec = cachedBiomeCodec;
         if (cachedBiomeRegistry == biomeRegistry && codec != null) {
             return codec;

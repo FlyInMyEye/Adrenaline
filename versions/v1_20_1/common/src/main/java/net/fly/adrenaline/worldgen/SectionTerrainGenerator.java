@@ -34,7 +34,7 @@ public final class SectionTerrainGenerator {
     }
 
     public static boolean enabled() {
-        return ENABLED && VERIFIED.get();
+        return ENABLED && AdrenalineConfig.get().sectionTerrainOptimizations && VERIFIED.get();
     }
 
     public static boolean supports(ChunkAccess chunk, NoiseChunk noise, BlockState defaultBlock, int minCellY, int cellCountY) {

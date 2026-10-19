@@ -1,13 +1,15 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import java.util.ArrayList;
 import java.util.List;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.DensityMapCache;
 import net.minecraft.util.CubicSpline;
 import net.minecraft.util.ToFloatFunction;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(CubicSpline.Multipoint.class)
@@ -18,9 +20,12 @@ public abstract class MixinCubicSplineMultipoint<C, I extends ToFloatFunction<C>
     @Shadow @Final private List<CubicSpline<C, I>> values;
     @Shadow @Final private float[] derivatives;
 
-    @Overwrite
+    @WrapMethod(method = "mapAll")
     @SuppressWarnings("unchecked")
-    public CubicSpline<C, I> mapAll(CubicSpline.CoordinateVisitor<I> visitor) {
+    private CubicSpline<C, I> adrenaline$mapAll(CubicSpline.CoordinateVisitor<I> visitor, Operation<CubicSpline<C, I>> call) {
+        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
+            return call.call(visitor);
+        }
         CubicSpline<C, I> original = (CubicSpline<C, I>) (Object) this;
         DensityMapCache.SplineVisitor cache = visitor instanceof DensityMapCache.SplineVisitor cached ? cached : null;
         if (cache != null) {

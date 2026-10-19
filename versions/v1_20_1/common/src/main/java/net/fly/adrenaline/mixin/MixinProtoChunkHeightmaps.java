@@ -48,7 +48,7 @@ public abstract class MixinProtoChunkHeightmaps {
         @Local(argsOnly = true) BlockState state,
         @Local(ordinal = 1) BlockState previous
     ) {
-        if (state != previous || !adrenaline$unmodifiedHeightmaps || !AdrenalineConfig.get().worldgenOptimizations) {
+        if (state != previous || !adrenaline$unmodifiedHeightmaps || !AdrenalineConfig.heightmapOptimizationsEnabled()) {
             return types;
         }
         var heightmaps = ((MixinChunkAccessAccessor) this).adrenaline$getHeightmaps();

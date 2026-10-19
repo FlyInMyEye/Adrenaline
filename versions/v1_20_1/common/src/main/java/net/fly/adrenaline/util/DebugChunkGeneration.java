@@ -60,12 +60,10 @@ public final class DebugChunkGeneration implements AutoCloseable {
             throw new IllegalArgumentException("Chunk commands require a noise-based generator");
         }
         AdrenalineConfig.Data settings = AdrenalineConfig.copy();
-        settings.worldgenOptimizations = optimized;
         settings.parallelWorldgen = false;
         settings.saveChunksAfterWorldCreation = false;
         if (!optimized) {
-            settings.worldgenOptimizations = false;
-            settings.fastLegacyRandom = false;
+            settings.disableWorldgenOptimizations();
         }
         try (DebugChunkGeneration generation = new DebugChunkGeneration(level, source, settings)) {
             ProtoChunk chunk = generation.generate(pos.x, pos.z, ChunkStatus.NOISE);

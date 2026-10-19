@@ -21,7 +21,7 @@ public class MixinRandomStateVisitor {
 
     @WrapOperation(method = "apply", at = @At(value = "INVOKE", target = "Ljava/util/Map;computeIfAbsent(Ljava/lang/Object;Ljava/util/function/Function;)Ljava/lang/Object;"))
     private Object adrenaline$avoidRecursiveDensityHashing(Map<Object, Object> wrapped, Object function, Function<Object, Object> mapper, Operation<Object> original) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
             return original.call(wrapped, function, mapper);
         }
         if (this.adrenaline$identityCache == null) {
