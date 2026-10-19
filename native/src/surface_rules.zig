@@ -260,7 +260,8 @@ fn java_integer(value: f64) i32 {
 
 fn use_input(inputs: *i32, order: *i32, flag: i32, id: i32) void {
     if (inputs.* & flag == 0) {
-        const index: u5 = @intCast(@popCount(@as(u32, @intCast(inputs.*))) * 3);
+        const shifts = [32]u5{ 0, 3, 3, 6, 3, 6, 6, 9, 3, 6, 6, 9, 6, 9, 9, 12, 3, 6, 6, 9, 6, 9, 9, 12, 6, 9, 9, 12, 9, 12, 12, 15 };
+        const index = shifts[@as(usize, @intCast(inputs.*))];
         order.* |= id << index;
         inputs.* |= flag;
     }
