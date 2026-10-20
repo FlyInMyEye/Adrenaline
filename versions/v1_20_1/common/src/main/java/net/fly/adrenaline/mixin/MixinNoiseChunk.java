@@ -78,13 +78,13 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique private DensityMapCache adrenaline$densityMapCache;
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/NoiseRouter;"), index = 0)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private DensityFunction.Visitor adrenaline$cacheRouterMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }
 
     @ModifyArg(method = {"<init>", "cachedClimateSampler"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/DensityFunction;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/DensityFunction;"), index = 0)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private DensityFunction.Visitor adrenaline$cacheDensityMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }
@@ -101,7 +101,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "cachedClimateSampler", at = @At("RETURN"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.BIOME_CLIMATE)
     private void adrenaline$cacheClimateColumns(NoiseRouter router, List<Climate.ParameterPoint> spawnTarget, CallbackInfoReturnable<Climate.Sampler> cir) {
         this.adrenaline$densityMapCache = null;
         if (!AdrenalineConfig.biomeClimateOptimizationsEnabled()) {
@@ -243,7 +243,8 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         AdrenalineMixinNoiseInterpolatorView[] interpolatorArray = this.adrenaline$interpolatorArray();
         CellDensityEvaluator[] sliceEvaluators = this.adrenaline$sliceDensityEvaluators(interpolatorArray);
         boolean nativePerlin = AdrenalineConfig.nativePerlinBatchingEnabled();
-        if (nativePerlin && this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
+        boolean nativeSection = nativePerlin || AdrenalineConfig.nativeBlendedNoiseEnabled();
+        if (nativeSection && this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
             this.adrenaline$perlinSectionBaseCellX = cellX;
             this.adrenaline$perlinSections = new PerlinSectionCache(
                 cellX * this.cellWidth,
@@ -265,7 +266,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             for (int i = 0; i < interpolatorArray.length; i++) {
                 AdrenalineMixinNoiseInterpolatorView interpolator = interpolatorArray[i];
                 double[] slice = (useFirstSlice ? interpolator.adrenaline$getSlice0() : interpolator.adrenaline$getSlice1())[cellZ];
-                if (nativePerlin) {
+                if (nativeSection) {
                     PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
                 }
                 try {
@@ -285,7 +286,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
                         }
                     }
                 } finally {
-                    if (nativePerlin) {
+                    if (nativeSection) {
                         PerlinBatching.exitSection();
                     }
                 }
@@ -374,9 +375,10 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.interpolationCounter++;
     }
 
+    @ControlsOptimization(Optimization.DENSITY_WRAPPERS)
     @WrapMethod(method = "wrap")
     private DensityFunction adrenaline$reuseWrapperFunction(DensityFunction densityFunction, Operation<DensityFunction> original) {
-        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densityWrapperOptimizationsEnabled()) {
             return original.call(densityFunction);
         }
         return this.wrapped.computeIfAbsent(densityFunction, this.adrenaline$wrapNewFunction);
@@ -396,9 +398,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "fillSlice", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.NOISE_SLICES)
     private void adrenaline$fillSlice(boolean useFirstSlice, int cellX, CallbackInfo ci) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.noiseSliceOptimizationsEnabled()) {
             return;
         }
 
@@ -407,9 +409,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "selectCellYZ", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization({Optimization.CELL_CACHE, Optimization.INTERPOLATION})
     private void adrenaline$selectCellYZ(int cellY, int cellZ, CallbackInfo ci) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.cellCacheOptimizationsEnabled() && !AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
         }
 
@@ -431,13 +433,22 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.fillingCell = true;
         this.cellStartBlockY = (cellY + this.cellNoiseMinY) * this.cellHeight;
         this.cellStartBlockZ = (this.firstCellZ + cellZ) * this.cellWidth;
-        this.adrenaline$fillCellCaches();
+        if (AdrenalineConfig.cellCacheOptimizationsEnabled()) {
+            this.adrenaline$fillCellCaches();
+        } else {
+            this.arrayInterpolationCounter++;
+            for (Object entry : this.cellCaches) {
+                AdrenalineMixinCacheAllInCellAccessor cache = (AdrenalineMixinCacheAllInCellAccessor) entry;
+                cache.adrenaline$getNoiseFiller().fillArray(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
+            }
+            this.arrayInterpolationCounter++;
+        }
         this.fillingCell = false;
         ci.cancel();
     }
 
     @Inject(method = "updateForY", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.INTERPOLATION)
     private void adrenaline$updateForY(int blockY, double yLerp, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -450,7 +461,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "updateForX", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.INTERPOLATION)
     private void adrenaline$updateForX(int blockX, double xLerp, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -463,7 +474,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "updateForZ", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.INTERPOLATION)
     private void adrenaline$updateForZ(int blockZ, double zLerp, CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -480,7 +491,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "swapSlices", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.INTERPOLATION)
     private void adrenaline$swapSlices(CallbackInfo ci) {
         if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
             return;
@@ -491,9 +502,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @WrapMethod(method = "preliminarySurfaceLevel")
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.PRELIMINARY_SURFACE)
     private int adrenaline$preliminarySurfaceLevel(int blockX, int blockZ, Operation<Integer> original) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()) {
+        if (!AdrenalineConfig.preliminarySurfaceOptimizationsEnabled()) {
             return original.call(blockX, blockZ);
         }
         int x = QuartPos.toBlock(QuartPos.fromBlock(blockX));
@@ -509,7 +520,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         AdrenalineMutableSinglePointContext context = this.adrenaline$singlePointContext;
         context.adrenaline$setX(x);
         context.adrenaline$setZ(z);
-        if (AdrenalineConfig.noiseChunkOptimizationsEnabled() && AdrenalineConfig.nativeDensityEvaluationEnabled()) {
+        if (AdrenalineConfig.nativeDensityEvaluationEnabled()) {
             if (!this.adrenaline$surfaceProgramInitialized) {
                 this.adrenaline$surfaceProgramInitialized = true;
                 this.adrenaline$surfaceProgram = NativeDensityProgramCompiler.compileColumn(this.initialDensityNoJaggedness).program();

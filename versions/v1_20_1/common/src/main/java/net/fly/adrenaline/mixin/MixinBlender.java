@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.levelgen.blending.Blender;
@@ -19,6 +21,7 @@ public class MixinBlender {
     private static final ThreadLocal<Blender> ADRENALINE_LAST_BLENDER = new ThreadLocal<>();
 
     @Inject(method = "of", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.BLENDING)
     private static void adrenaline$reuseBlender(WorldGenRegion region, CallbackInfoReturnable<Blender> cir) {
         if (!AdrenalineConfig.blendingOptimizationsEnabled()) {
             return;

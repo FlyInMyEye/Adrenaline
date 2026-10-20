@@ -34,11 +34,11 @@ public final class SectionTerrainGenerator {
     }
 
     public static boolean enabled() {
-        return ENABLED && AdrenalineConfig.get().sectionTerrainOptimizations && VERIFIED.get();
+        return ENABLED && AdrenalineConfig.sectionTerrainOptimizationsEnabled() && VERIFIED.get();
     }
 
     public static boolean supports(ChunkAccess chunk, NoiseChunk noise, BlockState defaultBlock, int minCellY, int cellCountY) {
-        if (!enabled() || !AdrenalineConfig.noiseChunkOptimizationsEnabled() || !AdrenalineConfig.nativeAquiferBatchingEnabled()
+        if (!enabled() || !AdrenalineConfig.noiseSliceOptimizationsEnabled() || !AdrenalineConfig.cellCacheOptimizationsEnabled() || !AdrenalineConfig.nativeAquiferBatchingEnabled()
             || !SectionPaletteBuilder.available() || chunk.isUpgrading() || noise.getBlender() != Blender.empty()
             || SharedConstants.debugVoidTerrain(chunk.getPos())
             || defaultBlock.isAir() || !defaultBlock.getFluidState().isEmpty()

@@ -19,7 +19,7 @@ public final class SurfaceNoiseBatch implements AutoCloseable {
 
     public SurfaceNoiseBatch(NormalNoise noise, int x, int z) {
         this.previous = CURRENT.get();
-        this.samples = !AdrenalineConfig.surfaceNoiseOptimizationsEnabled() ? null
+        this.samples = !AdrenalineConfig.surfaceBandNoiseOptimizationsEnabled() ? null
             : this.previous == null ? SAMPLE_POOL.get() : new SamplePool();
         this.noise = noise;
         this.x = x;
@@ -61,7 +61,7 @@ public final class SurfaceNoiseBatch implements AutoCloseable {
     public static double sample(NormalNoise noise, int x, int z) {
         SurfaceNoiseBatch batch = CURRENT.get();
         if (batch == null || batch.noise != noise || x < batch.x || x >= batch.x + 16 || z < batch.z || z >= batch.z + 16
-            || !AdrenalineConfig.nativePerlinBatchingEnabled()) {
+            || !AdrenalineConfig.nativeSurfaceNoiseEnabled()) {
             return noise.getValue(x, 0.0, z);
         }
         if (!batch.attempted) {

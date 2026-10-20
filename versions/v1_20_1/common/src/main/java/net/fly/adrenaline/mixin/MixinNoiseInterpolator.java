@@ -101,9 +101,9 @@ public class MixinNoiseInterpolator implements AdrenalineCompiledInterpolatorAcc
     }
 
     @Inject(method = "fillArray", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.CELL_INTERPOLATION)
     private void adrenaline$fillCellArray(double[] values, DensityFunction.ContextProvider contextProvider, CallbackInfo ci) {
-        if (!AdrenalineConfig.noiseChunkOptimizationsEnabled()
+        if (!AdrenalineConfig.cellInterpolationOptimizationsEnabled()
             || !(contextProvider instanceof MixinNoiseChunkAccessor noiseChunk)
             || !noiseChunk.adrenaline$isFillingCell()) {
             return;

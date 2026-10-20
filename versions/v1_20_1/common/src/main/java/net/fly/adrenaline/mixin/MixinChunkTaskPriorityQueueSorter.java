@@ -23,7 +23,7 @@ public abstract class MixinChunkTaskPriorityQueueSorter {
     }
 
     @Inject(method = "getProcessor", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.PARALLEL_WORLDGEN)
+    @ControlsOptimization(Optimization.GENERATION_DISPATCH)
     private <T> void adrenaline$createProcessorImmediately(ProcessorHandle<T> processor, boolean addBlocker, CallbackInfoReturnable<ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<T>>> cir) {
         if (!AdrenalineConfig.parallelWorldgenEnabled()) {
             return;

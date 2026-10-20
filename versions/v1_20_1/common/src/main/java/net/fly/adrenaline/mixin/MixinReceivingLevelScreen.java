@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
@@ -30,6 +32,7 @@ public abstract class MixinReceivingLevelScreen {
     }
 
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.TERRAIN_LOADING)
     private void adrenaline$bypassTerrainLoading(CallbackInfo ci) {
         AdrenalineConfig.FastTerrainLoadingMode mode = AdrenalineConfig.fastTerrainLoadingMode();
         if (mode == AdrenalineConfig.FastTerrainLoadingMode.OFF) {

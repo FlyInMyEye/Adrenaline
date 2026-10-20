@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -17,8 +19,9 @@ public abstract class MixinDensityFunctionsSpline {
     @Shadow @Final private CubicSpline<DensityFunctions.Spline.Point, DensityFunctions.Spline.Coordinate> spline;
 
     @WrapMethod(method = "mapAll")
+    @ControlsOptimization(Optimization.DENSITY_SPLINES)
     private DensityFunction adrenaline$mapAll(DensityFunction.Visitor visitor, Operation<DensityFunction> call) {
-        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densitySplineOptimizationsEnabled()) {
             return call.call(visitor);
         }
         CubicSpline<DensityFunctions.Spline.Point, DensityFunctions.Spline.Coordinate> mappedSpline = this.spline.mapAll(

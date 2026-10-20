@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.sugar.Local;
 import java.lang.invoke.MethodType;
@@ -44,6 +46,7 @@ public abstract class MixinProtoChunkHeightmaps {
         method = "setBlockState",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/ChunkStatus;heightmapsAfter()Ljava/util/EnumSet;")
     )
+    @ControlsOptimization(Optimization.HEIGHTMAP)
     private EnumSet<Heightmap.Types> adrenaline$skipUnchangedHeightmaps(
         EnumSet<Heightmap.Types> types,
         @Local(argsOnly = true) BlockPos pos,

@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.DensityMapCache;
 import net.minecraft.world.level.levelgen.DensityFunction;
@@ -21,11 +23,13 @@ public class MixinRandomStateMapping {
     private DensityMapCache adrenaline$mappingCache;
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/NoiseRouter;"), index = 0)
+    @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private DensityFunction.Visitor adrenaline$reuseRouterMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/DensityFunction;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/DensityFunction;"), index = 0)
+    @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private DensityFunction.Visitor adrenaline$reuseClimateMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }

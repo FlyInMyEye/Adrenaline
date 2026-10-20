@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.serialization.Codec;
@@ -45,6 +47,7 @@ public abstract class MixinChunkSerializer {
     }
 
     @WrapMethod(method = "write")
+    @ControlsOptimization(Optimization.CHUNK_SERIALIZATION)
     private static CompoundTag adrenaline$writeSections(ServerLevel level, ChunkAccess chunk, Operation<CompoundTag> original) {
         if (!AdrenalineConfig.parallelChunkSerializationEnabled()) {
             return original.call(level, chunk);
@@ -71,6 +74,7 @@ public abstract class MixinChunkSerializer {
     }
 
     @Redirect(method = "write", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/chunk/storage/ChunkSerializer;makeBiomeCodec(Lnet/minecraft/core/Registry;)Lcom/mojang/serialization/Codec;"))
+    @ControlsOptimization(Optimization.BIOME_CODEC)
     private static Codec<PalettedContainerRO<Holder<Biome>>> adrenaline$cacheBiomeCodec(Registry<Biome> biomeRegistry) {
         Codec<PalettedContainerRO<Holder<Biome>>> codec = ChunkSerializationSupport.biomeCodec(biomeRegistry, MixinChunkSerializer::makeBiomeCodec);
         SerializationContext context = adrenaline$currentContext();

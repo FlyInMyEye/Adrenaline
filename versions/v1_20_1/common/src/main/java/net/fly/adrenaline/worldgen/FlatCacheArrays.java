@@ -12,7 +12,7 @@ public final class FlatCacheArrays {
     }
 
     public static double[][] allocateFlatCacheValues(int xzSize, int zSize, NoiseChunk noiseChunk, boolean eagerlyPopulate) {
-        if (AdrenalineConfig.get().flatCacheOptimizations && AdrenalineConfig.blendingOptimizationsEnabled() && !eagerlyPopulate && noiseChunk.getBlender() == Blender.empty()) {
+        if (AdrenalineConfig.flatCacheOptimizationsEnabled() && !eagerlyPopulate && noiseChunk.getBlender() == Blender.empty()) {
             return EMPTY_VALUES;
         }
         return new double[xzSize][zSize];

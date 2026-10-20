@@ -19,9 +19,9 @@ import org.spongepowered.asm.mixin.injection.At;
 public class MixinMinecraftServerSpawnTicket {
 
     @WrapOperation(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;addRegionTicket(Lnet/minecraft/server/level/TicketType;Lnet/minecraft/world/level/ChunkPos;ILjava/lang/Object;)V"), require = 0)
-    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    @ControlsOptimization(Optimization.SPAWN_RADIUS)
     private <T> void adrenaline$useConfiguredSpawnZoneRadiusForTickets(ServerChunkCache chunkSource, TicketType<T> ticketType, ChunkPos chunkPos, int radius, T identifier, Operation<Void> original) {
-        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS) || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
             original.call(chunkSource, ticketType, chunkPos, radius, identifier);
             return;
         }

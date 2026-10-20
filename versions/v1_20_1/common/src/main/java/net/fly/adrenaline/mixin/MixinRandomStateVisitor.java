@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.IdentityHashMap;
@@ -20,6 +22,7 @@ public class MixinRandomStateVisitor {
     private Map<Object, Object> adrenaline$identityCache;
 
     @WrapOperation(method = "apply", at = @At(value = "INVOKE", target = "Ljava/util/Map;computeIfAbsent(Ljava/lang/Object;Ljava/util/function/Function;)Ljava/lang/Object;"))
+    @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private Object adrenaline$avoidRecursiveDensityHashing(Map<Object, Object> wrapped, Object function, Function<Object, Object> mapper, Operation<Object> original) {
         if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
             return original.call(wrapped, function, mapper);

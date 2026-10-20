@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import java.util.ArrayList;
@@ -22,8 +24,9 @@ public abstract class MixinCubicSplineMultipoint<C, I extends ToFloatFunction<C>
 
     @WrapMethod(method = "mapAll")
     @SuppressWarnings("unchecked")
+    @ControlsOptimization(Optimization.DENSITY_SPLINES)
     private CubicSpline<C, I> adrenaline$mapAll(CubicSpline.CoordinateVisitor<I> visitor, Operation<CubicSpline<C, I>> call) {
-        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densitySplineOptimizationsEnabled()) {
             return call.call(visitor);
         }
         CubicSpline<C, I> original = (CubicSpline<C, I>) (Object) this;

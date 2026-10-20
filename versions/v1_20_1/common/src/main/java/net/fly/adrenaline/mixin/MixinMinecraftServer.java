@@ -97,7 +97,7 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.INITIAL_SPAWN)
     private static void adrenaline$deferInitialSpawnSearch(ServerLevel level, ServerLevelData levelData, boolean generateBonusChest, boolean debugWorld, CallbackInfo ci) {
-        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE) || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
+        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT) || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return;
         }
         if (AdrenalinePlatform.onCreateWorldSpawn(level, levelData)) {
@@ -114,9 +114,9 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     }
 
     @ModifyConstant(method = "loadLevel", constant = @Constant(intValue = 11), require = 0)
-    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    @ControlsOptimization(Optimization.SPAWN_RADIUS)
     private int adrenaline$useConfiguredSpawnZoneRadiusForProgress(int radius) {
-        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS) || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
             return radius;
         }
         if (BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)) {
@@ -130,9 +130,9 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     }
 
     @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "CONSTANT", args = "intValue=441"), require = 0)
-    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    @ControlsOptimization(Optimization.SPAWN_WAIT)
     private int adrenaline$useConfiguredSpawnZoneChunkCount(int chunkCount) {
-        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
             return chunkCount;
         }
         if (!this.adrenaline$initialWorldCreation && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF) {
@@ -155,9 +155,9 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     }
 
     @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getTickingGenerated()I"), require = 0)
-    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    @ControlsOptimization(Optimization.SPAWN_WAIT)
     private int adrenaline$waitForResolvedSpawn(int generated) {
-        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_ZONE)) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
             return generated;
         }
         if (DeferredSpawnSearch.isPending()) {

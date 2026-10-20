@@ -271,7 +271,7 @@ public class MixinChunkMap {
             target = "Lnet/minecraft/util/thread/ProcessorHandle;tell(Ljava/lang/Object;)V"
         )
     )
-    @ControlsOptimization(Optimization.PARALLEL_WORLDGEN)
+    @ControlsOptimization(Optimization.GENERATION_DISPATCH)
     private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
         ChunkHolder holder = this.adrenaline$currentHolder.get();
         ChunkStatus nextStatus = this.adrenaline$dispatchStatus.get();

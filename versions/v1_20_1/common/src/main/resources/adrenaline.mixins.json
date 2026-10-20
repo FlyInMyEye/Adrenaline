@@ -86,7 +86,8 @@
     "MixinOreVeinifierInvoker",
     "MixinBlender",
     "MixinBeardifier",
-    "MixinNoiseChunkOreVeinifier"
+    "MixinNoiseChunkOreVeinifier",
+    "MixinAdditionalOptimizationTakeoverDetector"
   ],
   "client": [
     "MixinLoadingOverlay",

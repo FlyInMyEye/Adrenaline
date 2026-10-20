@@ -71,6 +71,7 @@ public class MixinNoiseBasedChunkGenerator {
             target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"
         )
     )
+    @ControlsOptimization(Optimization.INLINE_GENERATION_TASKS)
     private <T> CompletableFuture<T> inlineCreateBiomes(Supplier<T> supplier, Executor executor) {
         if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
@@ -85,6 +86,7 @@ public class MixinNoiseBasedChunkGenerator {
             target = "Ljava/util/concurrent/CompletableFuture;supplyAsync(Ljava/util/function/Supplier;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"
         )
     )
+    @ControlsOptimization(Optimization.INLINE_GENERATION_TASKS)
     private <T> CompletableFuture<T> inlineFillFromNoise(Supplier<T> supplier, Executor executor) {
         if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
@@ -99,6 +101,7 @@ public class MixinNoiseBasedChunkGenerator {
             target = "Ljava/util/concurrent/CompletableFuture;whenCompleteAsync(Ljava/util/function/BiConsumer;Ljava/util/concurrent/Executor;)Ljava/util/concurrent/CompletableFuture;"
         )
     )
+    @ControlsOptimization(Optimization.INLINE_GENERATION_TASKS)
     private <T> CompletableFuture<T> inlineFillFromNoiseCompletion(CompletableFuture<T> future, BiConsumer<? super T, ? super Throwable> action, Executor executor) {
         if (AdrenalineConfig.inlineTerrainFillTasks()) {
             return future.whenComplete(action);
@@ -107,7 +110,7 @@ public class MixinNoiseBasedChunkGenerator {
     }
 
     @Inject(method = "doFill", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.TERRAIN_FILL)
+    @ControlsOptimization({Optimization.TERRAIN_FILL, Optimization.SECTION_TERRAIN})
     private void adrenaline$fastFill(Blender blender, StructureManager structureManager, RandomState randomState, ChunkAccess chunk, int minCellY, int cellCountY, CallbackInfoReturnable<ChunkAccess> cir) {
         if (!AdrenalineConfig.terrainFillOptimizationsEnabled()) {
             return;

@@ -153,7 +153,7 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         adrenaline$searchDeltaZ = new int[12];
         adrenaline$nativeFluidLevels = new int[aquiferLocationCache.length];
         adrenaline$nativeFluidTypes = new byte[aquiferLocationCache.length];
-        if (AdrenalineConfig.nativeAquiferBatchingEnabled()) {
+        if (AdrenalineConfig.nativeAquiferBatchingEnabled() && AdrenalineConfig.aquiferStatusCacheOptimizationsEnabled()) {
             this.adrenaline$sharedFluidStatusCache = adrenaline$sharedFluidStatusCache(this.positionalRandomFactory);
         }
         for (int dy = 0; dy < sizeY; dy++) {
@@ -178,7 +178,7 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     @Nullable
     @ControlsOptimization(Optimization.AQUIFER)
     public BlockState computeSubstance(DensityFunction.FunctionContext context, double density) {
-        if (adrenaline$packedAquiferLocations != null) {
+        if (AdrenalineConfig.aquiferOptimizationsEnabled() && adrenaline$packedAquiferLocations != null) {
             return adrenaline$computeSubstanceFast(context, density);
         }
         return adrenaline$computeSubstanceVanilla(context, density);
@@ -579,7 +579,7 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         int x = (minGridX + localX) * 16 + (packedLocation >> 8);
         int y = (minGridY + localY) * 12 + (packedLocation >> 4 & 15);
         int z = (minGridZ + localZ) * 16 + (packedLocation & 15);
-        SharedAquiferFluidStatuses sharedCache = this.adrenaline$sharedFluidStatusCache;
+        SharedAquiferFluidStatuses sharedCache = AdrenalineConfig.aquiferStatusCacheOptimizationsEnabled() ? this.adrenaline$sharedFluidStatusCache : null;
         long location = aquiferLocationCache[index];
         if (sharedCache != null) {
             status = sharedCache.get(location);

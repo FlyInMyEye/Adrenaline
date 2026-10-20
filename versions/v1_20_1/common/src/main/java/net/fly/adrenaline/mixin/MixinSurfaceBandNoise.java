@@ -12,8 +12,8 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 @Mixin(value = SurfaceSystem.class, priority = 499)
 public class MixinSurfaceBandNoise {
     @Redirect(method = "getBand", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/synth/NormalNoise;getValue(DDD)D"), require = 0)
-    @ControlsOptimization(Optimization.SURFACE_NOISE)
+    @ControlsOptimization(Optimization.SURFACE_BAND_NOISE)
     private double adrenaline$reuseBandNoise(NormalNoise noise, double x, double y, double z) {
-        return SurfaceNoiseBatch.sampleExact(noise, x, y, z);
+        return net.fly.adrenaline.config.AdrenalineConfig.surfaceBandNoiseOptimizationsEnabled() ? SurfaceNoiseBatch.sampleExact(noise, x, y, z) : noise.getValue(x, y, z);
     }
 }

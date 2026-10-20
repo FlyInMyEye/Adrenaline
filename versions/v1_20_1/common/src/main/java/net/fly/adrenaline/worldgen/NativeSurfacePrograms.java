@@ -32,7 +32,7 @@ public final class NativeSurfacePrograms {
     private synchronized NativeSurfaceProgram compile(SurfaceRules.RuleSource source, Object original, Registry<Biome> registry, WorldGenerationContext generation, Object context) {
         Entry current = this.entry;
         if (current == null || !current.matches(source, registry, generation)) {
-            current = new Entry(source, registry, generation.getMinGenY(), generation.getGenDepth(), AdrenalineConfig.nativePerlinBatchingEnabled(),
+            current = new Entry(source, registry, generation.getMinGenY(), generation.getGenDepth(), AdrenalineConfig.nativeSurfaceNoiseEnabled(),
                 NativeSurfaceProgram.compile(source, original, registry, generation, context));
             this.entry = current;
         }
@@ -41,7 +41,7 @@ public final class NativeSurfacePrograms {
 
     private record Entry(SurfaceRules.RuleSource source, Registry<Biome> registry, int minY, int height, boolean nativeNoise, NativeSurfaceProgram program) {
         private boolean matches(SurfaceRules.RuleSource source, Registry<Biome> registry, WorldGenerationContext generation) {
-            return this.source == source && this.registry == registry && this.minY == generation.getMinGenY() && this.height == generation.getGenDepth() && this.nativeNoise == AdrenalineConfig.nativePerlinBatchingEnabled();
+            return this.source == source && this.registry == registry && this.minY == generation.getMinGenY() && this.height == generation.getGenDepth() && this.nativeNoise == AdrenalineConfig.nativeSurfaceNoiseEnabled();
         }
     }
 }

@@ -8,5 +8,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.METHOD)
 public @interface ControlsOptimization {
-    OptimizationTakeoverRegistry.Optimization value();
+    OptimizationTakeoverRegistry.Optimization[] value();
+    boolean local() default false;
 }

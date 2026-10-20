@@ -11,16 +11,16 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(value = MinecraftServer.class, priority = 500)
+@Mixin(value = MinecraftServer.class, priority = 1)
 public class MixinServerOptimizationTakeoverDetector {
 
     @Inject(method = "loadLevel", at = @At("HEAD"), require = 0)
-    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    @ControlsOptimization(Optimization.SPAWN_WAIT)
     private void adrenaline$detectSpawnZoneProgressControl(CallbackInfo ci) {
     }
 
     @Inject(method = "prepareLevels", at = @At("HEAD"), require = 0)
-    @ControlsOptimization(Optimization.SPAWN_ZONE)
+    @ControlsOptimization(Optimization.SPAWN_WAIT)
     private void adrenaline$detectSpawnZonePreparationControl(ChunkProgressListener progressListener, CallbackInfo ci) {
     }
 

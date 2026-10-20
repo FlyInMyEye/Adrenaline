@@ -1,6 +1,11 @@
 package net.fly.adrenaline.mixin;
 
 import java.nio.ByteBuffer;
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import net.fly.adrenaline.worldgen.AdrenalineCachedDensityAccess;
 import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
 import net.minecraft.core.QuartPos;
@@ -12,6 +17,11 @@ import org.spongepowered.asm.mixin.Shadow;
 @Mixin(targets = "net.minecraft.world.level.levelgen.NoiseChunk$FlatCache")
 public abstract class MixinNoiseChunkFlatCacheAllocation implements AdrenalineCachedDensityAccess {
     @Shadow @Final private double[][] values;
+
+    @Inject(method = "<init>", at = @At("RETURN"))
+    @ControlsOptimization(Optimization.FLAT_CACHE)
+    private void adrenaline$detectAllocationControl(CallbackInfo ci) {
+    }
 
     @Override
     public boolean adrenaline$writeNativeColumnInput(ByteBuffer target, int offset, NoiseChunk owner, int x, int z) {

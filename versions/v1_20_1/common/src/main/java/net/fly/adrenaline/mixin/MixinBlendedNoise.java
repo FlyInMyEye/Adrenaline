@@ -32,9 +32,9 @@ public abstract class MixinBlendedNoise implements AdrenalineBlendedNoiseAccess 
     @Unique private volatile BlendedNativeSampler.Data adrenaline$nativeData;
 
     @Inject(method = "compute", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.NOISE_CHUNK)
+    @ControlsOptimization(Optimization.NATIVE_BLENDED_NOISE)
     private void adrenaline$sampleNativeSection(DensityFunction.FunctionContext context, CallbackInfoReturnable<Double> cir) {
-        if (!AdrenalineConfig.nativePerlinBatchingEnabled()) {
+        if (!AdrenalineConfig.nativeBlendedNoiseEnabled()) {
             return;
         }
         double value = PerlinBatching.tryGetSection((BlendedNoise) (Object) this, context.blockX(), context.blockY(), context.blockZ());

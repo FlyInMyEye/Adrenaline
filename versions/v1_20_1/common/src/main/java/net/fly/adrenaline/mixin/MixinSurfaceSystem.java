@@ -59,7 +59,10 @@ public abstract class MixinSurfaceSystem implements AdrenalineNativeSurfaceProgr
 
     @WrapMethod(method = "buildSurface")
     private void adrenaline$batchSurfaceSampling(RandomState randomState, BiomeManager biomeManager, Registry<Biome> biomeRegistry, boolean useLegacyRandomSource, WorldGenerationContext context, ChunkAccess chunk, NoiseChunk noiseChunk, SurfaceRules.RuleSource ruleSource, Operation<Void> original) {
-        if (!AdrenalineConfig.surfaceOptimizationsEnabled() && !AdrenalineConfig.surfaceNoiseOptimizationsEnabled()) {
+        if (!AdrenalineConfig.surfaceOptimizationsEnabled() && !AdrenalineConfig.nativeSurfaceRulesEnabled()
+            && !AdrenalineConfig.surfaceContextOptimizationsEnabled() && !AdrenalineConfig.surfaceColumnOptimizationsEnabled()
+            && !AdrenalineConfig.surfaceBiomeOptimizationsEnabled() && !AdrenalineConfig.surfaceNoiseOptimizationsEnabled()
+            && !AdrenalineConfig.surfaceBandNoiseOptimizationsEnabled()) {
             try (SurfacePointEvaluator.Scope scope = SurfacePointEvaluator.suspend()) {
                 original.call(randomState, biomeManager, biomeRegistry, useLegacyRandomSource, context, chunk, noiseChunk, ruleSource);
             }
@@ -73,34 +76,35 @@ public abstract class MixinSurfaceSystem implements AdrenalineNativeSurfaceProgr
     }
 
     @ModifyVariable(method = "buildSurface", at = @At("STORE"), ordinal = 0, require = 0)
+    @ControlsOptimization(value = Optimization.SURFACE_COLUMN, local = true)
     private BlockColumn adrenaline$bufferSurfaceColumn(BlockColumn column,
                                                       @Local(argsOnly = true) ChunkAccess chunk,
                                                       @Local(argsOnly = true) SurfaceRules.RuleSource source,
                                                       @Local(ordinal = 0) MutableBlockPos position) {
-        return AdrenalineConfig.surfaceOptimizationsEnabled()
+        return AdrenalineConfig.surfaceColumnOptimizationsEnabled()
             ? SurfacePointEvaluator.column(column, (SurfaceSystem) (Object) this, chunk, position, this.defaultBlock, source) : column;
     }
 
     @WrapOperation(method = "buildSurface", at = @At(value = "NEW", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$Context;"), require = 0)
     @Coerce
+    @ControlsOptimization(value = {Optimization.SURFACE_CONTEXT, Optimization.SURFACE_BIOMES}, local = true)
     private Object adrenaline$reuseSurfaceContext(SurfaceSystem system, RandomState randomState,
                                                 ChunkAccess chunk, NoiseChunk noiseChunk,
                                                 Function<BlockPos, Holder<Biome>> biomeGetter,
                                                 Registry<Biome> biomes, WorldGenerationContext generation,
                                                 Operation<Object> original,
                                                 @Local(argsOnly = true) SurfaceRules.RuleSource source) {
-        if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
-            return original.call(system, randomState, chunk, noiseChunk, biomeGetter, biomes, generation);
-        }
         return SurfacePointEvaluator.context(system, randomState, chunk, noiseChunk, biomeGetter,
             biomes, generation, source, () -> original.call(system, randomState, chunk, noiseChunk, biomeGetter, biomes, generation));
     }
 
     @WrapOperation(method = "buildSurface", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/SurfaceRules$RuleSource;apply(Ljava/lang/Object;)Ljava/lang/Object;"), require = 0)
+    @ControlsOptimization(value = {Optimization.SURFACE_RULES, Optimization.NATIVE_SURFACE_RULES, Optimization.SURFACE_SPANS}, local = true)
     private Object adrenaline$compileSurfaceRules(SurfaceRules.RuleSource source, Object context, Operation<Object> original,
                                                   @Local(argsOnly = true) WorldGenerationContext generation,
                                                   @Share("surfaceSpans") LocalRef<SurfacePointEvaluator.Evaluator> spans) {
-        if (!AdrenalineConfig.surfaceOptimizationsEnabled()) {
+        if (!AdrenalineConfig.surfaceOptimizationsEnabled() && !AdrenalineConfig.nativeSurfaceRulesEnabled()
+            && !AdrenalineConfig.surfaceContextOptimizationsEnabled()) {
             return original.call(source, context);
         }
         Object rule = SurfacePointEvaluator.rule(source, context, generation, () -> original.call(source, context));
@@ -128,7 +132,7 @@ public abstract class MixinSurfaceSystem implements AdrenalineNativeSurfaceProgr
     }
 
     @Inject(method = "getSurfaceDepth", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.SURFACE_NOISE)
+    @ControlsOptimization(Optimization.SURFACE_DEPTH_NOISE)
     private void adrenaline$getSurfaceDepth(int blockX, int blockZ, CallbackInfoReturnable<Integer> cir) {
         if (!AdrenalineConfig.surfaceNoiseOptimizationsEnabled()) {
             return;

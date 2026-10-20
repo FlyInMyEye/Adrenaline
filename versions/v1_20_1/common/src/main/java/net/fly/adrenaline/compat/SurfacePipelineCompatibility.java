@@ -34,7 +34,8 @@ public final class SurfacePipelineCompatibility {
                             || result == LevelChunkSection[].class || result == int.class
                                 && (parameters.length == 0 || parameters.length == 1 && parameters[0] == int.class);
                         String name = method.getName().toLowerCase(java.util.Locale.ROOT);
-                        boolean replacesValue = name.startsWith("redirect$") || name.startsWith("wrapoperation$")
+                        boolean replacesValue = name.startsWith("constant$") || name.startsWith("localvar$") || name.startsWith("args$")
+                            || name.startsWith("redirect$") || name.startsWith("wrapoperation$")
                             || name.startsWith("modifyexpressionvalue$") || name.startsWith("modifyconstant$")
                             || name.startsWith("modifyarg$") || name.startsWith("modifyvariable$");
                         blockReads |= replacesValue && (result == int.class || result == boolean.class);

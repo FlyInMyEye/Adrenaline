@@ -134,7 +134,7 @@ public class AdrenalineConfigScreen extends Screen {
             .filter(setting -> setting.main)
             .sorted(java.util.Comparator.comparingInt(setting -> switch (setting.group) {
                 case SCHEDULING -> 0;
-                case STARTUP -> 1;
+                case STARTUP, WARMUP -> 1;
                 default -> 2;
             })).toList();
         for (Setting setting : settings) {
@@ -147,7 +147,9 @@ public class AdrenalineConfigScreen extends Screen {
             }
             if (previousGroup != setting.group) {
                 if (!this.advanced || this.group == Group.ALL) {
-                    this.options.add(new HeaderRow(this.advanced ? setting.group.title() : this.mainGroupTitle(setting.group)));
+                    if (this.advanced || previousGroup == null || !this.mainGroupTitle(previousGroup).equals(this.mainGroupTitle(setting.group))) {
+                        this.options.add(new HeaderRow(this.advanced ? setting.group.title() : this.mainGroupTitle(setting.group)));
+                    }
                 }
                 previousGroup = setting.group;
             }
@@ -433,10 +435,12 @@ public class AdrenalineConfigScreen extends Screen {
 
         @Override
         void update() {
-            this.control.setMessage(this.setting.label.apply(AdrenalineConfigScreen.this.session.draft));
+            Component label = this.setting.label.apply(AdrenalineConfigScreen.this.session.draft);
             this.reset.active = !this.setting.equal.test(AdrenalineConfigScreen.this.session.draft, AdrenalineSettings.DEFAULTS);
             MutableComponent tooltip = this.setting.title().copy().append("\n").append(this.setting.description());
             Component reason = this.setting.inactiveReason(AdrenalineConfigScreen.this.session.draft);
+            this.control.active = reason == null;
+            this.control.setMessage(reason == null ? label : label.copy().withStyle(style -> style.withColor(0xA0A0A0)));
             if (reason != null) {
                 tooltip.append("\n\n").append(reason.copy().withStyle(style -> style.withColor(0xFFCC66)));
             }
@@ -466,7 +470,7 @@ public class AdrenalineConfigScreen extends Screen {
             int count = Math.min(2, lines.size());
             int textY = y + (20 - count * AdrenalineConfigScreen.this.font.lineHeight) / 2 + 1;
             for (int line = 0; line < count; line++) {
-                graphics.drawString(AdrenalineConfigScreen.this.font, lines.get(line), x + 2, textY + line * AdrenalineConfigScreen.this.font.lineHeight, 0xFFFFFF);
+                graphics.drawString(AdrenalineConfigScreen.this.font, lines.get(line), x + 2, textY + line * AdrenalineConfigScreen.this.font.lineHeight, this.control.active ? 0xFFFFFF : 0xA0A0A0);
             }
             this.control.setPosition(controlX, y);
             this.control.setWidth(controlWidth);

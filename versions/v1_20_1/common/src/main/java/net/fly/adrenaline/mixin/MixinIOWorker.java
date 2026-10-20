@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.mojang.datafixers.util.Either;
 import java.util.BitSet;
 import java.util.Map;
@@ -50,8 +52,9 @@ public class MixinIOWorker implements SaveBackpressure {
     }
 
     @Inject(method = "createOldDataForRegion", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.REGION_SCANS)
     private void adrenaline$batchBlendingScan(int regionX, int regionZ, CallbackInfoReturnable<CompletableFuture<BitSet>> cir) {
-        if (!AdrenalineConfig.get().regionScanOptimizations || ((Object) this).getClass() != IOWorker.class) {
+        if (!AdrenalineConfig.regionScanOptimizationsEnabled() || ((Object) this).getClass() != IOWorker.class) {
             return;
         }
         cir.setReturnValue(this.submitTask(() -> {

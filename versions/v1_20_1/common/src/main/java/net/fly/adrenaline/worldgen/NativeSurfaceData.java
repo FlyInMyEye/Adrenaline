@@ -55,7 +55,7 @@ final class NativeSurfaceData {
     java.lang.invoke.MethodHandle temperatureTransform;
 
     int noise(NormalNoise noise, double minimum, double maximum, double yScale, double xzScale) {
-        if (!AdrenalineConfig.nativePerlinBatchingEnabled() || noise.getClass() != NormalNoise.class
+        if (!AdrenalineConfig.nativeSurfaceNoiseEnabled() || noise.getClass() != NormalNoise.class
             || SurfacePipelineCompatibility.hasForeignHooks(NormalNoise.class)
             || SurfacePipelineCompatibility.hasForeignHooks(PerlinNoise.class)
             || SurfacePipelineCompatibility.hasForeignHooks(ImprovedNoise.class)

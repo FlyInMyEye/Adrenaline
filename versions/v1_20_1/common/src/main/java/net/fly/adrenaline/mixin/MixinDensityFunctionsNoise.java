@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.worldgen.AdrenalineNoiseFunctionAccess;
 import net.fly.adrenaline.worldgen.PerlinBatching;
@@ -36,6 +38,7 @@ public abstract class MixinDensityFunctionsNoise implements AdrenalineNoiseFunct
     }
 
     @Inject(method = "compute", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NATIVE_PERLIN)
     private void adrenaline$computeNativePerlinSection(DensityFunction.FunctionContext context, CallbackInfoReturnable<Double> cir) {
         if (!AdrenalineConfig.nativePerlinBatchingEnabled()) {
             return;
@@ -51,6 +54,7 @@ public abstract class MixinDensityFunctionsNoise implements AdrenalineNoiseFunct
     }
 
     @Inject(method = "fillArray", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NATIVE_PERLIN)
     private void adrenaline$fillNativePerlinSection(double[] values, DensityFunction.ContextProvider contextProvider, CallbackInfo ci) {
         if (AdrenalineConfig.nativePerlinBatchingEnabled()
             && PerlinBatching.tryFillSection(this, this.noise.noise(), this.xzScale, this.yScale, values, contextProvider)) {

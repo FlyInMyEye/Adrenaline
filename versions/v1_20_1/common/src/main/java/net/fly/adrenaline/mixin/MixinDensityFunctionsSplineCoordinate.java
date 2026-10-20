@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -16,8 +18,9 @@ public abstract class MixinDensityFunctionsSplineCoordinate {
     @Shadow @Final private Holder<DensityFunction> function;
 
     @WrapMethod(method = "mapAll")
+    @ControlsOptimization(Optimization.DENSITY_SPLINES)
     private DensityFunctions.Spline.Coordinate adrenaline$mapAll(DensityFunction.Visitor visitor, Operation<DensityFunctions.Spline.Coordinate> call) {
-        if (!AdrenalineConfig.densityMappingOptimizationsEnabled()) {
+        if (!AdrenalineConfig.densitySplineOptimizationsEnabled()) {
             return call.call(visitor);
         }
         DensityFunction input = this.function.value();

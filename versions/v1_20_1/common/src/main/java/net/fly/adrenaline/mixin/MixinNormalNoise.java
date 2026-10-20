@@ -22,7 +22,7 @@ public abstract class MixinNormalNoise implements AdrenalineNormalNoiseNativeAcc
     @Shadow @Final private double valueFactor;
 
     @Inject(method = "getValue", at = @At("HEAD"), cancellable = true)
-    @ControlsOptimization(Optimization.SURFACE_NOISE)
+    @ControlsOptimization(Optimization.NATIVE_PERLIN)
     private void adrenaline$useNativeBatch(double x, double y, double z, CallbackInfoReturnable<Double> cir) {
         if (PerlinBatching.isVanillaSampleSuppressed()) {
             return;

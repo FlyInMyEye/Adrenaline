@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 
 import com.google.common.cache.CacheBuilder;
@@ -37,6 +39,7 @@ public class MixinBlock {
                 }));
 
     @Inject(method = "isShapeFullBlock", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.SHAPE_CACHE)
     private static void useThreadLocalCache(VoxelShape shape, CallbackInfoReturnable<Boolean> cir) {
         if (!AdrenalineConfig.shapeCacheOptimizationsEnabled()) {
             return;

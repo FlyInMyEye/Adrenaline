@@ -70,16 +70,26 @@ public final class SurfacePointEvaluator {
         if (cache != null) {
             cache.activeBiomes = biomes;
             cache.activeBiomeGetter = biomeGetter;
-            if (cache.resolver == null && AdrenalineConfig.biomeFiddleOptimizationsEnabled()
+            cache.cacheBiomes = false;
+            if (cache.resolver == null && AdrenalineConfig.surfaceBiomeOptimizationsEnabled()
                 && cache.manager.getClass() == BiomeManager.class
                 && cache.manager instanceof AdrenalineBiomeManagerSourceAccess
                 && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)) {
                 cache.bindResolver(chunk);
             }
         }
-        if (cache == null || !SurfacePipelineCompatibility.canReuseContext(system)
+        if (cache == null || !AdrenalineConfig.surfaceContextOptimizationsEnabled() || !SurfacePipelineCompatibility.canReuseContext(system)
             || SurfacePipelineCompatibility.hasForeignHooks(SurfaceRulesContextFactory.contextType())) {
-            return factory.get();
+            Object fresh = factory.get();
+            if (cache != null && cache.resolver != null && AdrenalineConfig.surfaceBiomeOptimizationsEnabled()
+                && !SurfacePipelineCompatibility.hasForeignHooks(system.getClass())
+                && !SurfacePipelineCompatibility.hasForeignHooks(fresh.getClass())
+                && fresh instanceof AdrenalineMixinSurfaceRulesContextMutable mutable) {
+                cache.biomesCache.rebind(chunk, cache.resolver);
+                cache.cacheBiomes = true;
+                mutable.adrenaline$setBiomeGetter(cache.biomesCache);
+            }
+            return fresh;
         }
         if (cache.system != system || cache.randomState != randomState || cache.biomes != biomes || cache.source != source
             || cache.minY != generation.getMinGenY() || cache.height != generation.getGenDepth()) {
@@ -110,7 +120,7 @@ public final class SurfacePointEvaluator {
             mutable.adrenaline$setLastPreliminarySurfaceCellOrigin(Long.MAX_VALUE);
             mutable.adrenaline$setBiome(null);
         }
-        cache.cacheBiomes = AdrenalineConfig.biomeFiddleOptimizationsEnabled() && cache.manager.getClass() == BiomeManager.class
+        cache.cacheBiomes = AdrenalineConfig.surfaceBiomeOptimizationsEnabled() && cache.manager.getClass() == BiomeManager.class
             && cache.manager instanceof AdrenalineBiomeManagerSourceAccess
             && !SurfacePipelineCompatibility.hasForeignHooks(BiomeManager.class)
             && !SurfacePipelineCompatibility.hasForeignHooks(system.getClass());
@@ -148,18 +158,26 @@ public final class SurfacePointEvaluator {
     }
 
     private static Object nativeRule(Cache cache, SurfaceRules.RuleSource source, Object context, WorldGenerationContext generation, Object original) {
-        if (!(AdrenalineConfig.nativeSurfaceRulesEnabled() && NativeSurfaceSampler.available()) || FACTORY == null || !(context instanceof AdrenalineMixinSurfaceRulesContextApi api)) {
+        if (FACTORY == null || !(context instanceof AdrenalineMixinSurfaceRulesContextApi api)) {
             return original;
         }
-        NativeSurfaceProgram program = ((AdrenalineNativeSurfaceProgramsAccess) cache.activeSystem).adrenaline$getSurfacePrograms()
-            .get(source, original, cache.activeBiomes, generation, context);
-        if (program == null) {
+        NativeSurfaceProgram program = AdrenalineConfig.nativeSurfaceRulesEnabled() && NativeSurfaceSampler.available()
+            ? ((AdrenalineNativeSurfaceProgramsAccess) cache.activeSystem).adrenaline$getSurfacePrograms()
+                .get(source, original, cache.activeBiomes, generation, context) : null;
+        SurfaceRulePlan javaPlan = program == null && AdrenalineConfig.surfaceOptimizationsEnabled()
+            ? SurfaceRulePlan.compile(source, context, generation, api) : null;
+        if (program == null && javaPlan == null) {
             return original;
+        }
+        if (javaPlan != null) {
+            javaPlan.biomes(cache.cacheBiomes ? cache.biomesCache : null);
         }
         NativeSurfaceEvaluator nativePlan = cache.nativePlan;
-        nativePlan.bind(program, api, generation.getMinGenY());
-        Evaluator evaluator = new Evaluator(null, api, cache.biomesCache, generation.getMinGenY());
-        evaluator.nativePlan = nativePlan;
+        Evaluator evaluator = new Evaluator(javaPlan, api, cache.biomesCache, generation.getMinGenY());
+        if (program != null) {
+            nativePlan.bind(program, api, generation.getMinGenY());
+            evaluator.nativePlan = nativePlan;
+        }
         evaluator.rebind(SurfaceRulesContextFactory.createTryApplyHandle(original), null, null);
         cache.transientEvaluator = evaluator;
         try {
@@ -201,7 +219,7 @@ public final class SurfacePointEvaluator {
         if (program != null) {
             cache.nativePlan.bind(program, contextApi, generation.getMinGenY(), cache.column != null && cache.column.buffered());
             evaluator.nativePlan = cache.nativePlan;
-        } else if (!(AdrenalineConfig.nativeSurfaceRulesEnabled() && NativeSurfaceSampler.available())) {
+        } else if (AdrenalineConfig.surfaceOptimizationsEnabled()) {
             if (evaluator.plan == null) {
                 evaluator.plan = SurfaceRulePlan.compile(source, context, generation, contextApi);
             }
@@ -223,12 +241,12 @@ public final class SurfacePointEvaluator {
 
     public static Holder<Biome> biome(BiomeManager manager, BlockPos position) {
         Cache cache = ACTIVE.get();
-        return cache != null && cache.manager == manager && cache.resolver != null ? cache.resolver.resolve(position) : null;
+        return AdrenalineConfig.surfaceBiomeOptimizationsEnabled() && cache != null && cache.manager == manager && cache.resolver != null ? cache.resolver.resolve(position) : null;
     }
 
     public static BlockColumn column(BlockColumn original, SurfaceSystem system, ChunkAccess chunk, MutableBlockPos position, BlockState defaultBlock, SurfaceRules.RuleSource source) {
         Cache cache = ACTIVE.get();
-        if (!AdrenalineConfig.get().surfaceColumnOptimizations) {
+        if (!AdrenalineConfig.surfaceColumnOptimizationsEnabled()) {
             return original;
         }
         if (!BUFFERED || cache == null || !cache.knownRules(source) || !SectionPaletteBuilder.available()
@@ -276,7 +294,7 @@ public final class SurfacePointEvaluator {
 
     public static boolean canCacheBiome(Object context) {
         Cache cache = ACTIVE.get();
-        return cache != null && cache.context == context && cache.supported;
+        return AdrenalineConfig.surfaceBiomeOptimizationsEnabled() && cache != null && cache.context == context && cache.supported;
     }
 
     public static final class Evaluator {
@@ -311,7 +329,7 @@ public final class SurfacePointEvaluator {
 
         private void rebind(MethodHandle original, FastSurfaceColumn blocks, BlockState defaultBlock) {
             this.original = original;
-            this.blocks = blocks != null && blocks.buffered() ? blocks : null;
+            this.blocks = AdrenalineConfig.surfaceSpanOptimizationsEnabled() && blocks != null && blocks.buffered() ? blocks : null;
             this.defaultBlock = defaultBlock;
             this.spanTop = 0;
             this.spanBottom = 0;
