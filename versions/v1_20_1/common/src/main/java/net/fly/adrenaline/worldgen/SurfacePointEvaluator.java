@@ -38,7 +38,6 @@ import org.objectweb.asm.Type;
 
 public final class SurfacePointEvaluator {
 
-    private static final boolean BUFFERED = Boolean.parseBoolean(System.getProperty("adrenaline.bufferedSurface", "true"));
     private static final String EVALUATOR = Type.getInternalName(Evaluator.class);
     private static final String STATE = Type.getDescriptor(BlockState.class);
     private static final String ARGUMENTS = "L" + EVALUATOR + ";";
@@ -249,7 +248,7 @@ public final class SurfacePointEvaluator {
         if (!AdrenalineConfig.surfaceColumnOptimizationsEnabled()) {
             return original;
         }
-        if (!BUFFERED || cache == null || !cache.knownRules(source) || !SectionPaletteBuilder.available()
+        if (cache == null || !cache.knownRules(source) || !SectionPaletteBuilder.available()
             || chunk.getClass() != ProtoChunk.class || chunk.getStatus().isOrAfter(ChunkStatus.INITIALIZE_LIGHT)
             || (chunk.getMinBuildHeight() & 15) != 0 || (chunk.getHeight() & 15) != 0
             || chunk.getHeightAccessorForGeneration().getMinBuildHeight() != chunk.getMinBuildHeight()

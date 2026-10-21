@@ -22,7 +22,6 @@ import net.minecraft.world.level.levelgen.blending.Blender;
 
 public final class SectionTerrainGenerator {
 
-    private static final boolean ENABLED = Boolean.parseBoolean(System.getProperty("adrenaline.sectionTerrain", "true"));
     private static final int VERIFY_INTERVAL = BuildConfig.DEBUG ? Math.max(0, Integer.getInteger("adrenaline.sectionVerifyInterval", 64)) : 0;
     private static final AtomicLong SEQUENCE = new AtomicLong();
     private static final AtomicBoolean VERIFIED = new AtomicBoolean(true);
@@ -34,7 +33,7 @@ public final class SectionTerrainGenerator {
     }
 
     public static boolean enabled() {
-        return ENABLED && AdrenalineConfig.sectionTerrainOptimizationsEnabled() && VERIFIED.get();
+        return AdrenalineConfig.sectionTerrainOptimizationsEnabled() && VERIFIED.get();
     }
 
     public static boolean supports(ChunkAccess chunk, NoiseChunk noise, BlockState defaultBlock, int minCellY, int cellCountY) {
