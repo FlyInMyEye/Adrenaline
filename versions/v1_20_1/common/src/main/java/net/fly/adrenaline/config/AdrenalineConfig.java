@@ -265,7 +265,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean aquiferStatusCacheOptimizationsEnabled() {
-        return get().aquiferStatusCacheOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER_STATUS_CACHE);
+        return get().aquiferStatusCacheOptimizations;
     }
 
     public static boolean nativeBlendedNoiseEnabled() {
@@ -273,7 +273,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean nativeSurfaceNoiseEnabled() {
-        return AdrenalineNatives.isAvailable() && get().nativeSurfaceNoise && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_SURFACE_NOISE);
+        return AdrenalineNatives.isAvailable() && get().nativeSurfaceNoise;
     }
 
     public static boolean inlineGenerationTasksEnabled() {
@@ -353,12 +353,11 @@ public class AdrenalineConfig {
     }
 
     public static boolean nativeDensityEvaluationEnabled() {
-        return AdrenalineNatives.isAvailable() && get().nativeDensityEvaluation && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_DENSITY);
+        return AdrenalineNatives.isAvailable() && get().nativeDensityEvaluation;
     }
 
     public static boolean nativeAquiferBatchingEnabled() {
-        return aquiferOptimizationsEnabled() && AdrenalineNatives.isAvailable() && get().nativeAquiferBatching
-            && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_AQUIFER);
+        return aquiferOptimizationsEnabled() && AdrenalineNatives.isAvailable() && get().nativeAquiferBatching;
     }
 
     public static boolean parallelChunkSerializationEnabled() {
@@ -366,7 +365,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean biomeSearchOptimizationsEnabled() {
-        return get().biomeSearchOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.BIOME_SEARCH);
+        return get().biomeSearchOptimizations;
     }
 
     public static boolean biomeClimateOptimizationsEnabled() {
