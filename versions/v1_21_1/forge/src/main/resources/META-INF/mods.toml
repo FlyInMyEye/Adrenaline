@@ -3,7 +3,7 @@ loaderVersion="[52,)"
 license="GPL-3.0-only"
 [[mods]]
 modId="adrenaline"
-version="0.1.2.4"
+version="0.1.3"
 displayName="Adrenaline"
 authors="Fly"
 logoFile="logo.png"

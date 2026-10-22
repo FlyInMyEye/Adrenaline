@@ -139,7 +139,7 @@ tasks.named('processResources', ProcessResources).configure {
         mod_id: 'adrenaline',
         mod_name: 'Adrenaline',
         mod_license: 'GPL-3.0-only',
-        mod_version: '0.1.2.4',
+        mod_version: '0.1.3',
         mod_authors: 'Fly',
         mod_description: 'Generation multithreading, but better'
     ]
