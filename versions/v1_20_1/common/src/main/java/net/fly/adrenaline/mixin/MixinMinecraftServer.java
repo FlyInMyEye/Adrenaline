@@ -67,6 +67,18 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
         AdaptiveWorldgenWorkers.beginTick((MinecraftServer) (Object) this);
     }
 
+    @WrapMethod(method = "tickServer")
+    private void adrenaline$onlyMaintainWarmupChunks(BooleanSupplier shouldKeepTicking, Operation<Void> original) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        if (!WarmupWorldDiscard.isServer(server)) {
+            original.call(shouldKeepTicking);
+            return;
+        }
+        for (ServerLevel level : server.getAllLevels()) {
+            level.getChunkSource().tick(shouldKeepTicking, false);
+        }
+    }
+
     @Inject(method = "tickServer", at = @At("RETURN"))
     private void adrenaline$finishAdaptiveWorkerTick(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
         AdaptiveWorldgenWorkers.endTick((MinecraftServer) (Object) this);

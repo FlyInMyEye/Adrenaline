@@ -15,13 +15,17 @@ public final class WarmupWorldDiscard {
         server = new WeakReference<>(warmupServer);
     }
 
+    public static boolean isServer(MinecraftServer candidate) {
+        return candidate != null && (server.get() == candidate || BackgroundWorldgenWarmupState.isServer(candidate));
+    }
+
     public static boolean isDiscarding() {
         return Boolean.TRUE.equals(DISCARDING.get());
     }
 
     public static void runShutdown(MinecraftServer candidate, Runnable shutdown) {
         boolean previous = isDiscarding();
-        if (candidate != null && server.get() == candidate) {
+        if (isServer(candidate)) {
             DISCARDING.set(true);
         } else {
             DISCARDING.remove();

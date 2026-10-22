@@ -137,13 +137,15 @@ public final class BackgroundWorldgenWarmup {
         }
 
         running = false;
-        BackgroundWorldgenWarmupState.end();
         WARMUP_CALL.remove();
         IntegratedServer detachedServer = server;
         server = null;
         boolean pendingLoad = loading != null;
         if (detachedServer != null) {
             WarmupWorldDiscard.mark(detachedServer);
+        }
+        BackgroundWorldgenWarmupState.end();
+        if (detachedServer != null) {
             BackgroundWorldSave.detach(detachedServer);
         }
         if (!pendingLoad) {
