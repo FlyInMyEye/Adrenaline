@@ -4,7 +4,6 @@ import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -73,17 +72,16 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique private NativeDensityProgram adrenaline$surfaceProgram;
     @Unique private boolean adrenaline$surfaceProgramInitialized;
     @Shadow private NoiseSettings noiseSettings;
-    @Shadow private Map<DensityFunction, DensityFunction> wrapped;
 
     @Unique private DensityMapCache adrenaline$densityMapCache;
 
-    @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/NoiseRouter;"), index = 0)
+    @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/NoiseRouter;"))
     @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private DensityFunction.Visitor adrenaline$cacheRouterMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }
 
-    @ModifyArg(method = {"<init>", "cachedClimateSampler"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/DensityFunction;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/DensityFunction;"), index = 0)
+    @ModifyArg(method = {"<init>", "cachedClimateSampler"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/DensityFunction;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/DensityFunction;"))
     @ControlsOptimization(Optimization.DENSITY_MAPPING)
     private DensityFunction.Visitor adrenaline$cacheDensityMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
@@ -376,12 +374,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @ControlsOptimization(Optimization.DENSITY_WRAPPERS)
-    @WrapMethod(method = "wrap")
-    private DensityFunction adrenaline$reuseWrapperFunction(DensityFunction densityFunction, Operation<DensityFunction> original) {
-        if (!AdrenalineConfig.densityWrapperOptimizationsEnabled()) {
-            return original.call(densityFunction);
-        }
-        return this.wrapped.computeIfAbsent(densityFunction, this.adrenaline$wrapNewFunction);
+    @ModifyArg(method = "wrap", at = @At(value = "INVOKE", target = "Ljava/util/Map;computeIfAbsent(Ljava/lang/Object;Ljava/util/function/Function;)Ljava/lang/Object;"), index = 1, require = 0)
+    private Function<DensityFunction, DensityFunction> adrenaline$reuseWrapperFunction(Function<DensityFunction, DensityFunction> original) {
+        return AdrenalineConfig.densityWrapperOptimizationsEnabled() ? this.adrenaline$wrapNewFunction : original;
     }
 
     @Unique
