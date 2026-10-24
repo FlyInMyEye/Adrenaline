@@ -30,11 +30,7 @@ public final class WorldCreationContextWaiter {
     }
 
     private static void prepare(WorldCreationContext context) {
-        if (context.options().generateStructures()) {
-            WorldgenPreparation.prepare(context.selectedDimensions().overworld(), context.worldgenLoadContext(), context.options().seed());
-        } else {
-            WorldgenPreparation.clear();
-        }
+        WorldgenPreparation.prepare(context.selectedDimensions().overworld(), context.worldgenLoadContext(), context.options().seed());
     }
 
     public static boolean isPreloading() {

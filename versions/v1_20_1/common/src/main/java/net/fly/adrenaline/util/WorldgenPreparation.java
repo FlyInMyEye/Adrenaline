@@ -5,7 +5,6 @@ import net.minecraft.Util;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.chunk.ChunkGenerator;
-import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
@@ -35,11 +34,9 @@ public final class WorldgenPreparation {
                     ? noiseGenerator.generatorSettings().value()
                     : NoiseGeneratorSettings.dummy();
                 RandomState randomState = RandomState.create(settings, registryAccess.lookupOrThrow(Registries.NOISE), seed);
-                ChunkGeneratorStructureState structureState = generator.createState(registryAccess.lookupOrThrow(Registries.STRUCTURE_SET), randomState, seed);
-                structureState.ensureStructuresGenerated();
                 synchronized (WorldgenPreparation.class) {
                     if (epoch == preparationEpoch) {
-                        prepared = new Prepared(generator, seed, structureState);
+                        prepared = new Prepared(generator, settings, seed, randomState);
                     }
                 }
             } finally {
@@ -52,11 +49,11 @@ public final class WorldgenPreparation {
         }, Util.backgroundExecutor());
     }
 
-    public static synchronized ChunkGeneratorStructureState take(ChunkGenerator generator, long seed) {
+    public static synchronized RandomState take(ChunkGenerator generator, NoiseGeneratorSettings settings, long seed) {
         Prepared current = prepared;
-        if (current != null && current.matches(generator, seed)) {
+        if (current != null && current.matches(generator, seed) && current.settings == settings) {
             prepared = null;
-            return current.structureState;
+            return current.randomState;
         }
         if (current != null && current.generator == generator) {
             prepared = null;
@@ -74,7 +71,7 @@ public final class WorldgenPreparation {
         preparingGenerator = null;
     }
 
-    private record Prepared(ChunkGenerator generator, long seed, ChunkGeneratorStructureState structureState) {
+    private record Prepared(ChunkGenerator generator, NoiseGeneratorSettings settings, long seed, RandomState randomState) {
 
         private boolean matches(ChunkGenerator candidateGenerator, long candidateSeed) {
             return this.generator == candidateGenerator && this.seed == candidateSeed;
