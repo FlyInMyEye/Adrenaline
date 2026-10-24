@@ -1,5 +1,6 @@
 package net.fly.adrenaline;
 
+import net.fly.adrenaline.AdrenalinePlatform.ModInfo;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -29,7 +30,10 @@ public class Adrenaline {
     public static final Logger LOGGER = GlobalCommon.LOGGER;
 
     public Adrenaline() {
-        AdrenalinePlatform.initialize(FMLPaths.CONFIGDIR.get(), modId -> ModList.get().isLoaded(modId));
+        AdrenalinePlatform.initialize(FMLPaths.CONFIGDIR.get(), modId -> ModList.get().isLoaded(modId), modId -> ModList.get().getMods().stream()
+            .filter(info -> info.getModId().equals(modId))
+            .map(info -> new ModInfo(modId, info.getDisplayName(), info.getOwningFile().getFile().getFileName()))
+            .findFirst().orElse(null));
         AdrenalinePlatform.setCreateWorldSpawnHook(ForgeEventFactory::onCreateWorldSpawn);
         AdrenalineCommon.init(AdrenalinePlatform.configDirectory());
         MinecraftForge.EVENT_BUS.register(this);

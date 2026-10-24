@@ -6,6 +6,6 @@ import com.terraformersmc.modmenu.api.ModMenuApi;
 public final class AdrenalineModMenu implements ModMenuApi {
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return AdrenalineConfigScreen::new;
+        return AdrenalineConfigScreen::create;
     }
 }

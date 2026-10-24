@@ -3,6 +3,9 @@ package net.fly.adrenaline.config;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
 import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
@@ -439,6 +442,13 @@ public class AdrenalineConfig {
 
     private static boolean normalizeSettings(Data value) {
         boolean changed = false;
+        if (value.dismissedBlacklistedMods == null) {
+            value.dismissedBlacklistedMods = List.of();
+            changed = true;
+        } else if (value.dismissedBlacklistedMods.stream().anyMatch(Objects::isNull)) {
+            value.dismissedBlacklistedMods = value.dismissedBlacklistedMods.stream().filter(Objects::nonNull).toList();
+            changed = true;
+        }
         if (value.settingsVersion == 0) {
             value.surfaceNoiseOptimizations = value.surfaceOptimizations;
             value.biomeSearchOptimizations = value.noiseChunkOptimizations;
@@ -581,6 +591,7 @@ public class AdrenalineConfig {
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
         public boolean debugLogging = false;
         public boolean forceEasterEgg = false;
+        public List<String> dismissedBlacklistedMods = List.of();
 
         public Data() {
         }
@@ -667,6 +678,7 @@ public class AdrenalineConfig {
             this.startBeforehand = other.startBeforehand;
             this.debugLogging = other.debugLogging;
             this.forceEasterEgg = other.forceEasterEgg;
+            this.dismissedBlacklistedMods = new ArrayList<>(other.dismissedBlacklistedMods);
         }
 
         public void disableWorldgenOptimizations() {

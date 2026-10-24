@@ -15,8 +15,8 @@ public class MixinGui {
 
     @Inject(method = "render", at = @At("TAIL"))
     private void adrenaline$renderWorldgenDifferenceHud(GuiGraphics guiGraphics, float partialTick, CallbackInfo ci) {
+        BuildWarningOverlay.renderGui(guiGraphics);
         if (BuildConfig.DEBUG) {
-            BuildWarningOverlay.renderGui(guiGraphics);
             WorldgenDifferenceHud.render(guiGraphics);
         }
     }

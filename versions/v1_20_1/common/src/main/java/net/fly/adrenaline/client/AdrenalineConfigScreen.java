@@ -6,6 +6,7 @@ import java.util.Locale;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.client.AdrenalineSettings.Group;
 import net.fly.adrenaline.client.AdrenalineSettings.Setting;
+import net.fly.adrenaline.compat.ModBlacklist;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.config.AdrenalineConfig.Data;
 import net.minecraft.client.gui.GuiGraphics;
@@ -44,6 +45,10 @@ public class AdrenalineConfigScreen extends Screen {
 
     public AdrenalineConfigScreen(Screen parent) {
         this(parent, new Session(), false);
+    }
+
+    public static Screen create(Screen parent) {
+        return ModBlacklist.shouldWarn() ? new BlacklistedModsScreen(parent) : new AdrenalineConfigScreen(parent);
     }
 
     private AdrenalineConfigScreen(Screen parent, Session session, boolean advanced) {

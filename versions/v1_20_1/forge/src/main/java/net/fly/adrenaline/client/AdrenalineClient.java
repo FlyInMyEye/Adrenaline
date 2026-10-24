@@ -19,12 +19,12 @@ public final class AdrenalineClient {
     public static void initialize() {
         ModLoadingContext.get().registerExtensionPoint(
             ConfigScreenHandler.ConfigScreenFactory.class,
-            () -> new ConfigScreenHandler.ConfigScreenFactory((minecraft, screen) -> new AdrenalineConfigScreen(screen))
+            () -> new ConfigScreenHandler.ConfigScreenFactory((minecraft, screen) -> AdrenalineConfigScreen.create(screen))
         );
 
         MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onClientTick);
+        MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onRenderGui);
         if (BuildConfig.DEBUG) {
-            MinecraftForge.EVENT_BUS.addListener(AdrenalineClient::onRenderGui);
             MinecraftForge.EVENT_BUS.register(new WorldgenStatsOverlay());
         }
 
@@ -41,6 +41,8 @@ public final class AdrenalineClient {
 
     private static void onRenderGui(RenderGuiEvent.Post event) {
         BuildWarningOverlay.renderGui(event.getGuiGraphics());
-        WorldgenDifferenceHud.render(event.getGuiGraphics());
+        if (BuildConfig.DEBUG) {
+            WorldgenDifferenceHud.render(event.getGuiGraphics());
+        }
     }
 }

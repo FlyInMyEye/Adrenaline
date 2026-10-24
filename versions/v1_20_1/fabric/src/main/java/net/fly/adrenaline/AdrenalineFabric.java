@@ -1,5 +1,7 @@
 package net.fly.adrenaline;
 
+import java.nio.file.Path;
+import net.fly.adrenaline.AdrenalinePlatform.ModInfo;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -21,7 +23,15 @@ public final class AdrenalineFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         FabricLoader loader = FabricLoader.getInstance();
-        AdrenalinePlatform.initialize(loader.getConfigDir(), loader::isModLoaded);
+        AdrenalinePlatform.initialize(loader.getConfigDir(), loader::isModLoaded, modId -> loader.getModContainer(modId).map(container -> {
+            var origin = container.getOrigin();
+            String fileName = switch (origin.getKind()) {
+                case PATH -> origin.getPaths().isEmpty() ? "" : origin.getPaths().get(0).getFileName().toString();
+                case NESTED -> Path.of(origin.getParentSubLocation()).getFileName().toString();
+                default -> "";
+            };
+            return new ModInfo(modId, container.getMetadata().getName(), fileName);
+        }).orElse(null));
         AdrenalineCommon.init(AdrenalinePlatform.configDirectory());
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             GlobalCommon.LOGGER.info("Adrenaline initialized, worldgen parallelism: {}", ChunkJobScheduler.get().parallelism());

@@ -4,7 +4,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import net.fly.adrenaline.client.AdrenalineConfigScreen;
+import net.fly.adrenaline.client.AdrenalineConfigButton;
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
 import net.fly.adrenaline.client.WorldCreationContextWaiter;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -15,7 +15,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationContext;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.WorldLoader;
 import net.minecraft.world.level.levelgen.presets.WorldPreset;
@@ -39,7 +38,7 @@ public abstract class MixinCreateWorldScreen extends Screen {
 
     @Inject(method = "init", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/worldselection/CreateWorldScreen;repositionElements()V"))
     private void adrenaline$addConfigButton(CallbackInfo ci) {
-        this.adrenaline$configButton = this.addRenderableWidget(Button.builder(Component.literal("A").setStyle(Style.EMPTY.withColor(0xFF59BD)), button -> this.minecraft.setScreen(new AdrenalineConfigScreen(this))).bounds(0, 0, 20, 20).build());
+        this.adrenaline$configButton = this.addRenderableWidget(new AdrenalineConfigButton(this, 0, 0));
     }
 
     @Inject(method = "repositionElements", at = @At("TAIL"))
