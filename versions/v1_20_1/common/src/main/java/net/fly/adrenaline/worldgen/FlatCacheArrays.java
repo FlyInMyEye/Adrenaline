@@ -19,6 +19,6 @@ public final class FlatCacheArrays {
     }
 
     public static boolean isEmptyBlender(Blender blender) {
-        return AdrenalineConfig.blendingOptimizationsEnabled() && blender == Blender.empty();
+        return AdrenalineConfig.flatCacheOptimizationsEnabled() && blender == Blender.empty();
     }
 }
