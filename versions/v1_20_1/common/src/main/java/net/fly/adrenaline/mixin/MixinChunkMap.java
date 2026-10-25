@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import com.mojang.datafixers.util.Either;
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
@@ -64,8 +65,9 @@ public class MixinChunkMap {
     @Final
     private BlockableEventLoop<Runnable> mainThreadExecutor;
 
-    @Unique
-    private ThreadLocal<ChunkHolder> adrenaline$currentHolder;
+    @Shadow
+    @Final
+    private ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> worldgenMailbox;
 
     @Unique
     private ThreadLocal<ChunkStatus> adrenaline$dispatchStatus;
@@ -78,7 +80,6 @@ public class MixinChunkMap {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
-        this.adrenaline$currentHolder = new ThreadLocal<>();
         this.adrenaline$dispatchStatus = new ThreadLocal<>();
     }
 
@@ -244,6 +245,9 @@ public class MixinChunkMap {
         ChunkHolder holder,
         ChunkStatus status
     ) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH)) {
+            return original.call(dependencies, generation, executor);
+        }
         Executor dispatch = task -> {
             ChunkStatus previous = this.adrenaline$dispatchStatus.get();
             this.adrenaline$dispatchStatus.set(status);
@@ -260,24 +264,18 @@ public class MixinChunkMap {
         return original.call(dependencies, generation, dispatch);
     }
 
-    @Inject(
-        method = {"lambda$scheduleChunkGeneration$23", "m_214956_", "method_17259"},
-        at = @At("HEAD")
-    )
-    private void captureHolder(ChunkHolder holder, Runnable task, CallbackInfo ci) {
-        this.adrenaline$currentHolder.set(holder);
+    @WrapMethod(method = {"lambda$scheduleChunkGeneration$23", "m_214956_", "method_17259"})
+    @ControlsOptimization(Optimization.GENERATION_DISPATCH)
+    private void adrenaline$dispatchGeneration(ChunkHolder holder, Runnable task, Operation<Void> original) {
+        if (OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH)) {
+            original.call(holder, task);
+            return;
+        }
+        this.adrenaline$dispatchWorldgenTask(this.worldgenMailbox, ChunkTaskPriorityQueueSorter.message(holder, task), holder);
     }
 
-    @Redirect(
-        method = {"lambda$scheduleChunkGeneration$23", "m_214956_", "method_17259"},
-        at = @At(
-            value = "INVOKE",
-            target = "Lnet/minecraft/util/thread/ProcessorHandle;tell(Ljava/lang/Object;)V"
-        )
-    )
-    @ControlsOptimization(Optimization.GENERATION_DISPATCH)
-    private void redirectWorldgenDispatch(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message) {
-        ChunkHolder holder = this.adrenaline$currentHolder.get();
+    @Unique
+    private void adrenaline$dispatchWorldgenTask(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message, ChunkHolder holder) {
         ChunkStatus nextStatus = this.adrenaline$dispatchStatus.get();
         this.adrenaline$dispatchStatus.remove();
         if (nextStatus != null) {
@@ -370,14 +368,6 @@ public class MixinChunkMap {
             WorldgenStageStats.finishSchedulingWork(dispatchWork);
         }
         instance.tell((ChunkTaskPriorityQueueSorter.Message<Runnable>) message);
-    }
-
-    @Inject(
-        method = {"lambda$scheduleChunkGeneration$23", "m_214956_", "method_17259"},
-        at = @At("RETURN")
-    )
-    private void clearHolder(ChunkHolder holder, Runnable task, CallbackInfo ci) {
-        this.adrenaline$currentHolder.remove();
     }
 
 }

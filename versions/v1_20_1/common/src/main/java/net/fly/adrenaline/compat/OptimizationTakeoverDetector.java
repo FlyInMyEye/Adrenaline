@@ -7,18 +7,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.InvokeDynamicInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import org.spongepowered.asm.mixin.refmap.ReferenceMapper;
 
 public final class OptimizationTakeoverDetector {
     private static final String CONTROL_DESCRIPTOR = "Lnet/fly/adrenaline/compat/ControlsOptimization;";
     private static final String MIXIN_MERGED_DESCRIPTOR = "Lorg/spongepowered/asm/mixin/transformer/meta/MixinMerged;";
     private static final String ADRENALINE_MIXIN_PACKAGE = "net.fly.adrenaline.mixin.";
     private static final Map<String, Map<MethodKey, Set<OptimizationTakeoverRegistry.Optimization>>> CLAIMS = new HashMap<>();
+    private static final ReferenceMapper REFERENCES = ReferenceMapper.read("adrenaline.refmap.json");
 
     private static final Map<String, Map<MethodKey, Map<MethodKey, Set<OptimizationTakeoverRegistry.Optimization>>>> LOCAL_CLAIMS = new HashMap<>();
 
@@ -26,6 +30,7 @@ public final class OptimizationTakeoverDetector {
     }
 
     public static synchronized void captureClaims(ClassNode targetClass, IMixinInfo mixinInfo) {
+        captureDeclaredClaims(targetClass, mixinInfo);
         Set<OptimizationTakeoverRegistry.Optimization> classControl = controlledBy(mixinInfo.getClassNode(0).visibleAnnotations, mixinInfo.getClassNode(0).invisibleAnnotations);
         Map<String, Set<OptimizationTakeoverRegistry.Optimization>> controlledMethods = new HashMap<>();
         Set<String> localMethods = new HashSet<>();
@@ -62,6 +67,41 @@ public final class OptimizationTakeoverDetector {
                         .computeIfAbsent(new MethodKey(call.name, call.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class)).addAll(controls);
                 } else if (controls != null) {
                     targetClaims.computeIfAbsent(new MethodKey(method.name, method.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class)).addAll(controls);
+                }
+            }
+        }
+    }
+
+    private static void captureDeclaredClaims(ClassNode targetClass, IMixinInfo mixinInfo) {
+        for (MethodNode handler : mixinInfo.getClassNode(0).methods) {
+            Set<OptimizationTakeoverRegistry.Optimization> controls = controlledBy(handler.visibleAnnotations, handler.invisibleAnnotations);
+            if (controls.isEmpty() || Boolean.TRUE.equals(annotationObject(handler.invisibleAnnotations, CONTROL_DESCRIPTOR, "local"))
+                || Boolean.TRUE.equals(annotationObject(handler.visibleAnnotations, CONTROL_DESCRIPTOR, "local")) || handler.visibleAnnotations == null) {
+                continue;
+            }
+            for (AnnotationNode annotation : handler.visibleAnnotations) {
+                Object value = annotationObject(List.of(annotation), annotation.desc, "method");
+                if (!(value instanceof List<?> selectors)) {
+                    continue;
+                }
+                for (Object selector : selectors) {
+                    if (!(selector instanceof String name)) {
+                        continue;
+                    }
+                    String mapped = REFERENCES.remapWithContext(mixinInfo.getConfig().getEnvironment().getRefmapObfuscationContext(),
+                        mixinInfo.getClassName().replace('.', '/'), name);
+                    int ownerEnd = mapped.startsWith("L") ? mapped.indexOf(';') : -1;
+                    String member = mapped.substring(ownerEnd + 1);
+                    int descriptorStart = member.indexOf('(');
+                    String methodName = descriptorStart < 0 ? member : member.substring(0, descriptorStart);
+                    String descriptor = descriptorStart < 0 ? null : member.substring(descriptorStart);
+                    for (MethodNode method : targetClass.methods) {
+                        if (method.name.equals(methodName) && (descriptor == null || method.desc.equals(descriptor))) {
+                            CLAIMS.computeIfAbsent(targetClass.name, key -> new HashMap<>())
+                                .computeIfAbsent(new MethodKey(method.name, method.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class))
+                                .addAll(controls);
+                        }
+                    }
                 }
             }
         }
@@ -178,6 +218,19 @@ public final class OptimizationTakeoverDetector {
             return controller;
         }
         for (AbstractInsnNode instruction : method.instructions) {
+            if (instruction instanceof InvokeDynamicInsnNode dynamic) {
+                for (Object argument : dynamic.bsmArgs) {
+                    if (argument instanceof Handle handle && owner.equals(handle.getOwner())) {
+                        MethodNode dependency = methods.get(handle.getName() + handle.getDesc());
+                        if (dependency != null) {
+                            controller = externalDependency(owner, dependency, methods, visited, true);
+                            if (controller != null) {
+                                return controller;
+                            }
+                        }
+                    }
+                }
+            }
             if (!(instruction instanceof MethodInsnNode call) || !owner.equals(call.owner)) {
                 continue;
             }

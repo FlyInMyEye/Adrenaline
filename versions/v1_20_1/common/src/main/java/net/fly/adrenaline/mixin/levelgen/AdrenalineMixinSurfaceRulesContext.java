@@ -1,10 +1,9 @@
 package net.fly.adrenaline.mixin.levelgen;
 
-import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
 import java.util.function.Function;
-import com.google.common.base.Supplier;
+import java.util.function.Supplier;
+import net.fly.adrenaline.compat.ControlsOptimization;
+import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.worldgen.SurfacePointEvaluator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -14,12 +13,20 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(targets = "net.minecraft.world.level.levelgen.SurfaceRules$Context")
 public abstract class AdrenalineMixinSurfaceRulesContext {
 
     @Shadow @Final private Function<BlockPos, Holder<Biome>> biomeGetter;
     @Shadow @Final private BlockPos.MutableBlockPos pos;
+    @Shadow private long lastUpdateY;
+    @Shadow private Supplier<Holder<Biome>> biome;
+    @Shadow private int blockY;
+    @Shadow private int waterHeight;
+    @Shadow private int stoneDepthBelow;
+    @Shadow private int stoneDepthAbove;
     @Unique private final Supplier<Holder<Biome>> adrenaline$biomeSupplier = this::adrenaline$getBiome;
     @Unique private Holder<Biome> adrenaline$cachedBiome;
     @Unique private int adrenaline$biomeX;
@@ -27,20 +34,24 @@ public abstract class AdrenalineMixinSurfaceRulesContext {
     @Unique private int adrenaline$biomeZ;
     @Unique private boolean adrenaline$biomeDirty = true;
 
-    @WrapOperation(method = "updateY", at = @At(value = "INVOKE", target = "Lcom/google/common/base/Suppliers;memoize(Lcom/google/common/base/Supplier;)Lcom/google/common/base/Supplier;"), require = 0)
-    private Supplier<Holder<Biome>> adrenaline$reuseBiomeSupplier(Supplier<Holder<Biome>> supplier, Operation<Supplier<Holder<Biome>>> original,
-                                                                @Local(argsOnly = true, ordinal = 3) int x,
-                                                                @Local(argsOnly = true, ordinal = 4) int y,
-                                                                @Local(argsOnly = true, ordinal = 5) int z) {
+    @Inject(method = "updateY", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.SURFACE_BIOMES)
+    private void adrenaline$reuseBiomeSupplier(int stoneDepthAbove, int stoneDepthBelow, int waterHeight, int x, int y, int z, CallbackInfo ci) {
         if (!SurfacePointEvaluator.canCacheBiome(this)) {
-            return original.call(supplier);
+            return;
         }
         this.adrenaline$biomeX = x;
         this.adrenaline$biomeY = y;
         this.adrenaline$biomeZ = z;
         this.adrenaline$biomeDirty = true;
         this.adrenaline$cachedBiome = null;
-        return this.adrenaline$biomeSupplier;
+        this.lastUpdateY++;
+        this.biome = this.adrenaline$biomeSupplier;
+        this.blockY = y;
+        this.waterHeight = waterHeight;
+        this.stoneDepthBelow = stoneDepthBelow;
+        this.stoneDepthAbove = stoneDepthAbove;
+        ci.cancel();
     }
 
     @Unique
