@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Wysoki",
   "tooltip.adrenaline.performance.extreme": "Ekstremalny",
   "tooltip.adrenaline.config.generation_threads": "Kontroluje równoległe wątki generowania chunków.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Zmniejsza liczbę pracowników generujących, gdy całkowite wykorzystanie procesora przekracza 90% lub takty serwera przekraczają 50 ms. Zatrzymuje co najmniej połowę skonfigurowanych pracowników i przywraca ich stopniowo w przypadku spadku obciążenia.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Minimalna liczba wątków przy użyciu CPU powyżej 90% lub czasie ticka serwera powyżej 50 ms: 1 wątek lub procent ustawionego maksimum, zaokrąglony w górę. Liczba wzrasta, gdy obciążenie spada. Wył. wyłącza dostosowywanie.",
   "tooltip.adrenaline.config.serialization_threads": "Kontroluje równoległe wątki kodowania zapisu chunków.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Zmienia promień chunków generowanych wokół spawnu.",
   "tooltip.adrenaline.config.parallel_worldgen": "Uruchamia generowanie chunków w puli generowania.",

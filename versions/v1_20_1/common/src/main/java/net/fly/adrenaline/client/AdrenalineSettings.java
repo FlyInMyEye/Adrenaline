@@ -12,9 +12,11 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.config.AdrenalineConfig.AdaptiveWorkerMode;
 import net.fly.adrenaline.config.AdrenalineConfig.Data;
 import net.fly.adrenaline.natives.AdrenalineNatives;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 
 final class AdrenalineSettings {
     static final Data DEFAULTS = new Data();
@@ -26,7 +28,7 @@ final class AdrenalineSettings {
     private static List<Setting> create() {
         List<Setting> settings = new ArrayList<>();
         settings.add(integer("generationWorkerThreads", "generation_threads", Group.SCHEDULING, true, Impact.HIGH, 0, Runtime.getRuntime().availableProcessors(), d -> d.generationWorkerThreads, (d, v) -> d.generationWorkerThreads = v).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
-        settings.add(toggle("adaptiveGenerationWorkers", "adaptive_generation_workers", Group.SCHEDULING, true, Impact.VARIABLE, d -> d.adaptiveGenerationWorkers, (d, v) -> d.adaptiveGenerationWorkers = v).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
+        settings.add(sliderChoice("adaptiveWorkerMode", "adaptive_generation_workers", Group.SCHEDULING, true, Impact.VARIABLE, List.of(AdaptiveWorkerMode.values()), Data::adaptiveWorkerMode, Data::setAdaptiveWorkerMode).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
         settings.add(toggle("parallelWorldgen", "parallel_worldgen", Group.SCHEDULING, true, Impact.EXTREME, d -> d.parallelWorldgen, (d, v) -> d.parallelWorldgen = v).controlled(Optimization.GENERATION_DISPATCH));
         settings.add(choice("stagePriority", "stage_priority", Group.SCHEDULING, false, Impact.VARIABLE, List.of(AdrenalineConfig.StagePriority.HIGHEST, AdrenalineConfig.StagePriority.FIFO, AdrenalineConfig.StagePriority.NEAREST), Data::stagePriority, Data::setStagePriority).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
         settings.add(integer("featureSafetyRadius", "feature_safety_radius", Group.SCHEDULING, false, Impact.VARIABLE, 1, 8, d -> d.featureSafetyRadius == 0 ? switch (d.featureCompatibility) { case "increased" -> 3; case "max" -> 7; default -> 1; } : d.featureSafetyRadius, (d, v) -> d.featureSafetyRadius = v).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
@@ -120,6 +122,13 @@ final class AdrenalineSettings {
             (a, b) -> Objects.equals(getter.apply(a), getter.apply(b)), null, null, 0, 0);
     }
 
+    private static <T> Setting sliderChoice(String id, String key, Group group, boolean main, Impact impact, List<T> values, Function<Data, T> getter, BiConsumer<Data, T> setter) {
+        return new Setting(id, key, group, main, impact, d -> label(key, getter.apply(d)), null,
+            (d, source) -> setter.accept(d, getter.apply(source)),
+            (a, b) -> Objects.equals(getter.apply(a), getter.apply(b)), d -> values.indexOf(getter.apply(d)),
+            (d, v) -> setter.accept(d, values.get(v)), 0, values.size() - 1);
+    }
+
     private static Setting integer(String id, String key, Group group, boolean main, Impact impact, int min, int max, ToIntFunction<Data> getter, BiConsumer<Data, Integer> setter) {
         return new Setting(id, key, group, main, impact, d -> integerLabel(key, getter.applyAsInt(d)), null,
             (d, source) -> setter.accept(d, getter.applyAsInt(source)),
@@ -140,6 +149,16 @@ final class AdrenalineSettings {
         if (value instanceof Boolean enabled) {
             return Component.translatable(enabled ? "gui.adrenaline.toggle.on" : "gui.adrenaline.toggle.off")
                 .withStyle(style -> style.withColor(enabled ? 0x55FF55 : 0xFF5555));
+        }
+        if (value instanceof AdaptiveWorkerMode mode) {
+            MutableComponent text = switch (mode) {
+                case ONE -> Component.literal("1");
+                case QUARTER -> Component.literal("25%");
+                case HALF -> Component.literal("50%");
+                case THREE_QUARTERS -> Component.literal("75%");
+                case OFF -> Component.translatable("gui.adrenaline.toggle.off");
+            };
+            return text.withStyle(style -> style.withColor(mode == AdaptiveWorkerMode.OFF ? 0xFF5555 : 0xFFFF55));
         }
         if (value instanceof AdrenalineConfig.StagePriority priority) {
             return Component.translatable("gui.adrenaline.stage_priority." + priority.name().toLowerCase(java.util.Locale.ROOT))

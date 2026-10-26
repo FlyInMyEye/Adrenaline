@@ -442,6 +442,13 @@ public class AdrenalineConfig {
 
     private static boolean normalizeSettings(Data value) {
         boolean changed = false;
+        if (value.adaptiveGenerationWorkers != null) {
+            value.setAdaptiveWorkerMode(value.adaptiveGenerationWorkers ? AdaptiveWorkerMode.HALF : AdaptiveWorkerMode.OFF);
+            changed = true;
+        } else if (value.adaptiveWorkerMode == null) {
+            value.adaptiveWorkerMode = AdaptiveWorkerMode.HALF;
+            changed = true;
+        }
         if (value.dismissedBlacklistedMods == null) {
             value.dismissedBlacklistedMods = List.of();
             changed = true;
@@ -551,7 +558,8 @@ public class AdrenalineConfig {
         public boolean oreVeinOptimizations = true;
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
-        public boolean adaptiveGenerationWorkers = true;
+        public Boolean adaptiveGenerationWorkers;
+        public AdaptiveWorkerMode adaptiveWorkerMode = AdaptiveWorkerMode.HALF;
         public int serializationWorkerThreads = 0;
         public boolean saveChunksAfterWorldCreation = true;
         public int incrementalSaveInterval = 128;
@@ -639,6 +647,7 @@ public class AdrenalineConfig {
             this.initialSpawnOptimization = other.initialSpawnOptimization;
             this.generationWorkerThreads = other.generationWorkerThreads;
             this.adaptiveGenerationWorkers = other.adaptiveGenerationWorkers;
+            this.adaptiveWorkerMode = other.adaptiveWorkerMode;
             this.serializationWorkerThreads = other.serializationWorkerThreads;
             this.saveChunksAfterWorldCreation = other.saveChunksAfterWorldCreation;
             this.incrementalSaveInterval = other.incrementalSaveInterval;
@@ -727,6 +736,18 @@ public class AdrenalineConfig {
             this.fastLegacyRandom = false;
         }
 
+        public AdaptiveWorkerMode adaptiveWorkerMode() {
+            if (this.adaptiveGenerationWorkers != null) {
+                return this.adaptiveGenerationWorkers ? AdaptiveWorkerMode.HALF : AdaptiveWorkerMode.OFF;
+            }
+            return this.adaptiveWorkerMode == null ? AdaptiveWorkerMode.HALF : this.adaptiveWorkerMode;
+        }
+
+        public void setAdaptiveWorkerMode(AdaptiveWorkerMode mode) {
+            this.adaptiveWorkerMode = mode;
+            this.adaptiveGenerationWorkers = null;
+        }
+
         public WarmupMode warmupMode() {
             if (!this.warmupOnStartup) {
                 return WarmupMode.OFF;
@@ -755,6 +776,24 @@ public class AdrenalineConfig {
         public void setStagePriority(StagePriority priority) {
             this.stagePriority = priority;
             this.prioritizeHigherStages = priority != StagePriority.FIFO;
+        }
+    }
+
+    public enum AdaptiveWorkerMode {
+        ONE(0),
+        QUARTER(25),
+        HALF(50),
+        THREE_QUARTERS(75),
+        OFF(100);
+
+        private final int minimumPercent;
+
+        AdaptiveWorkerMode(int minimumPercent) {
+            this.minimumPercent = minimumPercent;
+        }
+
+        public int minimumWorkers(int configuredWorkers) {
+            return Math.max(1, (int) ((configuredWorkers * (long) this.minimumPercent + 99L) / 100L));
         }
     }
 

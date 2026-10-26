@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "高",
   "tooltip.adrenaline.performance.extreme": "极高",
   "tooltip.adrenaline.config.generation_threads": "控制并行区块生成工作线程。",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "当 CPU 总使用率超过 90% 或服务器时钟周期超过 50 毫秒时，减少生成工作线程。保留至少一半已配置的工作线程，并在负载下降时逐渐恢复它们。",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "CPU 使用率超过 90% 或服务器每刻耗时超过 50 毫秒时保留的最少工作线程：1 个线程，或设定上限的百分比，向上取整。负载下降后会逐渐恢复线程数量。关闭则不自动调整。",
   "tooltip.adrenaline.config.serialization_threads": "控制并行区块保存编码工作线程。",
   "tooltip.adrenaline.config.spawn_zone_radius": "更改在出生点周围生成的区块半径。",
   "tooltip.adrenaline.config.parallel_worldgen": "将区块生成工作运行在生成线程池上。",

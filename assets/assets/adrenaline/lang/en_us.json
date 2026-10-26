@@ -155,7 +155,7 @@
   "tooltip.adrenaline.performance.high": "High",
   "tooltip.adrenaline.performance.extreme": "Extreme",
   "tooltip.adrenaline.config.generation_threads": "Maximum workers used to generate new terrain. Auto leaves CPU capacity for the rest of the game. This is a limit; adaptive workers may use fewer.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Reduces generation workers when total CPU usage exceeds 90% or server ticks exceed 50 ms. Keeps at least half your configured workers and restores them gradually when load drops.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Minimum workers kept when CPU usage exceeds 90% or server ticks exceed 50 ms: 1 worker or a percentage of the configured maximum, rounded up. Workers recover as load drops. Off disables adjustment.",
   "tooltip.adrenaline.config.serialization_threads": "Maximum workers used to encode chunk saves when Parallel chunk encoding is enabled. Auto chooses a limit based on available CPU threads.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Area prepared around spawn before entering a new world. The saved value is a radius; radius 11 prepares 21 × 21 chunks. Smaller areas load sooner but prepare less terrain.",
   "tooltip.adrenaline.config.parallel_worldgen": "Generates chunks using multiple workers. Independent of the individual terrain and biome optimizations in Advanced.",

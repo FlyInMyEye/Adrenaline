@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Высокое",
   "tooltip.adrenaline.performance.extreme": "Экстремальное",
   "tooltip.adrenaline.config.generation_threads": "Управляет параллельными потоками генерации чанков.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Снижает число потоков генерации при общей загрузке процессора выше 90% или времени тика сервера выше 50 мс. Сохраняет не менее половины заданных потоков и постепенно возвращает их при снижении нагрузки.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Минимальное число потоков при загрузке ЦП выше 90% или времени тика сервера выше 50 мс: 1 поток или доля от заданного максимума с округлением вверх. При снижении нагрузки потоки постепенно возвращаются. «Выкл.» отключает регулировку.",
   "tooltip.adrenaline.config.serialization_threads": "Управляет параллельными потоками кодирования сохранения чанков.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Изменяет радиус чанков, генерируемых вокруг спавна.",
   "tooltip.adrenaline.config.parallel_worldgen": "Выполняет генерацию чанков в пуле генерации.",

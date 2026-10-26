@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Høy",
   "tooltip.adrenaline.performance.extreme": "Ekstrem",
   "tooltip.adrenaline.config.generation_threads": "Styrer parallelle arbeidstråder for chunkgenerering.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Reduserer generasjonsarbeidere når total CPU-bruk overstiger 90 % eller servermerker overstiger 50 ms. Beholder minst halvparten av dine konfigurerte arbeidere og gjenoppretter dem gradvis når belastningen faller.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Minste antall arbeidere ved over 90% CPU-bruk eller serverticks over 50 ms: 1 arbeider eller en prosentandel av det angitte maksimumet, rundet opp. Antallet øker igjen når belastningen synker. Av deaktiverer tilpasningen.",
   "tooltip.adrenaline.config.serialization_threads": "Styrer parallelle arbeidstråder for koding av chunksaving.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Endrer chunkradiusen som genereres rundt spawn.",
   "tooltip.adrenaline.config.parallel_worldgen": "Kjører chunkgenereringsarbeid på genereringspoolen.",

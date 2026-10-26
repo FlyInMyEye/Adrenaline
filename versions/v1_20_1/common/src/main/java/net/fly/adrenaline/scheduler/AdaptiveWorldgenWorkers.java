@@ -6,6 +6,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.config.AdrenalineConfig.AdaptiveWorkerMode;
 import net.minecraft.server.MinecraftServer;
 
 public final class AdaptiveWorldgenWorkers {
@@ -103,8 +104,9 @@ public final class AdaptiveWorldgenWorkers {
                 return;
             }
             int configured = AdrenalineConfig.resolvedGenerationWorkerThreads();
-            boolean enabled = AdrenalineConfig.get().adaptiveGenerationWorkers && AdrenalineConfig.parallelWorldgenEnabled();
-            ChunkJobScheduler.get().setWorkerLimit(LIMIT.update(configured, enabled, cpuLoad, mspt, tickSequence));
+            AdaptiveWorkerMode mode = AdrenalineConfig.get().adaptiveWorkerMode();
+            boolean enabled = mode != AdaptiveWorkerMode.OFF && AdrenalineConfig.parallelWorldgenEnabled();
+            ChunkJobScheduler.get().setWorkerLimit(LIMIT.update(configured, mode.minimumWorkers(configured), enabled, cpuLoad, mspt, tickSequence));
         }
     }
 }

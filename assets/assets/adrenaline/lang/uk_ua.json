@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Високий",
   "tooltip.adrenaline.performance.extreme": "Екстремальний",
   "tooltip.adrenaline.config.generation_threads": "Керує паралельними потоками генерації чанків.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Зменшує генерацію працівників, коли загальне використання ЦП перевищує 90% або час роботи сервера перевищує 50 мс. Зберігає принаймні половину ваших налаштованих робітників і відновлює їх поступово, коли навантаження падає.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Мінімальна кількість потоків за завантаження ЦП понад 90% або часу тіку сервера понад 50 мс: 1 потік або частка від заданого максимуму з округленням угору. Коли навантаження спадає, потоки поступово повертаються. «Вимк.» вимикає регулювання.",
   "tooltip.adrenaline.config.serialization_threads": "Керує паралельними потоками кодування збереження чанків.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Змінює радіус чанків, згенерованих навколо спавну.",
   "tooltip.adrenaline.config.parallel_worldgen": "Запускає роботу генерації чанків у пулі генерації.",

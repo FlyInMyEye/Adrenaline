@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Élevé",
   "tooltip.adrenaline.performance.extreme": "Extrême",
   "tooltip.adrenaline.config.generation_threads": "Contrôle les travailleurs parallèles de génération de chunks.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Réduit les tâches de génération lorsque l'utilisation totale du processeur dépasse 90 % ou que les ticks du serveur dépassent 50 ms. Conserve au moins la moitié de vos travailleurs configurés et les restaure progressivement lorsque la charge diminue.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Minimum de travailleurs conservés au-delà de 90 % d’utilisation du processeur ou de 50 ms par tick serveur : 1 travailleur ou un pourcentage du maximum configuré, arrondi au supérieur. Leur nombre remonte lorsque la charge baisse. Désactivé empêche tout ajustement.",
   "tooltip.adrenaline.config.serialization_threads": "Contrôle les travailleurs parallèles d'encodage lors de l'enregistrement des chunks.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Modifie le rayon de chunks généré autour du point d'apparition.",
   "tooltip.adrenaline.config.parallel_worldgen": "Exécute le travail de génération de chunks sur le pool de génération.",

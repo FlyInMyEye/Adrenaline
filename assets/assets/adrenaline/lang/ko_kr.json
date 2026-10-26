@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "높음",
   "tooltip.adrenaline.performance.extreme": "매우 높음",
   "tooltip.adrenaline.config.generation_threads": "병렬 청크 생성 작업자를 제어합니다.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "총 CPU 사용량이 90%를 초과하거나 서버 틱이 50ms를 초과하는 경우 생성 작업자를 줄입니다. 구성된 작업자의 절반 이상을 유지하고 부하가 떨어지면 점차적으로 복원합니다.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "CPU 사용량이 90%를 넘거나 서버 틱이 50ms를 넘을 때 유지할 최소 작업자 수입니다. 작업자 1명 또는 설정된 최대치의 비율을 선택하며 소수점은 올림합니다. 부하가 줄면 작업자 수가 복구됩니다. 끄기는 자동 조정을 비활성화합니다.",
   "tooltip.adrenaline.config.serialization_threads": "병렬 청크 저장 인코딩 작업자를 제어합니다.",
   "tooltip.adrenaline.config.spawn_zone_radius": "스폰 주변에서 생성되는 청크 반경을 변경합니다.",
   "tooltip.adrenaline.config.parallel_worldgen": "청크 생성 작업을 생성 풀에서 실행합니다.",

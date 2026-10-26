@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "高",
   "tooltip.adrenaline.performance.extreme": "非常に高い",
   "tooltip.adrenaline.config.generation_threads": "並列チャンク生成ワーカーを制御します。",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "合計 CPU 使用率が 90% を超えるか、サーバー ティックが 50 ミリ秒を超える場合、世代ワーカーを削減します。構成されたワーカーの少なくとも半分を保持し、負荷が低下したときにそれらを徐々に復元します。",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "CPU 使用率が 90% を超えるか、サーバーのティックが 50 ミリ秒を超える場合に維持するワーカーの最小数。1 ワーカー、または設定した最大数に対する割合（切り上げ）を選択します。負荷が下がるとワーカー数が戻ります。オフでは自動調整しません。",
   "tooltip.adrenaline.config.serialization_threads": "並列チャンク保存エンコードワーカーを制御します。",
   "tooltip.adrenaline.config.spawn_zone_radius": "スポーン周辺で生成されるチャンク半径を変更します。",
   "tooltip.adrenaline.config.parallel_worldgen": "チャンク生成処理を生成プールで実行します。",

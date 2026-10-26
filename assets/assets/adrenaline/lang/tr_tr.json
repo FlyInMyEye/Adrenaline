@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Yüksek",
   "tooltip.adrenaline.performance.extreme": "Çok Yüksek",
   "tooltip.adrenaline.config.generation_threads": "Paralel parça oluşturma işçilerini denetler.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Toplam CPU kullanımı %90'ı aştığında veya sunucu tıklamaları 50 ms'yi aştığında üretim çalışanlarını azaltır. Yapılandırılmış çalışanlarınızın en az yarısını tutar ve yük düştüğünde onları kademeli olarak geri yükler.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "CPU kullanımı %90’ı veya sunucu tikleri 50 ms’yi aştığında korunacak en az çalışan sayısı: 1 çalışan veya ayarlanan üst sınırın yukarı yuvarlanmış bir yüzdesi. Yük azaldığında çalışanlar geri eklenir. Kapalı, otomatik ayarlamayı devre dışı bırakır.",
   "tooltip.adrenaline.config.serialization_threads": "Paralel chunklar kaydetme kodlama işçilerini denetler.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Doğma çevresinde oluşturulan chunklar yarıçapını değiştirir.",
   "tooltip.adrenaline.config.parallel_worldgen": "chunklar oluşturma işini oluşturma havuzunda çalıştırır.",

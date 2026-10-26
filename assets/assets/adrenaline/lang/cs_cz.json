@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Vysoký",
   "tooltip.adrenaline.performance.extreme": "Extrémní",
   "tooltip.adrenaline.config.generation_threads": "Řídí paralelní pracovníky generování chunků.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Snižuje počet generujících pracovníků, když celkové využití procesoru překročí 90 % nebo tiky serveru překročí 50 ms. Udržuje alespoň polovinu vašich nakonfigurovaných pracovníků a obnovuje je postupně při poklesu zatížení.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "Minimální počet pracovníků při vytížení CPU nad 90 % nebo délce tiku serveru nad 50 ms: 1 pracovník nebo procento nastaveného maxima, zaokrouhlené nahoru. Při poklesu zátěže se jejich počet obnoví. Vypnuto zakáže přizpůsobování.",
   "tooltip.adrenaline.config.serialization_threads": "Řídí paralelní pracovníky kódování ukládání chunků.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Mění poloměr chunků generovaných kolem spawnu.",
   "tooltip.adrenaline.config.parallel_worldgen": "Spouští práci na generování chunků v generovacím poolu.",

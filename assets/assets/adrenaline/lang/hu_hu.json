@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "Magas",
   "tooltip.adrenaline.performance.extreme": "Extrém",
   "tooltip.adrenaline.config.generation_threads": "A párhuzamos chunkgeneráló munkaszálakat vezérli.",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "Csökkenti a generációs munkások számát, ha a teljes CPU-használat meghaladja a 90%-ot, vagy a szerver tickjei meghaladja az 50 ms-ot. Megtartja a konfigurált dolgozók legalább felét, és fokozatosan visszaállítja őket, amikor a terhelés csökken.",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "A dolgozók minimális száma 90% feletti CPU-terhelés vagy 50 ms feletti szervertick esetén: 1 dolgozó vagy a beállított maximum felfelé kerekített százaléka. A terhelés csökkenésekor a számuk ismét nő. A kikapcsolás letiltja az igazítást.",
   "tooltip.adrenaline.config.serialization_threads": "A párhuzamos chunkmentési kódoló munkaszálakat vezérli.",
   "tooltip.adrenaline.config.spawn_zone_radius": "Megváltoztatja a spawn körül generált chunkok sugarát.",
   "tooltip.adrenaline.config.parallel_worldgen": "A chunkgenerálási munkát a generálási poolban futtatja.",

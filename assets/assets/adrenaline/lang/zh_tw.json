@@ -149,7 +149,7 @@
   "tooltip.adrenaline.performance.high": "高",
   "tooltip.adrenaline.performance.extreme": "極高",
   "tooltip.adrenaline.config.generation_threads": "控制平行區塊生成工作執行緒。",
-  "tooltip.adrenaline.config.adaptive_generation_workers": "當 CPU 總使用率超過 90% 或伺服器時脈週期超過 50 毫秒時，減少產生工作執行緒。保留至少一半已配置的工作線程，並在負載下降時逐漸恢復它們。",
+  "tooltip.adrenaline.config.adaptive_generation_workers": "CPU 使用率超過 90% 或伺服器每刻耗時超過 50 毫秒時保留的最少工作執行緒：1 個執行緒，或設定上限的百分比，無條件進位。負載下降後會逐漸恢復執行緒數量。關閉則不自動調整。",
   "tooltip.adrenaline.config.serialization_threads": "控制平行區塊儲存編碼工作執行緒。",
   "tooltip.adrenaline.config.spawn_zone_radius": "變更在出生點周圍生成的區塊半徑。",
   "tooltip.adrenaline.config.parallel_worldgen": "將區塊生成工作在生成執行緒池上執行。",
