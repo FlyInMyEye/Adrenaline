@@ -7,17 +7,20 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.DynamicOps;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.ChunkSerializationSupport;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -96,6 +99,33 @@ public abstract class MixinChunkSerializer {
         return context != null ? context.encode(codec, ops, value) : ChunkSerializationSupport.encodeStart(codec, ops, value);
     }
 
+    private static final class SectionTask extends CompletableFuture<Void> implements Runnable {
+        private final AtomicBoolean claimed = new AtomicBoolean();
+        private final LevelChunkSection section;
+        private final Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec;
+        private final Tag[] output;
+
+        private SectionTask(LevelChunkSection section, Codec<PalettedContainerRO<Holder<Biome>>> biomeCodec, Tag[] output) {
+            this.section = section;
+            this.biomeCodec = biomeCodec;
+            this.output = output;
+        }
+
+        @Override
+        public void run() {
+            if (!this.claimed.compareAndSet(false, true)) {
+                return;
+            }
+            try {
+                this.output[0] = BLOCK_STATE_CODEC.encodeStart(NbtOps.INSTANCE, this.section.getStates()).resultOrPartial(error -> {}).orElse(null);
+                this.output[1] = this.biomeCodec.encodeStart(NbtOps.INSTANCE, this.section.getBiomes()).resultOrPartial(error -> {}).orElse(null);
+                this.complete(null);
+            } catch (Throwable failure) {
+                this.completeExceptionally(failure);
+            }
+        }
+    }
+
     private static final class SerializationContext {
         private final ChunkPos chunkPos;
         private final LevelChunkSection[] sections;
@@ -113,18 +143,26 @@ public abstract class MixinChunkSerializer {
 
             Tag[][] prepared = new Tag[this.sections.length][2];
             ForkJoinPool serializationPool = ChunkSerializationSupport.serializationPool();
-            ObjectArrayList<CompletableFuture<Void>> futures = new ObjectArrayList<>(this.sections.length);
+            SectionTask[] tasks = new SectionTask[this.sections.length];
             for (int i = 0; i < this.sections.length; i++) {
-                final int index = i;
-                LevelChunkSection section = this.sections[i];
-                futures.add(CompletableFuture.runAsync(() -> {
-                    prepared[index][0] = (Tag) BLOCK_STATE_CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, section.getStates()).resultOrPartial(error -> {}).orElse(null);
-                    prepared[index][1] = (Tag) biomeCodec.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, section.getBiomes()).resultOrPartial(error -> {}).orElse(null);
-                }, serializationPool));
+                tasks[i] = new SectionTask(this.sections[i], biomeCodec, prepared[i]);
+            }
+            boolean help = AdrenalineConfig.parallelWorldgenEnabled() && ChunkJobScheduler.get().hasSpareWorkers();
+            for (SectionTask task : tasks) {
+                try {
+                    serializationPool.execute(task);
+                } catch (RejectedExecutionException exception) {
+                    help = true;
+                }
+            }
+            if (help) {
+                for (SectionTask task : tasks) {
+                    task.run();
+                }
             }
 
             try {
-                CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+                CompletableFuture.allOf(tasks).join();
                 this.sectionTags = prepared;
             } catch (Exception exception) {
                 GlobalCommon.LOGGER.warn("[Adrenaline] Parallel pre-encode failed for chunk {}; falling back to synchronous serialization", this.chunkPos, exception);

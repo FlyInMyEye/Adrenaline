@@ -62,6 +62,10 @@ public final class ChunkJobScheduler {
         return this.pool.getParallelism();
     }
 
+    public synchronized boolean hasSpareWorkers() {
+        return this.runningCount < this.maxActive;
+    }
+
     public synchronized void setWorkerLimit(int workers) {
         this.refreshPoolIfNeeded();
         int previous = this.maxActive;
