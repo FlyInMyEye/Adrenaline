@@ -101,7 +101,7 @@ public final class PerlinSection {
             this.zCount,
             grid
         );
-        if (!sampled || !same(PerlinBatching.sampleVanilla(() -> this.noise.getValue(x, y, z)), grid[this.valueIndex(xIndex, yIndex, zIndex)])) {
+        if (!sampled || !same(PerlinBatching.sampleVanilla(this.noise, x, y, z), grid[this.valueIndex(xIndex, yIndex, zIndex)])) {
             this.rejected = true;
             return null;
         }

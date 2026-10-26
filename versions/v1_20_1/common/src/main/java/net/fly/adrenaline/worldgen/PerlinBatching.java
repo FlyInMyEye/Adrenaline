@@ -1,7 +1,6 @@
 package net.fly.adrenaline.worldgen;
 
 import java.util.IdentityHashMap;
-import java.util.function.DoubleSupplier;
 import net.fly.adrenaline.natives.PerlinNativeSampler;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
@@ -10,7 +9,6 @@ import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 public final class PerlinBatching {
     private static final ThreadLocal<BatchContext> CONTEXT = new ThreadLocal<>();
     private static final ThreadLocal<SectionScope> SECTION_SCOPE = ThreadLocal.withInitial(SectionScope::new);
-    private static final ThreadLocal<Integer> VANILLA_SAMPLE_DEPTH = ThreadLocal.withInitial(() -> 0);
 
     private PerlinBatching() {
     }
@@ -86,16 +84,17 @@ public final class PerlinBatching {
     }
 
     public static boolean isVanillaSampleSuppressed() {
-        return VANILLA_SAMPLE_DEPTH.get() != 0;
+        return SECTION_SCOPE.get().vanillaSampleDepth != 0;
     }
 
-    public static double sampleVanilla(DoubleSupplier sampler) {
-        int depth = VANILLA_SAMPLE_DEPTH.get();
-        VANILLA_SAMPLE_DEPTH.set(depth + 1);
+    public static double sampleVanilla(NormalNoise noise, double x, double y, double z) {
+        SectionScope scope = SECTION_SCOPE.get();
+        int depth = scope.vanillaSampleDepth;
+        scope.vanillaSampleDepth = depth + 1;
         try {
-            return sampler.getAsDouble();
+            return noise.getValue(x, y, z);
         } finally {
-            VANILLA_SAMPLE_DEPTH.set(depth);
+            scope.vanillaSampleDepth = depth;
         }
     }
 
@@ -105,6 +104,7 @@ public final class PerlinBatching {
         private int zIndex;
         private DensityFunction.ContextProvider provider;
         private boolean active;
+        private int vanillaSampleDepth;
     }
 
     private static final class BatchContext {
