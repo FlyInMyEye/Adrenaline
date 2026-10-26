@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.worldgen.AdrenalineNormalNoiseNativeAccess;
@@ -33,12 +34,12 @@ public abstract class MixinNormalNoise implements AdrenalineNormalNoiseNativeAcc
         }
     }
 
-    @Inject(method = "getValue", at = @At("RETURN"))
-    private void adrenaline$recordNativeBatch(double x, double y, double z, CallbackInfoReturnable<Double> cir) {
-        if (PerlinBatching.isVanillaSampleSuppressed()) {
-            return;
+    @ModifyReturnValue(method = "getValue", at = @At("RETURN"))
+    private double adrenaline$recordNativeBatch(double value, double x, double y, double z) {
+        if (!PerlinBatching.isVanillaSampleSuppressed()) {
+            PerlinBatching.record((NormalNoise) (Object) this, x, y, z, value);
         }
-        PerlinBatching.record((NormalNoise) (Object) this, x, y, z, cir.getReturnValue());
+        return value;
     }
 
     @Override
