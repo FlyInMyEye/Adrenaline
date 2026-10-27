@@ -3,22 +3,16 @@ package net.fly.adrenaline.mixin;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.worldgen.AdrenalineBlenderCacheAccess;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Blender.class)
 public class MixinBlender {
-
-    @Unique
-    private static final ThreadLocal<WorldGenRegion> ADRENALINE_LAST_REGION = new ThreadLocal<>();
-
-    @Unique
-    private static final ThreadLocal<Blender> ADRENALINE_LAST_BLENDER = new ThreadLocal<>();
 
     @Inject(method = "of", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.BLENDING)
@@ -27,8 +21,8 @@ public class MixinBlender {
             return;
         }
 
-        if (region != null && region == ADRENALINE_LAST_REGION.get()) {
-            Blender blender = ADRENALINE_LAST_BLENDER.get();
+        if (region != null) {
+            Blender blender = ((AdrenalineBlenderCacheAccess) region).adrenaline$getCachedBlender();
             if (blender != null) {
                 cir.setReturnValue(blender);
             }
@@ -37,13 +31,15 @@ public class MixinBlender {
 
     @Inject(method = "of", at = @At("RETURN"))
     private static void adrenaline$cacheBlender(WorldGenRegion region, CallbackInfoReturnable<Blender> cir) {
+        if (region == null) {
+            return;
+        }
+        AdrenalineBlenderCacheAccess cache = (AdrenalineBlenderCacheAccess) region;
         if (!AdrenalineConfig.blendingOptimizationsEnabled()) {
-            ADRENALINE_LAST_REGION.remove();
-            ADRENALINE_LAST_BLENDER.remove();
+            cache.adrenaline$cacheBlender(null);
             return;
         }
 
-        ADRENALINE_LAST_REGION.set(region);
-        ADRENALINE_LAST_BLENDER.set(cir.getReturnValue());
+        cache.adrenaline$cacheBlender(cir.getReturnValue());
     }
 }
