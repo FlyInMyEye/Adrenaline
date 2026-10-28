@@ -37,7 +37,6 @@ public final class ChunkJob implements Runnable {
     private WaitingReason waitingReason;
     private long waitingStartedNanos;
     private boolean capacityHeld;
-    private boolean yielded;
     private ServerLevel priorityLevel;
     private ChunkPos priorityPos;
     private long[] cachedPriorityFoci;
@@ -226,22 +225,6 @@ public final class ChunkJob implements Runnable {
         return true;
     }
 
-    boolean markYielded() {
-        if (this.yielded) {
-            return false;
-        }
-        this.yielded = true;
-        return true;
-    }
-
-    boolean clearYielded() {
-        if (!this.yielded) {
-            return false;
-        }
-        this.yielded = false;
-        return true;
-    }
-
     void cancel() {
         this.finishWaiting();
         if (!this.started && this.cancellationHandled.compareAndSet(false, true)) {
@@ -267,7 +250,6 @@ public final class ChunkJob implements Runnable {
             }
             CompletableFuture<?> completion = this.execute(this.work);
             DeferredNotificationBuffer.flush();
-            ChunkJobScheduler.get().releaseWorker(this);
             if (completion == null) {
                 completion = CompletableFuture.completedFuture(null);
             }

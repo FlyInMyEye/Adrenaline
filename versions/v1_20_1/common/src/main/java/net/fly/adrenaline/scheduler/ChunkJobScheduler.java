@@ -36,7 +36,6 @@ public final class ChunkJobScheduler {
     private boolean cancelling;
 
     private int runningCount;
-    private int yieldedCount;
     private final HashSet<Long> activeFootprint = new HashSet<>();
     private final HashSet<ChunkJob> activeJobs = new HashSet<>();
 
@@ -96,7 +95,7 @@ public final class ChunkJobScheduler {
         int processors = Runtime.getRuntime().availableProcessors();
         int[] snapshot = new int[processors];
         AtomicIntegerArray states = this.workerStates;
-        boolean waitingWork = this.pendingDependencies.get() > 0 || this.yieldedCount > 0 || !this.conflictPending.isEmpty() || !this.capacityQueue.isEmpty();
+        boolean waitingWork = this.pendingDependencies.get() > 0 || this.runningCount > 0 || !this.conflictPending.isEmpty() || !this.capacityQueue.isEmpty();
         int configuredWorkers = Math.min(this.pool.getParallelism(), processors);
         for (int i = 0; i < configuredWorkers; i++) {
             int state = i < states.length() ? states.get(i) : WORKER_IDLE;
@@ -177,17 +176,6 @@ public final class ChunkJobScheduler {
         return true;
     }
 
-    synchronized void releaseWorker(ChunkJob job) {
-        if (job.schedulerEpoch() != this.epoch || !job.releaseCapacity()) {
-            return;
-        }
-        this.runningCount--;
-        if (job.markYielded()) {
-            this.yieldedCount++;
-        }
-        this.drainCapacityQueue();
-    }
-
     synchronized void onComplete(ChunkJob job) {
         this.activeJobs.remove(job);
         notifyAll();
@@ -197,9 +185,6 @@ public final class ChunkJobScheduler {
         this.refreshPoolIfNeeded();
         if (job.releaseCapacity()) {
             this.runningCount--;
-        }
-        if (job.clearYielded()) {
-            this.yieldedCount--;
         }
         Set<Long> footprint = job.footprint();
         this.activeFootprint.removeAll(footprint);
@@ -279,7 +264,6 @@ public final class ChunkJobScheduler {
             this.epoch++;
             this.cancelling = true;
             this.runningCount = 0;
-            this.yieldedCount = 0;
             this.activeFootprint.clear();
             this.conflictPending.clear();
             this.waitIndex.clear();
