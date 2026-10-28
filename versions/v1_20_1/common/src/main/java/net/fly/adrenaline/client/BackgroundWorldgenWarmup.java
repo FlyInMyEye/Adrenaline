@@ -96,13 +96,13 @@ public final class BackgroundWorldgenWarmup {
 
     public static void beforeContextLoad(Minecraft minecraft) {
         stop(minecraft);
-        if (loading != null) {
+        if (loading != null || WorldCreationContextWaiter.isPreloading()) {
             Screen previous = minecraft.screen;
             Screen waiting = new GenericDirtMessageScreen(Component.translatable("selectWorld.preparing"));
             minecraft.setScreen(waiting);
             try {
                 minecraft.managedBlock(() -> {
-                    if (loading == null) {
+                    if (loading == null && !WorldCreationContextWaiter.isPreloading()) {
                         return true;
                     }
                     ((MixinMinecraftFrameInvoker) minecraft).adrenaline$runTick(false);

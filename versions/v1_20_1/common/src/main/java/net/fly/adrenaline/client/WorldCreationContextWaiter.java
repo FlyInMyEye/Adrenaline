@@ -88,7 +88,9 @@ public final class WorldCreationContextWaiter {
     }
 
     public static void consume() {
-        future = null;
+        if (!isPreloading()) {
+            future = null;
+        }
     }
 
     public static void beginWorldLoad() {

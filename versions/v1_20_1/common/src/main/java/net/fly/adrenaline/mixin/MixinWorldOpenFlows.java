@@ -25,6 +25,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(WorldOpenFlows.class)
 public class MixinWorldOpenFlows {
 
+    @Inject(
+        method = {
+            "recreateWorldData",
+            "loadWorldStem(Lnet/minecraft/world/level/storage/LevelStorageSource$LevelStorageAccess;Z)Lnet/minecraft/server/WorldStem;"
+        },
+        at = @At("HEAD")
+    )
+    private void adrenaline$awaitContextBeforePackDiscovery(CallbackInfoReturnable<?> cir) {
+        BackgroundWorldgenWarmup.beforeContextLoad(Minecraft.getInstance());
+    }
+
     @Inject(method = "loadWorldDataBlocking", at = @At("HEAD"))
     private <D, R> void adrenaline$awaitWarmupBeforeReload(WorldLoader.PackConfig packs, WorldLoader.WorldDataSupplier<D> supplier, WorldLoader.ResultFactory<D, R> factory, CallbackInfoReturnable<R> cir) {
         BackgroundWorldgenWarmup.beforeContextLoad(Minecraft.getInstance());
