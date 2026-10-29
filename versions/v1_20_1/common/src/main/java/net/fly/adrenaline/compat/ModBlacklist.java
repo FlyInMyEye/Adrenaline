@@ -9,7 +9,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.config.AdrenalineConfig.Data;
 
 public final class ModBlacklist {
-    private static final List<String> MOD_IDS = List.of("zfastnoise", "c2me", "terraingraph", "byepregen");
+    private static final List<String> MOD_IDS = List.of("zfastnoise", "c2me", "terraingraph", "byepregen", "lightload");
     private static List<ModInfo> detected = List.of();
     private static List<String> detectedIds = List.of();
 

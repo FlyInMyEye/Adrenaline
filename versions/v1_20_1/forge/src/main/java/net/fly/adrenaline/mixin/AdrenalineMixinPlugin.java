@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Set;
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.compat.LightLoadCompat;
 import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
 import net.fly.adrenaline.compatdata.IncompatibilityRegistry;
@@ -29,6 +30,9 @@ public class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
+        if (IncompatibilityRegistry.isLoaded("lightload")) {
+            LightLoadCompat.disable();
+        }
         if (LoadingModList.get() == null) {
             disabledMixins = Set.of();
             return;

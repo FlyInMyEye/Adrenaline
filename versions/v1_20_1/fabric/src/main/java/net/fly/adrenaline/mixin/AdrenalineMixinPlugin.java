@@ -6,6 +6,7 @@ import java.util.Set;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.compat.LightLoadCompat;
 import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
 import net.fly.adrenaline.compatdata.IncompatibilityRegistry;
@@ -28,6 +29,9 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
+        if (IncompatibilityRegistry.isLoaded("lightload")) {
+            LightLoadCompat.disable();
+        }
         Set<String> mixins = new HashSet<>();
         for (IncompatibleData incompatibility : IncompatibilityRegistry.all()) {
             if (IncompatibilityRegistry.isLoaded(incompatibility.modId())) {
