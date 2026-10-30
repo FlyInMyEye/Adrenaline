@@ -2,6 +2,7 @@ package net.fly.adrenaline;
 
 import java.nio.file.Path;
 import net.fly.adrenaline.compat.ModBlacklist;
+import net.fly.adrenaline.compatdata.ModernFixCompat;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
 
@@ -16,6 +17,7 @@ public final class AdrenalineCommon {
         AdrenalineNatives.initialize();
         AdrenalineConfig.init(configDirectory);
         ModBlacklist.initialize();
+        ModernFixCompat.registerOverrideOwners();
         GlobalCommon.workerPool();
         GlobalCommon.LOGGER.info("{} initialized for {}", MOD_ID, TARGET_VERSION);
     }

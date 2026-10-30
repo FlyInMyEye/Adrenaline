@@ -7,6 +7,7 @@ import net.fly.adrenaline.compat.LightLoadCompat;
 import net.fly.adrenaline.compat.MixinPlatform;
 import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
+import net.fly.adrenaline.compatdata.ModernFixCompat;
 import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -24,6 +25,9 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
+        if (MixinPlatform.isModLoaded("modernfix")) {
+            ModernFixCompat.configureEarly();
+        }
         if (MixinPlatform.isModLoaded("lightload")) {
             LightLoadCompat.disable();
         }

@@ -15,14 +15,18 @@ import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
 import net.fly.adrenaline.util.WarmupWorldDiscard;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.server.level.progress.ChunkProgressListener;
+import net.minecraft.util.Unit;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.ServerLevelData;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,7 +37,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.function.BooleanSupplier;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
-public class MixinMinecraftServer implements InitialWorldCreationAccess {
+public abstract class MixinMinecraftServer implements InitialWorldCreationAccess {
+
+    @Shadow private long nextTickTime;
+
+    @Shadow protected abstract void waitUntilNextTick();
 
     @Unique
     private int adrenaline$lastSpawnSaveCount;
@@ -192,6 +200,25 @@ public class MixinMinecraftServer implements InitialWorldCreationAccess {
     @Inject(method = "prepareLevels", at = @At("HEAD"))
     private void adrenaline$beginIncrementalSpawnSaving(ChunkProgressListener progressListener, CallbackInfo ci) {
         this.adrenaline$lastSpawnSaveCount = 0;
+    }
+
+    @Inject(method = "prepareLevels", at = @At("RETURN"))
+    private void adrenaline$finishWarmupPreparation(ChunkProgressListener progressListener, CallbackInfo ci) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        if (!BackgroundWorldgenWarmupState.isServer(server) || !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
+            return;
+        }
+        ServerLevel level = server.overworld();
+        ServerChunkCache chunkSource = level.getChunkSource();
+        ChunkPos center = new ChunkPos(level.getSharedSpawnPos());
+        int radius = BackgroundWorldgenWarmupState.spawnZoneRadius() + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
+        int diameter = radius * 2 - 1;
+        chunkSource.addRegionTicket(TicketType.START, center, radius, Unit.INSTANCE);
+        while (server.isRunning() && BackgroundWorldgenWarmupState.isServer(server)
+            && chunkSource.getTickingGenerated() < diameter * diameter) {
+            this.nextTickTime = Util.getMillis() + 10L;
+            this.waitUntilNextTick();
+        }
     }
 
     @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V", ordinal = 0))
