@@ -1,23 +1,20 @@
 package net.fly.adrenaline.mixin;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.LightLoadCompat;
+import net.fly.adrenaline.compat.MixinPlatform;
 import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
-import net.fly.adrenaline.compatdata.IncompatibilityRegistry;
-import net.fly.adrenaline.compatdata.IncompatibleData;
+import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
     private static final Set<String> DEBUG_MIXINS = Set.of(
-        "net.fly.adrenaline.mixin.MixinDebugScreenOverlay",
+        MixinPlatform.DEBUG_MIXIN,
         "net.fly.adrenaline.mixin.MixinLoggerChunkProgressListener",
         "net.fly.adrenaline.mixin.MixinMinecraftServerWorldgenDebug",
         "net.fly.adrenaline.mixin.MixinPlayerList",
@@ -25,20 +22,11 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
         "net.fly.adrenaline.mixin.MixinWorldgenDifferenceInput"
     );
 
-    private Set<String> disabledMixins = Set.of();
-
     @Override
     public void onLoad(String mixinPackage) {
-        if (IncompatibilityRegistry.isLoaded("lightload")) {
+        if (MixinPlatform.isModLoaded("lightload")) {
             LightLoadCompat.disable();
         }
-        Set<String> mixins = new HashSet<>();
-        for (IncompatibleData incompatibility : IncompatibilityRegistry.all()) {
-            if (IncompatibilityRegistry.isLoaded(incompatibility.modId())) {
-                mixins.addAll(List.of(incompatibility.incompatibleMixins()));
-            }
-        }
-        this.disabledMixins = Set.copyOf(mixins);
     }
 
     @Override
@@ -48,10 +36,10 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinTectonicInvert") && !FabricLoader.getInstance().isModLoaded("tectonic")) {
+        if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinTectonicInvert") && !MixinPlatform.isModLoaded("tectonic")) {
             return false;
         }
-        return (BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName)) && !this.disabledMixins.contains(mixinClassName);
+        return BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName);
     }
 
     @Override
@@ -70,18 +58,8 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-        net.fly.adrenaline.worldgen.SurfaceRuleHooks.capture(targetClass);
+        SurfaceRuleHooks.capture(targetClass);
         OptimizationTakeoverDetector.captureClaims(targetClass, mixinInfo);
-        OptimizationTakeoverDetector.detectTakeovers(targetClass, AdrenalineMixinPlugin::displayName);
-    }
-
-    private static String displayName(String mixinClassName) {
-        String resource = mixinClassName.replace('.', '/') + ".class";
-        for (ModContainer container : FabricLoader.getInstance().getAllMods()) {
-            if (container.findPath(resource).isPresent()) {
-                return container.getMetadata().getName();
-            }
-        }
-        return mixinClassName;
+        OptimizationTakeoverDetector.detectTakeovers(targetClass, MixinPlatform::mixinOwnerName);
     }
 }
