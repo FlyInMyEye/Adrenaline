@@ -62,9 +62,7 @@ public final class OptimizationTakeoverDetector {
                 }
                 Set<OptimizationTakeoverRegistry.Optimization> controls = controlledMethods.get(call.name + call.desc);
                 if (controls != null && localMethods.contains(call.name + call.desc)) {
-                    LOCAL_CLAIMS.computeIfAbsent(targetClass.name, key -> new HashMap<>())
-                        .computeIfAbsent(new MethodKey(method.name, method.desc), key -> new HashMap<>())
-                        .computeIfAbsent(new MethodKey(call.name, call.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class)).addAll(controls);
+                    captureLocalClaim(targetClass.name, method, new MethodKey(call.name, call.desc), controls);
                 } else if (controls != null) {
                     targetClaims.computeIfAbsent(new MethodKey(method.name, method.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class)).addAll(controls);
                 }
@@ -75,9 +73,20 @@ public final class OptimizationTakeoverDetector {
     private static void captureDeclaredClaims(ClassNode targetClass, IMixinInfo mixinInfo) {
         for (MethodNode handler : mixinInfo.getClassNode(0).methods) {
             Set<OptimizationTakeoverRegistry.Optimization> controls = controlledBy(handler.visibleAnnotations, handler.invisibleAnnotations);
-            if (controls.isEmpty() || Boolean.TRUE.equals(annotationObject(handler.invisibleAnnotations, CONTROL_DESCRIPTOR, "local"))
-                || Boolean.TRUE.equals(annotationObject(handler.visibleAnnotations, CONTROL_DESCRIPTOR, "local")) || handler.visibleAnnotations == null) {
+            if (controls.isEmpty() || handler.visibleAnnotations == null) {
                 continue;
+            }
+            boolean local = Boolean.TRUE.equals(annotationObject(handler.invisibleAnnotations, CONTROL_DESCRIPTOR, "local"))
+                || Boolean.TRUE.equals(annotationObject(handler.visibleAnnotations, CONTROL_DESCRIPTOR, "local"));
+            MethodKey handlerKey = new MethodKey(handler.name, handler.desc);
+            if (local) {
+                for (MethodNode method : targetClass.methods) {
+                    if (mixinInfo.getClassName().equals(mergedBy(method)) && method.desc.equals(handler.desc)
+                        && (method.name.equals(handler.name) || method.name.endsWith("$" + handler.name))) {
+                        handlerKey = new MethodKey(method.name, method.desc);
+                        break;
+                    }
+                }
             }
             for (AnnotationNode annotation : handler.visibleAnnotations) {
                 Object value = annotationObject(List.of(annotation), annotation.desc, "method");
@@ -97,9 +106,13 @@ public final class OptimizationTakeoverDetector {
                     String descriptor = descriptorStart < 0 ? null : member.substring(descriptorStart);
                     for (MethodNode method : targetClass.methods) {
                         if (method.name.equals(methodName) && (descriptor == null || method.desc.equals(descriptor))) {
-                            CLAIMS.computeIfAbsent(targetClass.name, key -> new HashMap<>())
-                                .computeIfAbsent(new MethodKey(method.name, method.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class))
-                                .addAll(controls);
+                            if (local) {
+                                captureLocalClaim(targetClass.name, method, handlerKey, controls);
+                            } else {
+                                CLAIMS.computeIfAbsent(targetClass.name, key -> new HashMap<>())
+                                    .computeIfAbsent(new MethodKey(method.name, method.desc), key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class))
+                                    .addAll(controls);
+                            }
                         }
                     }
                 }
@@ -107,14 +120,21 @@ public final class OptimizationTakeoverDetector {
         }
     }
 
+    private static void captureLocalClaim(String owner, MethodNode caller, MethodKey handler,
+                                         Set<OptimizationTakeoverRegistry.Optimization> controls) {
+        LOCAL_CLAIMS.computeIfAbsent(owner, key -> new HashMap<>())
+            .computeIfAbsent(new MethodKey(caller.name, caller.desc), key -> new HashMap<>())
+            .computeIfAbsent(handler, key -> EnumSet.noneOf(OptimizationTakeoverRegistry.Optimization.class)).addAll(controls);
+    }
+
     public static synchronized void detectTakeovers(
             ClassNode targetClass,
             Function<String, String> displayNameResolver
     ) {
         Map<MethodKey, Set<OptimizationTakeoverRegistry.Optimization>> targetClaims =
-                CLAIMS.get(targetClass.name);
-
-        if (targetClaims == null) {
+                CLAIMS.getOrDefault(targetClass.name, Map.of());
+        Map<MethodKey, Map<MethodKey, Set<OptimizationTakeoverRegistry.Optimization>>> localClaims = LOCAL_CLAIMS.get(targetClass.name);
+        if (targetClaims.isEmpty() && localClaims == null) {
             return;
         }
 
@@ -123,7 +143,6 @@ public final class OptimizationTakeoverDetector {
             methods.put(method.name + method.desc, method);
         }
 
-        Map<MethodKey, Map<MethodKey, Set<OptimizationTakeoverRegistry.Optimization>>> localClaims = LOCAL_CLAIMS.get(targetClass.name);
         if (localClaims != null) {
             for (var callerEntry : localClaims.entrySet()) {
                 MethodKey callerKey = callerEntry.getKey();
@@ -194,19 +213,14 @@ public final class OptimizationTakeoverDetector {
 
     private static boolean isDestructiveHandler(String name) {
         String normalizedName = name.toLowerCase(java.util.Locale.ROOT);
-
-        return !normalizedName.startsWith("handler$")
-                && (
-                normalizedName.startsWith("constant$")
-                        || normalizedName.startsWith("localvar$")
-                        || normalizedName.startsWith("args$")
-                        || normalizedName.contains("redirect$")
-                        || normalizedName.contains("wrap")
-                        || normalizedName.contains("modify")
-                        || normalizedName.contains("$redirect")
-                        || normalizedName.contains("$wrap")
-                        || normalizedName.contains("$modify")
-        );
+        if (normalizedName.startsWith("mixinextras$bridge$")) {
+            normalizedName = normalizedName.substring("mixinextras$bridge$".length());
+        }
+        return normalizedName.startsWith("constant$") || normalizedName.startsWith("localvar$")
+            || normalizedName.startsWith("args$") || normalizedName.startsWith("redirect$")
+            || normalizedName.startsWith("wrapoperation$") || normalizedName.startsWith("wrapmethod$")
+            || normalizedName.startsWith("wrapwithcondition$")
+            || normalizedName.startsWith("modify") && normalizedName.indexOf('$') >= 0;
     }
 
     private static String externalDependency(String owner, MethodNode method, Map<String, MethodNode> methods, Set<String> visited, boolean followVanilla) {
@@ -223,9 +237,16 @@ public final class OptimizationTakeoverDetector {
                     if (argument instanceof Handle handle && owner.equals(handle.getOwner())) {
                         MethodNode dependency = methods.get(handle.getName() + handle.getDesc());
                         if (dependency != null) {
-                            controller = externalDependency(owner, dependency, methods, visited, true);
-                            if (controller != null) {
-                                return controller;
+                            String external = externalOwner(dependency);
+                            if (external != null) {
+                                if (followVanilla || isDestructiveHandler(dependency.name) || cancelsCallback(dependency)) {
+                                    return external;
+                                }
+                            } else {
+                                controller = externalDependency(owner, dependency, methods, visited, followVanilla);
+                                if (controller != null) {
+                                    return controller;
+                                }
                             }
                         }
                     }
@@ -240,7 +261,7 @@ public final class OptimizationTakeoverDetector {
             }
             String external = externalOwner(dependency);
             if (external != null) {
-                if (isDestructiveHandler(dependency.name) || cancelsCallback(dependency)) {
+                if (followVanilla || isDestructiveHandler(dependency.name) || cancelsCallback(dependency)) {
                     return external;
                 }
             } else if (followVanilla || mergedBy(dependency) != null || dependency.name.startsWith("mixinextras$")) {

@@ -76,13 +76,13 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique private DensityMapCache adrenaline$densityMapCache;
 
     @ModifyArg(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/NoiseRouter;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/NoiseRouter;"))
-    @ControlsOptimization(Optimization.DENSITY_MAPPING)
+    @ControlsOptimization(value = Optimization.DENSITY_MAPPING, local = true)
     private DensityFunction.Visitor adrenaline$cacheRouterMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }
 
     @ModifyArg(method = {"<init>", "cachedClimateSampler"}, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/levelgen/DensityFunction;mapAll(Lnet/minecraft/world/level/levelgen/DensityFunction$Visitor;)Lnet/minecraft/world/level/levelgen/DensityFunction;"))
-    @ControlsOptimization(Optimization.DENSITY_MAPPING)
+    @ControlsOptimization(value = Optimization.DENSITY_MAPPING, local = true)
     private DensityFunction.Visitor adrenaline$cacheDensityMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
     }
@@ -99,7 +99,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Inject(method = "cachedClimateSampler", at = @At("RETURN"), cancellable = true)
-    @ControlsOptimization(Optimization.BIOME_CLIMATE)
+    @ControlsOptimization(value = Optimization.BIOME_CLIMATE, local = true)
     private void adrenaline$cacheClimateColumns(NoiseRouter router, List<Climate.ParameterPoint> spawnTarget, CallbackInfoReturnable<Climate.Sampler> cir) {
         this.adrenaline$densityMapCache = null;
         if (!AdrenalineConfig.biomeClimateOptimizationsEnabled()) {

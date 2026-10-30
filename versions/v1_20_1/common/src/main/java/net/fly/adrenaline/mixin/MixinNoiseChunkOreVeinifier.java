@@ -68,7 +68,7 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
             target = "Lnet/minecraft/world/level/levelgen/OreVeinifier;create(Lnet/minecraft/world/level/levelgen/DensityFunction;Lnet/minecraft/world/level/levelgen/DensityFunction;Lnet/minecraft/world/level/levelgen/DensityFunction;Lnet/minecraft/world/level/levelgen/PositionalRandomFactory;)Lnet/minecraft/world/level/levelgen/NoiseChunk$BlockStateFiller;"
         )
     )
-    @ControlsOptimization(Optimization.ORE_VEIN)
+    @ControlsOptimization(value = Optimization.ORE_VEIN, local = true)
     private NoiseChunk.BlockStateFiller adrenaline$fastOreVeinifier(DensityFunction veinToggle, DensityFunction veinRidged, DensityFunction veinGap, PositionalRandomFactory randomFactory) {
         NoiseChunk.BlockStateFiller filler;
         if (!AdrenalineConfig.oreVeinOptimizationsEnabled()) {
@@ -121,7 +121,7 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
     }
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    @ControlsOptimization(Optimization.MATERIAL_RULE)
+    @ControlsOptimization(value = Optimization.MATERIAL_RULE, local = true)
     private void adrenaline$captureMaterialPath(CallbackInfo ci) {
         if (!AdrenalineConfig.materialRuleOptimizationsEnabled() || this.cellCaches.isEmpty()
             || !(this.blockStateRule instanceof AdrenalineMaterialRuleListAccess rules)) {
