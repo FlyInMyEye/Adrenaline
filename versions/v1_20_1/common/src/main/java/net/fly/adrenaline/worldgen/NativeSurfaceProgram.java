@@ -2,6 +2,7 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -82,6 +83,27 @@ public final class NativeSurfaceProgram {
     private static final Class<?> RUNTIME_TEST = runtimeTest();
     private static final Class<?> RUNTIME_CONDITION = RUNTIME_TEST.getRecordComponents()[0].getType();
     private static final Class<?> RUNTIME_NOT = runtimeNot();
+    private static final ClassValue<Field[]> NAMESPACED_FIELDS = new ClassValue<>() {
+        @Override
+        protected Field[] computeValue(Class<?> type) {
+            Field base = null;
+            Field rules = null;
+            for (Field field : type.getDeclaredFields()) {
+                if (Modifier.isStatic(field.getModifiers()) || !Modifier.isFinal(field.getModifiers())) continue;
+                if (field.getType() == RUNTIME_RULE) {
+                    if (base != null) return new Field[0];
+                    base = field;
+                } else if (field.getType() == Map.class) {
+                    if (rules != null) return new Field[0];
+                    rules = field;
+                }
+            }
+            if (base == null || rules == null) return new Field[0];
+            base.setAccessible(true);
+            rules.setAccessible(true);
+            return new Field[]{base, rules};
+        }
+    };
     private final ByteBuffer bytecode;
     private final long address;
     private final boolean contextReusable;
@@ -217,7 +239,7 @@ public final class NativeSurfaceProgram {
     private static Object captured(Object object, Class<?> type) throws IllegalAccessException {
         for (Class<?> current = object.getClass(); current != null; current = current.getSuperclass()) {
             for (Field field : current.getDeclaredFields()) {
-                if (!java.lang.reflect.Modifier.isStatic(field.getModifiers()) && type.isAssignableFrom(field.getType())) {
+                if (!Modifier.isStatic(field.getModifiers()) && type.isAssignableFrom(field.getType())) {
                     field.setAccessible(true);
                     return field.get(object);
                 }
@@ -427,12 +449,15 @@ public final class NativeSurfaceProgram {
                 result = this.condition(component(source, 0), component(runtime, 0), biome, unresolved, child, fail, depth + 1);
             } else if (type.getName().equals("terrablender.worldgen.surface.NamespacedSurfaceRuleSource")
                 && runtime.getClass().getName().equals("terrablender.worldgen.surface.NamespacedSurfaceRuleSource$NamespacedRule") && !this.holderHooks) {
-                if (unresolved) {
+                Field[] fields = NAMESPACED_FIELDS.get(runtime.getClass());
+                if (fields.length == 0) {
+                    result = this.result(FALLBACK);
+                } else if (unresolved) {
                     result = this.result(BIOME);
                 } else {
-                    int base = this.rule(component(source, 0), component(runtime, 1), biome, false, fail, depth + 1);
+                    int base = this.rule(component(source, 0), fields[0].get(runtime), biome, false, fail, depth + 1);
                     Map<?, ?> sources = (Map<?, ?>) component(source, 1);
-                    Map<?, ?> applied = (Map<?, ?>) component(runtime, 2);
+                    Map<?, ?> applied = (Map<?, ?>) fields[1].get(runtime);
                     String namespace = biome == null ? null : biome.location().getNamespace();
                     Object selected = namespace == null ? null : sources.get(namespace);
                     result = this.biomeUse(selected == null ? base
