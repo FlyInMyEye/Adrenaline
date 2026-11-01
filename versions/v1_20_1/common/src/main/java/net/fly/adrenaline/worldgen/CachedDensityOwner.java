@@ -12,8 +12,7 @@ final class CachedDensityOwner {
             for (Field field : type.getDeclaredFields()) {
                 if (field.getType() == NoiseChunk.class && !Modifier.isStatic(field.getModifiers())) {
                     try {
-                        field.setAccessible(true);
-                        return MethodHandles.lookup().unreflectVarHandle(field);
+                        return MethodHandles.privateLookupIn(type, MethodHandles.lookup()).unreflectVarHandle(field);
                     } catch (IllegalAccessException exception) {
                         throw new IllegalArgumentException(exception);
                     }
