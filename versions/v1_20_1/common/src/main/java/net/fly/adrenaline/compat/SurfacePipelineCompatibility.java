@@ -7,6 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.Heightmap;
+import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.transformer.meta.MixinMerged;
 
@@ -24,7 +25,8 @@ public final class SurfacePipelineCompatibility {
             for (Class<?> current = type; current != null; current = current.getSuperclass()) {
                 for (Method method : current.getDeclaredMethods()) {
                     MixinMerged merged = method.getAnnotation(MixinMerged.class);
-                    if (merged != null && !merged.mixin().startsWith("net.fly.adrenaline.mixin.")) {
+                    if (merged != null && !merged.mixin().startsWith("net.fly.adrenaline.mixin.")
+                        && !(method.isAnnotationPresent(Accessor.class) && method.getParameterCount() == 0 && method.getReturnType() != void.class)) {
                         foreign = true;
                         priority = Math.max(priority, merged.priority());
                         Class<?> result = method.getReturnType();
