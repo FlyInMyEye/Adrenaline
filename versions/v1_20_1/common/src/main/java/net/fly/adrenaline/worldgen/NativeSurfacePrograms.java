@@ -41,7 +41,8 @@ public final class NativeSurfacePrograms {
 
     private record Entry(SurfaceRules.RuleSource source, Registry<Biome> registry, int minY, int height, boolean nativeNoise, NativeSurfaceProgram program) {
         private boolean matches(SurfaceRules.RuleSource source, Registry<Biome> registry, WorldGenerationContext generation) {
-            return this.source == source && this.registry == registry && this.minY == generation.getMinGenY() && this.height == generation.getGenDepth() && this.nativeNoise == AdrenalineConfig.nativeSurfaceNoiseEnabled();
+            return this.registry == registry && this.minY == generation.getMinGenY() && this.height == generation.getGenDepth()
+                && this.nativeNoise == AdrenalineConfig.nativeSurfaceNoiseEnabled() && SurfaceRuleSources.equivalent(this.source, source);
         }
     }
 }
