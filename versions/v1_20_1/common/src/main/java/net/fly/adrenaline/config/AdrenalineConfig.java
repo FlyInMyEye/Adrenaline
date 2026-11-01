@@ -43,7 +43,7 @@ public class AdrenalineConfig {
             changed = true;
         }
         if (loaded.stagePriority == null) {
-            loaded.stagePriority = loaded.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO;
+            loaded.stagePriority = loaded.stagePriority();
             changed = true;
         }
         if (loaded.fastTerrainLoadingMode == null) {
@@ -446,7 +446,7 @@ public class AdrenalineConfig {
             value.setAdaptiveWorkerMode(value.adaptiveGenerationWorkers ? AdaptiveWorkerMode.HALF : AdaptiveWorkerMode.OFF);
             changed = true;
         } else if (value.adaptiveWorkerMode == null) {
-            value.adaptiveWorkerMode = AdaptiveWorkerMode.HALF;
+            value.adaptiveWorkerMode = AdaptiveWorkerMode.QUARTER;
             changed = true;
         }
         if (value.dismissedBlacklistedMods == null) {
@@ -559,14 +559,14 @@ public class AdrenalineConfig {
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
         public Boolean adaptiveGenerationWorkers;
-        public AdaptiveWorkerMode adaptiveWorkerMode = AdaptiveWorkerMode.HALF;
+        public AdaptiveWorkerMode adaptiveWorkerMode = AdaptiveWorkerMode.QUARTER;
         public int serializationWorkerThreads = 0;
         public boolean saveChunksAfterWorldCreation = true;
         public int incrementalSaveInterval = 128;
         public boolean skipSavingScreenAfterExit = true;
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
-        public boolean prioritizeHigherStages = true;
+        public Boolean prioritizeHigherStages;
         public StagePriority stagePriority;
         public String featureCompatibility = "classic";
         public int featureSafetyRadius;
@@ -740,7 +740,7 @@ public class AdrenalineConfig {
             if (this.adaptiveGenerationWorkers != null) {
                 return this.adaptiveGenerationWorkers ? AdaptiveWorkerMode.HALF : AdaptiveWorkerMode.OFF;
             }
-            return this.adaptiveWorkerMode == null ? AdaptiveWorkerMode.HALF : this.adaptiveWorkerMode;
+            return this.adaptiveWorkerMode == null ? AdaptiveWorkerMode.QUARTER : this.adaptiveWorkerMode;
         }
 
         public void setAdaptiveWorkerMode(AdaptiveWorkerMode mode) {
@@ -770,7 +770,11 @@ public class AdrenalineConfig {
         }
 
         public StagePriority stagePriority() {
-            return this.stagePriority == null ? (this.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO) : this.stagePriority;
+            if (this.stagePriority != null) {
+                return this.stagePriority;
+            }
+            return this.prioritizeHigherStages == null ? StagePriority.NEAREST
+                : this.prioritizeHigherStages ? StagePriority.HIGHEST : StagePriority.FIFO;
         }
 
         public void setStagePriority(StagePriority priority) {
