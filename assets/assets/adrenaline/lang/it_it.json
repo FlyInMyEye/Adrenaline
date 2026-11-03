@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Applica",
   "gui.adrenaline.config.no_results": "Nessuna impostazione corrisponde alla tua ricerca.",
   "gui.adrenaline.config.native_unavailable": "Backend nativo non disponibile in questa sessione.",
+  "gui.adrenaline.config.work_in_progress": "In fase di sviluppo. Questa impostazione non è ancora disponibile.",
   "gui.adrenaline.config.requires": "Inattivo: richiede %s.",
   "gui.adrenaline.config.requires_exact_noise": "Inattivo mentre il Perlin mobile approssimativo è abilitato.",
   "gui.adrenaline.config.default_value": "Impostazione predefinita: %s",

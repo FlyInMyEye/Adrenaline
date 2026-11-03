@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Zastosuj",
   "gui.adrenaline.config.no_results": "Żadne ustawienia nie pasują do Twojego wyszukiwania.",
   "gui.adrenaline.config.native_unavailable": "Natywny backend jest niedostępny w tej sesji.",
+  "gui.adrenaline.config.work_in_progress": "W trakcie prac. To ustawienie nie jest jeszcze dostępne.",
   "gui.adrenaline.config.requires": "Nieaktywny: wymaga %s.",
   "gui.adrenaline.config.requires_exact_noise": "Nieaktywne, gdy włączony jest przybliżony zmiennoprzecinkowy Perlin.",
   "gui.adrenaline.config.default_value": "Wartość domyślna: %s",

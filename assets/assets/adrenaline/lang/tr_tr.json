@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Uygula",
   "gui.adrenaline.config.no_results": "Aramanızla eşleşen ayar yok.",
   "gui.adrenaline.config.native_unavailable": "Yerel arka uç bu oturumda kullanılamıyor.",
+  "gui.adrenaline.config.work_in_progress": "Geliştirme aşamasında. Bu ayar henüz kullanılamıyor.",
   "gui.adrenaline.config.requires": "Etkin değil: %s gerektirir.",
   "gui.adrenaline.config.requires_exact_noise": "Yaklaşık Kayan Perlin etkinken etkin değildir.",
   "gui.adrenaline.config.default_value": "Varsayılan: %s",

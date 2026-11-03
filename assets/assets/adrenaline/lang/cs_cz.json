@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Použít",
   "gui.adrenaline.config.no_results": "Vašemu vyhledávání neodpovídají žádné nastavení.",
   "gui.adrenaline.config.native_unavailable": "Nativní backend není v této relaci dostupný.",
+  "gui.adrenaline.config.work_in_progress": "Probíhá vývoj. Toto nastavení zatím není dostupné.",
   "gui.adrenaline.config.requires": "Neaktivní: vyžaduje %s.",
   "gui.adrenaline.config.requires_exact_noise": "Neaktivní, když je povolena funkce Přibližný plovoucí perlin.",
   "gui.adrenaline.config.default_value": "Výchozí: %s",

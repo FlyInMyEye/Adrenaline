@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "適用",
   "gui.adrenaline.config.no_results": "検索に一致する設定はありません。",
   "gui.adrenaline.config.native_unavailable": "このセッションではネイティブバックエンドを利用できません。",
+  "gui.adrenaline.config.work_in_progress": "開発中です。この設定はまだ利用できません。",
   "gui.adrenaline.config.requires": "非アクティブ: %s が必要です。",
   "gui.adrenaline.config.requires_exact_noise": "近似浮動小数点パーリンが有効な間は非アクティブです。",
   "gui.adrenaline.config.default_value": "デフォルト: %s",

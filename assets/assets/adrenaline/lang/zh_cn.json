@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "应用",
   "gui.adrenaline.config.no_results": "没有与您的搜索匹配的设置。",
   "gui.adrenaline.config.native_unavailable": "此会话中原生后端不可用。",
+  "gui.adrenaline.config.work_in_progress": "正在开发中。此设置暂不可用。",
   "gui.adrenaline.config.requires": "无效：需要 %s。",
   "gui.adrenaline.config.requires_exact_noise": "启用近似浮动柏林时处于非活动状态。",
   "gui.adrenaline.config.default_value": "默认值：%s",

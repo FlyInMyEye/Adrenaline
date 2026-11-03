@@ -2,8 +2,10 @@ package net.fly.adrenaline.config;
 
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import net.fly.adrenaline.BuildConfig;
@@ -23,6 +25,8 @@ public class AdrenalineConfig {
     public static final int MAX_FEATURE_SAFETY_RADIUS = 8;
 
     private static final Data DEFAULTS = new Data();
+    private static final List<Field> WORK_IN_PROGRESS = Arrays.stream(Data.class.getFields())
+        .filter(field -> field.isAnnotationPresent(WorkInProgress.class)).toList();
     private static JsonConfigManager<Data> manager;
     private static volatile Data data = DEFAULTS;
     private static volatile Data runtimeOverride;
@@ -75,6 +79,7 @@ public class AdrenalineConfig {
         if (value == null) {
             THREAD_OVERRIDE.remove();
         } else {
+            resetWorkInProgress(value);
             THREAD_OVERRIDE.set(value);
         }
         return previous;
@@ -108,6 +113,7 @@ public class AdrenalineConfig {
 
     public static void setRuntimeOverride(Data value) {
         if (BuildConfig.DEBUG) {
+            if (value != null) resetWorkInProgress(value);
             runtimeOverride = value;
         }
     }
@@ -440,6 +446,26 @@ public class AdrenalineConfig {
         return BuildConfig.DEBUG && get().forceEasterEgg;
     }
 
+    public static boolean isWorkInProgress(String setting) {
+        return WORK_IN_PROGRESS.stream().anyMatch(field -> field.getName().equals(setting));
+    }
+
+    private static boolean resetWorkInProgress(Data value) {
+        boolean changed = false;
+        try {
+            for (Field field : WORK_IN_PROGRESS) {
+                Object fallback = field.get(DEFAULTS);
+                if (!Objects.equals(field.get(value), fallback)) {
+                    field.set(value, fallback);
+                    changed = true;
+                }
+            }
+        } catch (IllegalAccessException exception) {
+            throw new IllegalStateException("Cannot reset work-in-progress setting", exception);
+        }
+        return changed;
+    }
+
     private static boolean normalizeSettings(Data value) {
         boolean changed = false;
         if (value.adaptiveGenerationWorkers != null) {
@@ -513,7 +539,7 @@ public class AdrenalineConfig {
             value.settingsVersion = 2;
             changed = true;
         }
-        return changed;
+        return resetWorkInProgress(value) || changed;
     }
 
     public static class Data {
@@ -583,6 +609,7 @@ public class AdrenalineConfig {
         public boolean parallelizeFull = true;
         public boolean fastLegacyRandom = true;
         public boolean nativePerlinBatching = true;
+        @WorkInProgress
         public boolean approximateNativePerlin = false;
         public boolean nativeDensityEvaluation = true;
         public boolean nativeAquiferBatching = true;

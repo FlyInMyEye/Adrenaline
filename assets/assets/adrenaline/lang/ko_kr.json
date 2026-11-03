@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "적용",
   "gui.adrenaline.config.no_results": "검색어와 일치하는 설정이 없습니다.",
   "gui.adrenaline.config.native_unavailable": "이 세션에서는 네이티브 백엔드를 사용할 수 없습니다.",
+  "gui.adrenaline.config.work_in_progress": "개발 중입니다. 이 설정은 아직 사용할 수 없습니다.",
   "gui.adrenaline.config.requires": "비활성: %s가 필요합니다.",
   "gui.adrenaline.config.requires_exact_noise": "Approximate Float Perlin이 활성화된 동안에는 비활성화됩니다.",
   "gui.adrenaline.config.default_value": "기본값: %s",

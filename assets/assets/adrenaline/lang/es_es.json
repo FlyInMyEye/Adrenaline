@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Aplicar",
   "gui.adrenaline.config.no_results": "Ninguna configuración coincide con su búsqueda.",
   "gui.adrenaline.config.native_unavailable": "El backend nativo no está disponible en esta sesión.",
+  "gui.adrenaline.config.work_in_progress": "En desarrollo. Este ajuste aún no está disponible.",
   "gui.adrenaline.config.requires": "Inactivo: requiere %s.",
   "gui.adrenaline.config.requires_exact_noise": "Inactivo mientras Aproximate Float Perlin está habilitado.",
   "gui.adrenaline.config.default_value": "Valor predeterminado: %s",

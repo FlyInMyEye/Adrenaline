@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Застосувати",
   "gui.adrenaline.config.no_results": "Жодне налаштування не відповідає вашому пошуку.",
   "gui.adrenaline.config.native_unavailable": "Нативний backend недоступний у цій сесії.",
+  "gui.adrenaline.config.work_in_progress": "У розробці. Це налаштування поки недоступне.",
   "gui.adrenaline.config.requires": "Неактивний: вимагає %s.",
   "gui.adrenaline.config.requires_exact_noise": "Неактивний, поки ввімкнено приблизний плаваючий перлін.",
   "gui.adrenaline.config.default_value": "За замовчуванням: %s",

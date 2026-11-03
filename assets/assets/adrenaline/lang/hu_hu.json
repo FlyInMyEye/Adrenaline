@@ -186,6 +186,7 @@
   "gui.adrenaline.config.apply": "Alkalmaz",
   "gui.adrenaline.config.no_results": "Egyetlen beállítás sem felel meg a keresésnek.",
   "gui.adrenaline.config.native_unavailable": "A natív backend ebben a munkamenetben nem érhető el.",
+  "gui.adrenaline.config.work_in_progress": "Fejlesztés alatt. Ez a beállítás még nem érhető el.",
   "gui.adrenaline.config.requires": "Inaktív: %s szükséges.",
   "gui.adrenaline.config.requires_exact_noise": "Inaktív, amíg az Approximate Float Perlin engedélyezve van.",
   "gui.adrenaline.config.default_value": "Alapértelmezett: %s",

@@ -216,6 +216,7 @@ final class AdrenalineSettings {
         final BiConsumer<Data, Integer> setInteger;
         final int min;
         final int max;
+        private final boolean workInProgress;
         private List<Optimization> controlled = List.of();
         private boolean nativeBackend;
         private final List<Requirement> requirements = new ArrayList<>();
@@ -236,6 +237,7 @@ final class AdrenalineSettings {
             this.setInteger = setInteger;
             this.min = min;
             this.max = max;
+            this.workInProgress = AdrenalineConfig.isWorkInProgress(id);
         }
 
         private Setting controlled(Optimization... optimizations) {
@@ -280,6 +282,9 @@ final class AdrenalineSettings {
         }
 
         Component inactiveReason(Data draft) {
+            if (this.workInProgress) {
+                return Component.translatable("gui.adrenaline.config.work_in_progress");
+            }
             for (Optimization operation : this.controlled) {
                 String controller = OptimizationTakeoverRegistry.controller(operation).orElse(null);
                 if (controller != null) {
