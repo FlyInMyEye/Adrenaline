@@ -343,6 +343,11 @@ public final class NativeSurfaceProgram {
         }
     }
 
+    @FunctionalInterface
+    private interface Branch {
+        int get() throws ReflectiveOperationException;
+    }
+
     private static final class Builder {
         private final WorldGenerationContext generation;
         private final Registry<Biome> registry;
@@ -445,8 +450,8 @@ public final class NativeSurfaceProgram {
                         : this.node(new Node(12, noise, this.data.table(palette), palette.size(), this.data.noiseSlot(noise), 0, 0));
                 }
             } else if (type == TEST && runtime.getClass() == RUNTIME_TEST) {
-                int child = this.rule(component(source, 1), component(runtime, 1), biome, unresolved, fail, depth + 1);
-                result = this.condition(component(source, 0), component(runtime, 0), biome, unresolved, child, fail, depth + 1);
+                result = this.condition(component(source, 0), component(runtime, 0), biome, unresolved,
+                    () -> this.rule(component(source, 1), component(runtime, 1), biome, unresolved, fail, depth + 1), () -> fail, depth + 1);
             } else if (type.getName().equals("terrablender.worldgen.surface.NamespacedSurfaceRuleSource")
                 && runtime.getClass().getName().equals("terrablender.worldgen.surface.NamespacedSurfaceRuleSource$NamespacedRule") && !this.holderHooks) {
                 Field[] fields = NAMESPACED_FIELDS.get(runtime.getClass());
@@ -464,9 +469,12 @@ public final class NativeSurfaceProgram {
                         : this.rule(selected, applied.get(namespace), biome, false, base, depth + 1));
                 }
             } else {
+                SurfaceRuleSequences.Layout sequence = SurfaceRuleSequences.get(type);
                 Field delegate = SurfaceRuleDelegates.source(type);
-                Field grid = delegate == null && this.stableGrid(source, 0) ? SurfaceRuleDelegates.grid(type, runtime, RUNTIME_RULE) : null;
-                if (delegate != null) {
+                Field grid = sequence == null && delegate == null && this.stableGrid(source, 0) ? SurfaceRuleDelegates.grid(type, runtime, RUNTIME_RULE) : null;
+                if (sequence != null) {
+                    result = this.sequence(source, runtime, sequence, biome, unresolved, fail, depth + 1);
+                } else if (delegate != null) {
                     result = this.rule((SurfaceRules.RuleSource) delegate.get(source), runtime, biome, unresolved, fail, depth + 1);
                 } else if (grid != null && grid.get(runtime) instanceof Object[][] cells && cells.length == 16) {
                     var table = new ArrayList<Integer>(256);
@@ -480,6 +488,24 @@ public final class NativeSurfaceProgram {
                 }
             }
             this.memo.put(key, result);
+            return result;
+        }
+
+        private int sequence(Object source, Object runtime, SurfaceRuleSequences.Layout layout, ResourceKey<Biome> biome,
+                             boolean unresolved, int fail, int depth) throws ReflectiveOperationException {
+            List<?> sources = (List<?>) layout.sources().get(source);
+            if (sources.size() == 1) {
+                return this.rule(sources.get(0), runtime, biome, unresolved, fail, depth);
+            }
+            if (runtime.getClass() != layout.runtime() || !(layout.rules().get(runtime) instanceof List<?> applied)
+                || applied.size() != sources.size() + (layout.original() == null ? 0 : 1)) {
+                return this.result(FALLBACK);
+            }
+            int result = layout.original() == null ? fail
+                : this.rule(layout.original().get(source), applied.get(sources.size()), biome, unresolved, fail, depth);
+            for (int i = sources.size() - 1; i >= 0; i--) {
+                result = this.rule(sources.get(i), applied.get(i), biome, unresolved, result, depth);
+            }
             return result;
         }
 
@@ -556,7 +582,7 @@ public final class NativeSurfaceProgram {
             } else if (type == RUNTIME_TEST) {
                 Object condition = component(runtime, 0);
                 result = this.runtimeCondition(condition, biome, unresolved,
-                    this.runtimeRule(component(runtime, 1), biome, unresolved, fail, depth + 1), fail, depth + 1);
+                    () -> this.runtimeRule(component(runtime, 1), biome, unresolved, fail, depth + 1), () -> fail, depth + 1);
             } else if (type.getName().startsWith(SurfaceRules.bandlands().getClass().getName() + "$$Lambda$")) {
                 result = this.rule(SurfaceRules.bandlands(), runtime, biome, unresolved, fail, depth + 1);
             } else {
@@ -566,7 +592,7 @@ public final class NativeSurfaceProgram {
             return result;
         }
 
-        private int runtimeCondition(Object runtime, ResourceKey<Biome> biome, boolean unresolved, int yes, int no, int depth) throws ReflectiveOperationException {
+        private int runtimeCondition(Object runtime, ResourceKey<Biome> biome, boolean unresolved, Branch yes, Branch no, int depth) throws ReflectiveOperationException {
             if (depth > 128) throw new IllegalArgumentException("Surface runtime condition depth");
             if (runtime.getClass() == RUNTIME_NOT && !SurfaceRuleHooks.hasRuleHooks(runtime.getClass())) {
                 return this.runtimeCondition(component(runtime, 0), biome, unresolved, no, yes, depth + 1);
@@ -587,7 +613,7 @@ public final class NativeSurfaceProgram {
             return null;
         }
 
-        private int condition(Object source, Object runtime, ResourceKey<Biome> biome, boolean unresolved, int yes, int no, int depth) throws ReflectiveOperationException {
+        private int condition(Object source, Object runtime, ResourceKey<Biome> biome, boolean unresolved, Branch yes, Branch no, int depth) throws ReflectiveOperationException {
             if (depth > 128) {
                 throw new IllegalArgumentException("Surface condition depth");
             }
@@ -609,49 +635,49 @@ public final class NativeSurfaceProgram {
                     return this.result(FALLBACK);
                 }
                 boolean matches = biome != null && predicate.test(biome);
-                return this.biomeUse(matches ? yes : no);
+                return this.biomeUse((matches ? yes : no).get());
             }
             if (type == STONE && runtime.getClass().getEnclosingClass() == type) {
                 if ((int) component(source, 2) != 0 && SurfaceRuleHooks.hooked("adrenaline$getSurfaceSecondary()D")) {
                     return this.result(FALLBACK);
                 }
                 return this.node(new Node(1, (int) component(source, 0), (boolean) component(source, 1) ? 1 : 0,
-                    (int) component(source, 2), component(source, 3) == CaveSurface.CEILING ? 1 : 0, yes, no));
+                    (int) component(source, 2), component(source, 3) == CaveSurface.CEILING ? 1 : 0, yes.get(), no.get()));
             }
             if (type == Y && runtime.getClass().getEnclosingClass() == type) {
                 return this.node(new Node(2, ((VerticalAnchor) component(source, 0)).resolveY(this.generation),
-                    (int) component(source, 1), (boolean) component(source, 2) ? 1 : 0, 0, yes, no));
+                    (int) component(source, 1), (boolean) component(source, 2) ? 1 : 0, 0, yes.get(), no.get()));
             }
             if (type == WATER && runtime.getClass().getEnclosingClass() == type) {
                 return this.node(new Node(3, (int) component(source, 0), (int) component(source, 1),
-                    (boolean) component(source, 2) ? 1 : 0, 0, yes, no));
+                    (boolean) component(source, 2) ? 1 : 0, 0, yes.get(), no.get()));
             }
             if (source == SurfaceRules.hole() && runtime.getClass().getEnclosingClass() == SurfaceRulesContextFactory.contextType()) {
-                return this.node(new Node(4, 0, 0, 0, 0, yes, no));
+                return this.node(new Node(4, 0, 0, 0, 0, yes.get(), no.get()));
             }
             if (source == SurfaceRules.abovePreliminarySurface() && !SurfaceRuleHooks.hooked("adrenaline$getMinSurfaceLevel()I") && runtime.getClass().getEnclosingClass() == SurfaceRulesContextFactory.contextType()) {
-                return this.node(new Node(5, 0, 0, 0, 0, yes, no));
+                return this.node(new Node(5, 0, 0, 0, 0, yes.get(), no.get()));
             }
             if (type == NOISE && runtime.getClass().getEnclosingClass() == type) {
                 NormalNoise noise = (NormalNoise) captured(runtime, NormalNoise.class);
                 int id = noise == null ? -1 : this.data.noise(noise, (double) component(source, 1), (double) component(source, 2), 0.0D, 1.0D);
-                return id < 0 ? this.result(FALLBACK) : this.node(new Node(10, id, this.data.noiseSlot(id), 0, 0, yes, no));
+                return id < 0 ? this.result(FALLBACK) : this.node(new Node(10, id, this.data.noiseSlot(id), 0, 0, yes.get(), no.get()));
             }
             if (source == SurfaceRules.steep() && runtime.getClass().getEnclosingClass() == SurfaceRulesContextFactory.contextType()) {
                 this.steep = true;
-                return this.node(new Node(13, 0, 0, 0, 0, yes, no));
+                return this.node(new Node(13, 0, 0, 0, 0, yes.get(), no.get()));
             }
             if (source == SurfaceRules.temperature() && runtime.getClass().getEnclosingClass() == SurfaceRulesContextFactory.contextType()) {
                 if (!this.data.climates(this.registry)) {
                     this.contextReusable = false;
                     return this.result(FALLBACK);
                 }
-                return this.node(new Node(11, 0, 0, 0, 0, yes, no));
+                return this.node(new Node(11, 0, 0, 0, 0, yes.get(), no.get()));
             }
             if (type == GRADIENT && runtime.getClass().getEnclosingClass() == type) {
                 int random = this.random(runtime);
                 return this.node(new Node(random < 0 ? 6 : 9, ((VerticalAnchor) component(source, 1)).resolveY(this.generation),
-                    ((VerticalAnchor) component(source, 2)).resolveY(this.generation), Math.max(0, random), 0, yes, no));
+                    ((VerticalAnchor) component(source, 2)).resolveY(this.generation), Math.max(0, random), 0, yes.get(), no.get()));
             }
             return this.result(FALLBACK);
         }
