@@ -6,6 +6,7 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.synth.NormalNoise;
 import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 
+// TODO: Extend native noise batching to custom generators such as TFG.
 public final class PerlinBatching {
     private static final ThreadLocal<BatchContext> CONTEXT = new ThreadLocal<>();
     private static final ThreadLocal<SectionScope> SECTION_SCOPE = ThreadLocal.withInitial(SectionScope::new);

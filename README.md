@@ -42,8 +42,6 @@ Project pages:
 
 Son, did you see the comparison above? You SHOULD use this mod in your modpack, but remember to also add Fly's Config Lib. You can also build a debug version from source for extra debugging and profiling tools.
 
-If your pack includes ModernFix, launch it once with Adrenaline, click **Fix and Restart** if prompted, then relaunch. Ship the updated `config/modernfix-mixins.properties` with your pack so players don't have to repeat the fix themselves.
-
 ---
 
 P.S. The translations were AI-generated. If you spot a mistake in your language, feel free to open a pull request.
