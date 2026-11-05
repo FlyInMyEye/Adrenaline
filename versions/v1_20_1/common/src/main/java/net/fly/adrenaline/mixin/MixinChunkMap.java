@@ -16,6 +16,7 @@ import java.util.function.Function;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.scheduler.ChunkGenerationRequest;
 import net.fly.adrenaline.scheduler.ChunkJob;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.SaveBackpressure;
@@ -60,7 +61,7 @@ public class MixinChunkMap {
     private ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> worldgenMailbox;
 
     @Unique
-    private ThreadLocal<ChunkStatus> adrenaline$dispatchStatus;
+    private ThreadLocal<ChunkGenerationRequest> adrenaline$dispatchRequest;
 
     @Unique
     private int adrenaline$saveFlushDepth;
@@ -70,7 +71,7 @@ public class MixinChunkMap {
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void adrenaline$initializeSchedulingState(CallbackInfo ci) {
-        this.adrenaline$dispatchStatus = new ThreadLocal<>();
+        this.adrenaline$dispatchRequest = new ThreadLocal<>();
     }
 
     @ModifyArg(
@@ -226,20 +227,21 @@ public class MixinChunkMap {
         if (OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH)) {
             return original.call(dependencies, generation, executor);
         }
+        ChunkGenerationRequest request = new ChunkGenerationRequest(status);
         Executor dispatch = task -> {
-            ChunkStatus previous = this.adrenaline$dispatchStatus.get();
-            this.adrenaline$dispatchStatus.set(status);
+            ChunkGenerationRequest previous = this.adrenaline$dispatchRequest.get();
+            this.adrenaline$dispatchRequest.set(request);
             try {
                 executor.execute(task);
             } finally {
                 if (previous == null) {
-                    this.adrenaline$dispatchStatus.remove();
+                    this.adrenaline$dispatchRequest.remove();
                 } else {
-                    this.adrenaline$dispatchStatus.set(previous);
+                    this.adrenaline$dispatchRequest.set(previous);
                 }
             }
         };
-        return original.call(dependencies, generation, dispatch);
+        return request.bind(original.call(dependencies, generation, dispatch));
     }
 
     @WrapMethod(method = {"lambda$scheduleChunkGeneration$23", "m_214956_", "method_17259"})
@@ -254,8 +256,9 @@ public class MixinChunkMap {
 
     @Unique
     private void adrenaline$dispatchWorldgenTask(ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> instance, Object message, ChunkHolder holder) {
-        ChunkStatus nextStatus = this.adrenaline$dispatchStatus.get();
-        this.adrenaline$dispatchStatus.remove();
+        ChunkGenerationRequest request = this.adrenaline$dispatchRequest.get();
+        this.adrenaline$dispatchRequest.remove();
+        ChunkStatus nextStatus = request == null ? null : request.status();
         if (nextStatus != null) {
             ChunkJobScheduler.get().dependencyReady();
         }
@@ -315,26 +318,14 @@ public class MixinChunkMap {
                     Runnable runnable = taskFunction.apply(discardedCompletionHandle);
                     WorldgenStageStats.finishSchedulingWork(executionWork);
                     runnable.run();
-                    CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
-                    return future == null ? CompletableFuture.completedFuture(null) : future;
-                }, () -> {
-                    CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
-                    if (future != null) {
-                        future.complete(ChunkHolder.UNLOADED_CHUNK);
-                    }
-                }, contextClassLoader);
+                    return request.completion();
+                }, request::cancel, contextClassLoader);
                 WorldgenStageStats.finishSchedulingWork(resumedWork);
             } else {
                 job = new ChunkJob(pos, 0, () -> {
                     taskFunction.apply(discardedCompletionHandle).run();
-                    CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
-                    return future == null ? CompletableFuture.completedFuture(null) : future;
-                }, () -> {
-                    CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = holder.getFutureIfPresentUnchecked(scheduledStatus);
-                    if (future != null) {
-                        future.complete(ChunkHolder.UNLOADED_CHUNK);
-                    }
-                }, contextClassLoader);
+                    return request.completion();
+                }, request::cancel, contextClassLoader);
             }
             job.trackWaiting(pos, scheduledStatus);
             job.prioritizeNearest(this.level, pos);
