@@ -46,3 +46,10 @@ pub inline fn evaluate_slice(program: []const u8, x: i32, y: i32, z: i32, step: 
     }
     return density_program.evaluate_density_slice(program, x, y, z, step, output, inputs);
 }
+
+pub inline fn evaluate_lattice(program: []const u8, x: i32, y: i32, z: i32, width: usize, height: usize, step_xz: i32, step_y: i32, output: []f64, inputs: []const f64) bool {
+    if (comptime builtin.cpu.arch == .x86_64 and !backend_options.is_simd_backend) {
+        if (backend_runtime.supports(.avx2)) return backend_abi.adrenaline_density_lattice_avx2(program.ptr, program.len, x, y, z, width, height, step_xz, step_y, inputs.ptr, inputs.len, output.ptr) != 0;
+    }
+    return density_program.evaluate_density_lattice(program, x, y, z, width, height, step_xz, step_y, output, inputs);
+}

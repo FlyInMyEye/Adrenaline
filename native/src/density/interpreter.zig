@@ -18,18 +18,29 @@ const noise_blended = @import("../noise/blended.zig");
 const noise_types = @import("../noise/types.zig");
 
 pub noinline fn evaluate_density_program_generic(comptime capacity: usize, comptime fixed_cell: bool, program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, requested_width: usize, requested_height: usize, output: []c.jdouble, inputs: []const f64, cache_values: []f64, cache_ready: []bool) bool {
-    return evaluate_density_grid(capacity, fixed_cell, false, program, base_x, base_y, base_z, requested_width, requested_height, 1, output, inputs, cache_values, cache_ready);
+    return evaluate_density_grid(capacity, fixed_cell, false, program, base_x, base_y, base_z, requested_width, requested_height, 1, 1, output, inputs, cache_values, cache_ready);
 }
 
 pub fn evaluate_density_slice(comptime capacity: usize, program: []const u8, x: i32, y: i32, z: i32, step: i32, output: []f64, inputs: []const f64) bool {
-    return evaluate_density_grid(capacity, false, true, program, x, y, z, 1, output.len, step, output, inputs, &.{}, &.{});
+    return evaluate_density_grid(capacity, false, true, program, x, y, z, 1, output.len, 1, step, output, inputs, &.{}, &.{});
 }
 
-fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, comptime slice: bool, program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, requested_width: usize, requested_height: usize, step_y: i32, output: []c.jdouble, inputs: []const f64, cache_values: []f64, cache_ready: []bool) bool {
+pub fn evaluate_density_lattice(comptime capacity: usize, program: []const u8, x: i32, y: i32, z: i32, width: usize, height: usize, step_xz: i32, step_y: i32, output: []f64, inputs: []const f64) bool {
+    return evaluate_density_grid(capacity, false, true, program, x, y, z, width, height, step_xz, step_y, output, inputs, &.{}, &.{});
+}
+
+fn LatticeStack(comptime capacity: usize) type {
+    return struct {
+        threadlocal var values: [core_limits.max_density_stack][capacity]f64 = undefined;
+    };
+}
+
+fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, comptime slice: bool, program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, requested_width: usize, requested_height: usize, step_xz: i32, step_y: i32, output: []c.jdouble, inputs: []const f64, cache_values: []f64, cache_ready: []bool) bool {
     @setFloatMode(.strict);
     const width = if (fixed_cell) 4 else requested_width;
     const height = if (fixed_cell) 8 else requested_height;
-    var stack: [core_limits.max_density_stack][capacity]f64 = undefined;
+    var local_stack: [if (slice and capacity > 256) 0 else core_limits.max_density_stack][capacity]f64 = undefined;
+    const stack: [][capacity]f64 = if (slice and capacity > 256) &LatticeStack(capacity).values else &local_stack;
     var interpolation_width: [@max(4, capacity)]f64 = undefined;
     var interpolation_height: [capacity]f64 = undefined;
     var interpolation_ready = false;
@@ -95,10 +106,10 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                 }
                 const first: [*]const u8 = @ptrFromInt(@as(usize, @intCast(first_address)));
                 const second: [*]const u8 = @ptrFromInt(@as(usize, @intCast(second_address)));
-                if (slice) {
+                if (slice and width == 1) {
                     density_noise.density_normal_noise_slice(.{ .first = first, .first_octaves = first_octaves, .second = second, .second_octaves = second_octaves, .factor = value_factor }, base_x, base_y, base_z, step_y, xz_scale, y_scale, stack[stack_size][0..total]);
                 } else {
-                    density_noise.density_normal_noise_grid(first, first_octaves, second, second_octaves, value_factor, @as(f64, @floatFromInt(base_x)) * xz_scale, @as(f64, @floatFromInt(base_y)) * y_scale, @as(f64, @floatFromInt(base_z)) * xz_scale, xz_scale, y_scale, width, height, stack[stack_size][0..total]);
+                    density_noise.density_normal_noise_grid(first, first_octaves, second, second_octaves, value_factor, @as(f64, @floatFromInt(base_x)) * xz_scale, @as(f64, @floatFromInt(base_y)) * y_scale, @as(f64, @floatFromInt(base_z)) * xz_scale, xz_scale * @as(f64, @floatFromInt(step_xz)), y_scale * @as(f64, @floatFromInt(step_y)), width, height, stack[stack_size][0..total]);
                 }
                 stack_size += 1;
             },
@@ -467,16 +478,16 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                 const noise = density_noise.DensityNoise.read(program, &program_counter) orelse return false;
                 if (kind > 2) return false;
                 if (kind != 2) {
-                    if (slice) {
+                    if (slice and width == 1) {
                         density_noise.density_normal_noise_slice(noise, base_x, if (kind == 0) base_y else 0, base_z, step_y, 0.25, if (kind == 0) 0.25 else 0.0, stack[stack_size][0..total]);
                     } else {
-                        density_noise.density_normal_noise_grid(noise.first, noise.first_octaves, noise.second, noise.second_octaves, noise.factor, @as(f64, @floatFromInt(base_x)) * 0.25, if (kind == 0) @as(f64, @floatFromInt(base_y)) * 0.25 else 0.0, @as(f64, @floatFromInt(base_z)) * 0.25, 0.25, if (kind == 0) 0.25 else 0.0, width, height, stack[stack_size][0..total]);
+                        density_noise.density_normal_noise_grid(noise.first, noise.first_octaves, noise.second, noise.second_octaves, noise.factor, @as(f64, @floatFromInt(base_x)) * 0.25, if (kind == 0) @as(f64, @floatFromInt(base_y)) * 0.25 else 0.0, @as(f64, @floatFromInt(base_z)) * 0.25, 0.25 * @as(f64, @floatFromInt(step_xz)), if (kind == 0) 0.25 * @as(f64, @floatFromInt(step_y)) else 0.0, width, height, stack[stack_size][0..total]);
                     }
                     for (stack[stack_size][0..total]) |*value| value.* *= 4.0;
                 } else {
                     for (0..width) |x| {
                         for (0..width) |z| {
-                            const value = noise.sample((@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z))) * 0.25, (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x))) * 0.25, 0.0) * 4.0;
+                            const value = noise.sample((@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z)) * @as(f64, @floatFromInt(step_xz))) * 0.25, (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x)) * @as(f64, @floatFromInt(step_xz))) * 0.25, 0.0) * 4.0;
                             @memset(stack[stack_size][(x * width + z) * height ..][0..height], value);
                         }
                     }
@@ -494,9 +505,9 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                     for (0..width) |z| {
                         for (0..if (height_independent == 1) @as(usize, 1) else height) |y| {
                             const i = (x * width + z) * height + y;
-                            const sx = (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x))) * xz_scale + stack[stack_size - 3][i];
+                            const sx = (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x)) * @as(f64, @floatFromInt(step_xz))) * xz_scale + stack[stack_size - 3][i];
                             const sy = (@as(f64, @floatFromInt(base_y)) + @as(f64, @floatFromInt(y)) * @as(f64, @floatFromInt(step_y))) * y_scale + stack[stack_size - 2][i];
-                            const sz = (@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z))) * xz_scale + stack[stack_size - 1][i];
+                            const sz = (@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z)) * @as(f64, @floatFromInt(step_xz))) * xz_scale + stack[stack_size - 1][i];
                             stack[stack_size - 3][i] = noise.sample(sx, sy, sz);
                         }
                         if (height_independent == 1) {
@@ -521,9 +532,9 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                                 (if (value < -0.5) 0.75 else if (value < 0.0) 1.0 else if (value < 0.5) 1.5 else 2.0)
                             else
                                 (if (value < -0.75) 0.5 else if (value < -0.5) 0.75 else if (value < 0.5) 1.0 else if (value < 0.75) 2.0 else 3.0);
-                            const nx = (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x))) / rarity;
+                            const nx = (@as(f64, @floatFromInt(base_x)) + @as(f64, @floatFromInt(x)) * @as(f64, @floatFromInt(step_xz))) / rarity;
                             const ny = (@as(f64, @floatFromInt(base_y)) + @as(f64, @floatFromInt(y)) * @as(f64, @floatFromInt(step_y))) / rarity;
-                            const nz = (@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z))) / rarity;
+                            const nz = (@as(f64, @floatFromInt(base_z)) + @as(f64, @floatFromInt(z)) * @as(f64, @floatFromInt(step_xz))) / rarity;
                             stack[stack_size - 1][i] = rarity * @abs(noise.sample(nx, ny, nz));
                         }
                     }
@@ -708,12 +719,12 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                 const main: [*]const u8 = @ptrFromInt(@as(usize, @intCast(main_address)));
                 if (comptime builtin.cpu.arch == .x86_64 and !backend_options.is_simd_backend) {
                     if (backend_runtime.supports(.avx2)) {
-                        backend_abi.adrenaline_blended_noise_grid_avx2(min, max, main, &config, base_x, base_y, base_z, 1, step_y, 1, width, height, width, &stack[stack_size]);
+                        backend_abi.adrenaline_blended_noise_grid_avx2(min, max, main, &config, base_x, base_y, base_z, step_xz, step_y, step_xz, width, height, width, &stack[stack_size]);
                         stack_size += 1;
                         continue;
                     }
                 }
-                noise_blended.blended_noise_grid_impl(false, min, max, main, &config, base_x, base_y, base_z, 1, step_y, 1, width, height, width, stack[stack_size][0..total]);
+                noise_blended.blended_noise_grid_impl(false, min, max, main, &config, base_x, base_y, base_z, step_xz, step_y, step_xz, width, height, width, stack[stack_size][0..total]);
                 stack_size += 1;
             },
             31 => {

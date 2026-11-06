@@ -78,6 +78,19 @@ public final class PerlinSection {
         return true;
     }
 
+    public boolean fillGrid(double[] output) {
+        if (AdrenalineConfig.approximateNativePerlinEnabled() || this.rejected
+            || output.length != this.xCount * this.yCount * this.zCount) {
+            return false;
+        }
+        double[] grid = this.exactGrid(0, 0, 0, this.baseX, this.baseY, this.baseZ);
+        if (grid == null) {
+            return false;
+        }
+        System.arraycopy(grid, 0, output, 0, output.length);
+        return true;
+    }
+
     private double[] exactGrid(int xIndex, int yIndex, int zIndex, double x, double y, double z) {
         double[] grid = this.values;
         if (grid != null) {

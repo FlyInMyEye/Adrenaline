@@ -4,9 +4,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseChunk;
+import net.minecraft.world.level.levelgen.DensityFunctions;
+import net.minecraft.world.level.levelgen.synth.BlendedNoise;
 import net.minecraft.world.level.levelgen.blending.Blender;
 
 public final class NativeDensityProgram {
+
+    private static final Object FLAT_CACHE = ((DensityFunctions.MarkerOrMarked) DensityFunctions.flatCache(DensityFunctions.zero())).type();
 
     public static final byte END = 0;
     public static final byte NOISE = 1;
@@ -172,6 +176,50 @@ public final class NativeDensityProgram {
                     for (int j = 0; j < count; j++) {
                         this.inputValues.putDouble(offset + j * Double.BYTES, input.source.compute(provider.forIndex(j)));
                     }
+                }
+            }
+        }
+        return true;
+    }
+
+    public boolean prepareLattice(NoiseChunk owner, PerlinSectionCache sections, int x, int z, int width, int height, int step,
+                                  ByteBuffer target, double[] scratch) {
+        if (this.interpolators.length != 0 || this.emptyBlender && owner.getBlender() != Blender.empty()) {
+            return false;
+        }
+        for (InputBinding input : this.inputs) {
+            if (!(input.source instanceof AdrenalineNoiseFunctionAccess) && !(input.source instanceof AdrenalineBlendedNoiseAccess && input.source instanceof BlendedNoise)
+                && !(input.source instanceof AdrenalineCachedDensityAccess && input.owner == owner
+                    && input.source instanceof DensityFunctions.MarkerOrMarked marker && marker.type() == FLAT_CACHE)) {
+                return false;
+            }
+        }
+        int count = width * width * height;
+        for (int i = 0; i < this.inputs.length; i++) {
+            InputBinding input = this.inputs[i];
+            int offset = i * count * Double.BYTES;
+            if (input.source instanceof AdrenalineCachedDensityAccess cache) {
+                for (int cx = 0; cx < width; cx++) {
+                    for (int cz = 0; cz < width; cz++) {
+                        int start = offset + (cx * width + cz) * height * Double.BYTES;
+                        if (!cache.adrenaline$writeNativeColumnInput(target, start, owner, x + cx * step, z + cz * step)) {
+                            return false;
+                        }
+                        double value = target.getDouble(start);
+                        for (int cy = 1; cy < height; cy++) {
+                            target.putDouble(start + cy * Double.BYTES, value);
+                        }
+                    }
+                }
+            } else {
+                boolean filled = input.source instanceof AdrenalineNoiseFunctionAccess noise
+                    ? sections.fillGrid(input.source, noise.adrenaline$getNoise(), noise.adrenaline$getXzScale(), noise.adrenaline$getYScale(), scratch)
+                    : sections.fillGrid((BlendedNoise) input.source, scratch);
+                if (!filled) {
+                    return false;
+                }
+                for (int j = 0; j < count; j++) {
+                    target.putDouble(offset + j * Double.BYTES, scratch[j]);
                 }
             }
         }

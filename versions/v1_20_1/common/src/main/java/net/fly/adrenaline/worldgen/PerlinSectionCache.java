@@ -62,6 +62,24 @@ public final class PerlinSectionCache {
         if (yOffset % this.cellHeight != 0 || yIndex < 0 || yIndex >= this.yCount) {
             return Double.NaN;
         }
+        double[] values = this.blendedGrid(noise);
+        return values.length == 0 ? Double.NaN : values[(xIndex * this.zCount + zIndex) * this.yCount + yIndex];
+    }
+
+    public boolean fillGrid(Object key, NormalNoise noise, double xzScale, double yScale, double[] output) {
+        return this.section(key, noise, xzScale, yScale).fillGrid(output);
+    }
+
+    public boolean fillGrid(BlendedNoise noise, double[] output) {
+        double[] grid = this.blendedGrid(noise);
+        if (grid.length == 0 || grid.length != output.length) {
+            return false;
+        }
+        System.arraycopy(grid, 0, output, 0, output.length);
+        return true;
+    }
+
+    private double[] blendedGrid(BlendedNoise noise) {
         double[] values = this.blendedSections.get(noise);
         if (values == null) {
             values = new double[this.xCount * this.yCount * this.zCount];
@@ -72,7 +90,7 @@ public final class PerlinSectionCache {
             }
             this.blendedSections.put(noise, values);
         }
-        return values.length == 0 ? Double.NaN : values[(xIndex * this.zCount + zIndex) * this.yCount + yIndex];
+        return values;
     }
 
     private PerlinSection section(Object key, NormalNoise noise, double xzScale, double yScale) {
