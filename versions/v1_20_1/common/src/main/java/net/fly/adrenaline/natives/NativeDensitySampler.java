@@ -1,6 +1,7 @@
 package net.fly.adrenaline.natives;
 
 import java.lang.ref.Reference;
+import java.nio.ByteBuffer;
 import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 import net.fly.adrenaline.worldgen.NativeDensityProgram;
 
@@ -44,7 +45,25 @@ public final class NativeDensitySampler {
         }
     }
 
-    private static native int preliminarySurfaceLevel0(java.nio.ByteBuffer program, int length, java.nio.ByteBuffer inputs, int inputCount, int cacheCount, int x, int z, int minY, int maxY, int step);
-    private static native boolean evaluate0(java.nio.ByteBuffer program, int length, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output);
-    private static native boolean evaluateWithInputs0(java.nio.ByteBuffer program, int length, java.nio.ByteBuffer inputs, int inputCount, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output);
+    public static boolean evaluateSlice(NativeDensityProgram program, int x, int y, int z, int step, double[] output) {
+        if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
+            return false;
+        }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
+        try {
+            return evaluateSlice0(program.bytecode(), program.length(), program.inputValues(), program.inputCount(), x, y, z, step, output.length, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.DENSITY, exception);
+            return false;
+        } finally {
+            Reference.reachabilityFence(program);
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
+        }
+    }
+
+    private static native boolean evaluateSlice0(ByteBuffer program, int length, ByteBuffer inputs, int inputCount, int x, int y, int z, int step, int count, double[] output);
+
+    private static native int preliminarySurfaceLevel0(ByteBuffer program, int length, ByteBuffer inputs, int inputCount, int cacheCount, int x, int z, int minY, int maxY, int step);
+    private static native boolean evaluate0(ByteBuffer program, int length, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output);
+    private static native boolean evaluateWithInputs0(ByteBuffer program, int length, ByteBuffer inputs, int inputCount, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output);
 }

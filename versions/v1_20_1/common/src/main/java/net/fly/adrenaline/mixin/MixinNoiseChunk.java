@@ -227,7 +227,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         if (cached == null || cached.length != interpolators.length) {
             cached = new CellDensityEvaluator[interpolators.length];
             for (int i = 0; i < interpolators.length; i++) {
-                cached[i] = CellDensityCompiler.compile(interpolators[i].adrenaline$getNoiseFiller());
+                cached[i] = CellDensityCompiler.compileSlice(interpolators[i].adrenaline$getNoiseFiller());
             }
             this.adrenaline$sliceDensityEvaluators = cached;
         }
@@ -272,6 +272,11 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
                     if (evaluator == null) {
                         interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
                     } else {
+                        if (evaluator instanceof NativeCellDensityEvaluator nativeEvaluator
+                            && nativeEvaluator.fillSlice(slice, this.sliceFillingContextProvider, this.cellStartBlockX,
+                                this.cellNoiseMinY * this.cellHeight, this.cellStartBlockZ, this.cellHeight)) {
+                            continue;
+                        }
                         if (nativePerlin) {
                             PerlinBatching.begin(slice.length);
                         }
