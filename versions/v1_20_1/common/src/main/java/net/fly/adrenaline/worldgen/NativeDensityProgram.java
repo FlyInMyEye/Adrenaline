@@ -51,6 +51,7 @@ public final class NativeDensityProgram {
     private final InputBinding[] inputs;
     private final boolean emptyBlender;
     private ByteBuffer inputValues;
+    private double[] sliceInput;
     private final int columnCacheCount;
 
     NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators) {
@@ -135,6 +136,45 @@ public final class NativeDensityProgram {
             }
         }
         this.prepare();
+        return true;
+    }
+
+    public boolean prepareSlice(DensityFunction.ContextProvider provider, int count) {
+        DensityFunction.FunctionContext first = provider.forIndex(0);
+        if (this.interpolators.length != 0 || this.emptyBlender && first.getBlender() != Blender.empty()) {
+            return false;
+        }
+        int x = first.blockX();
+        int z = first.blockZ();
+        if (this.inputs.length > 0) {
+            int bytes = Math.multiplyExact(Math.multiplyExact(this.inputs.length, count), Double.BYTES);
+            if (this.inputValues == null || this.inputValues.capacity() != bytes) {
+                this.inputValues = ByteBuffer.allocateDirect(bytes).order(ByteOrder.LITTLE_ENDIAN);
+            }
+            for (int i = 0; i < this.inputs.length; i++) {
+                InputBinding input = this.inputs[i];
+                int offset = i * count * Double.BYTES;
+                if (input.source instanceof AdrenalineCachedDensityAccess cache && first == input.owner
+                    && cache.adrenaline$writeNativeColumnInput(this.inputValues, offset, input.owner, x, z)) {
+                    double value = this.inputValues.getDouble(offset);
+                    for (int j = 1; j < count; j++) {
+                        this.inputValues.putDouble(offset + j * Double.BYTES, value);
+                    }
+                } else if (input.source instanceof AdrenalineNoiseFunctionAccess || input.source instanceof AdrenalineBlendedNoiseAccess) {
+                    if (this.sliceInput == null || this.sliceInput.length != count) {
+                        this.sliceInput = new double[count];
+                    }
+                    input.source.fillArray(this.sliceInput, provider);
+                    for (int j = 0; j < count; j++) {
+                        this.inputValues.putDouble(offset + j * Double.BYTES, this.sliceInput[j]);
+                    }
+                } else {
+                    for (int j = 0; j < count; j++) {
+                        this.inputValues.putDouble(offset + j * Double.BYTES, input.source.compute(provider.forIndex(j)));
+                    }
+                }
+            }
+        }
         return true;
     }
 
