@@ -44,3 +44,5 @@ pub extern fn adrenaline_aquifer_context_init(memory: [*]align(8) u8, capacity: 
 pub extern fn adrenaline_aquifer_context_prepare(memory: [*]align(8) const u8, density: [*]const f64, candidates: [*]i64, global_level: i32, global_type: i8, base_x: i32, base_y: i32, base_z: i32, width: usize, height: usize, deferred: [*]i32, materials: [*]i8) callconv(.c) usize;
 
 pub extern fn adrenaline_density_slice_avx2(program: [*]const u8, program_length: usize, x: i32, y: i32, z: i32, step: i32, count: usize, inputs: [*]const f64, input_length: usize, output: [*]f64) callconv(.c) c_int;
+
+pub extern fn adrenaline_density_lattice_avx2(program: [*]const u8, program_length: usize, x: i32, y: i32, z: i32, width: usize, height: usize, step_xz: i32, step_y: i32, inputs: [*]const f64, input_length: usize, output: [*]f64) callconv(.c) c_int;

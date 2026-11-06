@@ -14,6 +14,7 @@ import net.fly.adrenaline.worldgen.AdrenalineShiftedNoiseAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NativeCellDensityEvaluator;
+import net.fly.adrenaline.worldgen.NativeSliceLattice;
 import net.fly.adrenaline.worldgen.NativeDensityProgram;
 import net.fly.adrenaline.worldgen.NativeDensityProgramCompiler;
 import net.fly.adrenaline.natives.NativeDensitySampler;
@@ -150,6 +151,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     @Unique private double[] adrenaline$valueZ1;
     @Unique private double[] adrenaline$values;
     @Unique private PerlinSectionCache adrenaline$perlinSections;
+    @Unique private double[][] adrenaline$sliceLattices;
     @Unique private int adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
     @Unique
     private final Function<DensityFunction, DensityFunction> adrenaline$wrapNewFunction = this::adrenaline$wrapNew;
@@ -191,6 +193,7 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.adrenaline$values = new double[size];
         this.adrenaline$sliceDensityEvaluators = null;
         this.adrenaline$perlinSections = null;
+        this.adrenaline$sliceLattices = null;
         this.adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
     }
 
@@ -255,6 +258,17 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
                 this.cellCountXZ + 1
             );
         }
+        boolean nativeLattice = nativePerlin && AdrenalineConfig.nativeBlendedNoiseEnabled() && AdrenalineConfig.nativeDensityEvaluationEnabled();
+        if (nativeLattice && this.adrenaline$sliceLattices == null) {
+            this.adrenaline$sliceLattices = new double[interpolatorArray.length][];
+            for (int i = 0; i < sliceEvaluators.length; i++) {
+                if (sliceEvaluators[i] instanceof NativeCellDensityEvaluator evaluator) {
+                    this.adrenaline$sliceLattices[i] = NativeSliceLattice.evaluate(evaluator.program(), (NoiseChunk) (Object) this,
+                        this.adrenaline$perlinSections, this.cellStartBlockX, this.cellNoiseMinY * this.cellHeight, this.firstCellZ * this.cellWidth,
+                        this.cellCountXZ + 1, this.cellCountY + 1, this.cellWidth, this.cellHeight);
+                }
+            }
+        }
         int perlinXIndex = cellX - this.adrenaline$perlinSectionBaseCellX;
         for (int cellZ = 0; cellZ < this.cellCountXZ + 1; cellZ++) {
             int currentCellZ = this.firstCellZ + cellZ;
@@ -264,6 +278,12 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             for (int i = 0; i < interpolatorArray.length; i++) {
                 AdrenalineMixinNoiseInterpolatorView interpolator = interpolatorArray[i];
                 double[] slice = (useFirstSlice ? interpolator.adrenaline$getSlice0() : interpolator.adrenaline$getSlice1())[cellZ];
+                if (nativeLattice && perlinXIndex >= 0 && perlinXIndex <= this.cellCountXZ && this.adrenaline$sliceLattices[i] != null) {
+                    double[] lattice = this.adrenaline$sliceLattices[i];
+                    System.arraycopy(lattice, (perlinXIndex * (this.cellCountXZ + 1) + cellZ) * slice.length, slice, 0, slice.length);
+                    this.sliceFillingContextProvider.forIndex(slice.length - 1);
+                    continue;
+                }
                 if (nativeSection) {
                     PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
                 }

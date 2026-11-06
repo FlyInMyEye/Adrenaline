@@ -22,3 +22,7 @@ pub fn evaluate_density_slice(program: []const u8, x: i32, y: i32, z: i32, step:
     if (output.len <= 64) return density_interpreter.evaluate_density_slice(64, program, x, y, z, step, output, inputs);
     return density_interpreter.evaluate_density_slice(core_limits.max_grid_axis, program, x, y, z, step, output, inputs);
 }
+
+pub fn evaluate_density_lattice(program: []const u8, x: i32, y: i32, z: i32, width: usize, height: usize, step_xz: i32, step_y: i32, output: []f64, inputs: []const f64) bool {
+    return density_interpreter.evaluate_density_lattice(1280, program, x, y, z, width, height, step_xz, step_y, output, inputs);
+}

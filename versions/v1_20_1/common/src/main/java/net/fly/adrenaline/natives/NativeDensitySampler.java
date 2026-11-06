@@ -45,6 +45,23 @@ public final class NativeDensitySampler {
         }
     }
 
+    public static boolean evaluateLattice(NativeDensityProgram program, ByteBuffer inputs, int x, int y, int z,
+                                          int width, int height, int stepXz, int stepY, double[] output) {
+        if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
+            return false;
+        }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
+        try {
+            return evaluateLattice0(program.bytecode(), program.length(), inputs, program.inputCount(), x, y, z, stepXz, stepY, width, height, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.DENSITY, exception);
+            return false;
+        } finally {
+            Reference.reachabilityFence(program);
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
+        }
+    }
+
     public static boolean evaluateSlice(NativeDensityProgram program, int x, int y, int z, int step, double[] output) {
         if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
             return false;
@@ -60,6 +77,8 @@ public final class NativeDensitySampler {
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
         }
     }
+
+    private static native boolean evaluateLattice0(ByteBuffer program, int length, ByteBuffer inputs, int inputCount, int x, int y, int z, int stepXz, int stepY, int width, int height, double[] output);
 
     private static native boolean evaluateSlice0(ByteBuffer program, int length, ByteBuffer inputs, int inputCount, int x, int y, int z, int step, int count, double[] output);
 
