@@ -1,5 +1,7 @@
 package net.fly.adrenaline.natives;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 
 public final class NativeAquiferSampler {
@@ -56,6 +58,42 @@ public final class NativeAquiferSampler {
         }
     }
 
+    public static ByteBuffer createContext(short[] packedLocations, int[] fluidLevels, byte[] fluidTypes,
+                                           int minGridX, int minGridY, int minGridZ, int gridSizeX, int gridSizeZ) {
+        if (!AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
+            return null;
+        }
+        try {
+            int bytes = contextBytes0(packedLocations.length);
+            if (bytes <= 0) {
+                return null;
+            }
+            ByteBuffer context = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
+            return createContext0(context, packedLocations, fluidLevels, fluidTypes, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ)
+                ? context : null;
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.AQUIFER, exception);
+            return null;
+        }
+    }
+
+    public static boolean prepareContext(ByteBuffer context, double[] densityValues, long[] candidates, int globalFluidLevel, byte globalFluidType,
+                                         int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, int[] deferredIndices, int[] deferredCount, byte[] output) {
+        if (!AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
+            return false;
+        }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.AQUIFER_PREPARE);
+        try {
+            return prepareContext0(context, densityValues, candidates, globalFluidLevel, globalFluidType,
+                baseX, baseY, baseZ, cellWidth, cellHeight, deferredIndices, deferredCount, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.AQUIFER, exception);
+            return false;
+        } finally {
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.AQUIFER_PREPARE, startedNanos);
+        }
+    }
+
     public static boolean classify(double[] densityValues, byte[] globalMaterials, long[] candidates, int[] fluidLevels, byte[] fluidTypes,
                                    int baseY, int cellWidth, int cellHeight, byte[] output) {
         if (!AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
@@ -82,4 +120,12 @@ public final class NativeAquiferSampler {
 
     private static native boolean classify0(double[] densityValues, byte[] globalMaterials, long[] candidates, int[] fluidLevels, byte[] fluidTypes,
                                             int baseY, int cellWidth, int cellHeight, byte[] output);
+
+    private static native int contextBytes0(int count);
+
+    private static native boolean createContext0(ByteBuffer context, short[] packedLocations, int[] fluidLevels, byte[] fluidTypes,
+                                                int minGridX, int minGridY, int minGridZ, int gridSizeX, int gridSizeZ);
+
+    private static native boolean prepareContext0(ByteBuffer context, double[] densityValues, long[] candidates, int globalFluidLevel, byte globalFluidType,
+                                                 int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, int[] deferredIndices, int[] deferredCount, byte[] output);
 }

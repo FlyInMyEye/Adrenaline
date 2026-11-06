@@ -1,6 +1,4 @@
-const c = @cImport({
-    @cInclude("jni.h");
-});
+const c = @import("../core/jni.zig").c;
 const std = @import("std");
 
 const Node = extern struct { op: i32, a: i32, b: i32, c: i32, d: i32, yes: i32, no: i32, reserved: i32 };
@@ -295,7 +293,7 @@ fn noise_value(config: Noise, x: i32, y: i32, z: i32) f64 {
     @setFloatMode(.strict);
     const first: [*]const u8 = @ptrFromInt(config.first);
     const second: [*]const u8 = @ptrFromInt(config.second);
-    return @import("adrenaline_native.zig").normal_noise_value(first, config.first_count, second, config.second_count, config.factor, @as(f64, @floatFromInt(x)) * config.xz_scale, if (config.y_scale == 0.0) 0.0 else @as(f64, @floatFromInt(y)) * config.y_scale, @as(f64, @floatFromInt(z)) * config.xz_scale);
+    return @import("../noise/scalar.zig").normal_noise_value(first, config.first_count, second, config.second_count, config.factor, @as(f64, @floatFromInt(x)) * config.xz_scale, if (config.y_scale == 0.0) 0.0 else @as(f64, @floatFromInt(y)) * config.y_scale, @as(f64, @floatFromInt(z)) * config.xz_scale);
 }
 
 fn cached_noise(program: Program, cache: *ColumnCache, index: usize, slot: usize, x: i32, y: i32, z: i32) f64 {
@@ -322,7 +320,12 @@ fn temperature_noise(program: Program, cache: *ColumnCache, index: u32, kind: u2
             nx = @as(f32, @floatFromInt(x)) / 8.0;
             nz = @as(f32, @floatFromInt(z)) / 8.0;
         } else {
-            const scale: f64 = switch (kind) { 1 => 0.05, 2 => 0.2, 3 => 0.09, else => unreachable };
+            const scale: f64 = switch (kind) {
+                1 => 0.05,
+                2 => 0.2,
+                3 => 0.09,
+                else => unreachable,
+            };
             nx = @as(f64, @floatFromInt(x)) * scale;
             nz = @as(f64, @floatFromInt(z)) * scale;
         }
