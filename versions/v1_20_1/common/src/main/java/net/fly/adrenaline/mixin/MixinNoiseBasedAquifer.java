@@ -8,6 +8,7 @@ import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
 import net.fly.adrenaline.worldgen.AdrenalineFluidStatusAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNativeAquiferAccess;
 import net.fly.adrenaline.worldgen.SharedAquiferFluidStatuses;
+import java.nio.ByteBuffer;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
@@ -107,6 +108,12 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
 
     @Unique
     private boolean adrenaline$nativeFluidTableUnsupported;
+
+    @Unique
+    private ByteBuffer adrenaline$nativeContext;
+
+    @Unique
+    private boolean adrenaline$nativeContextInitialized;
 
     @Unique
     private double[] adrenaline$nativeBarrierValues;
@@ -213,9 +220,18 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
             return true;
         }
 
-        boolean prepared = NativeAquiferSampler.prepare(densityValues, adrenaline$nativeCandidates, adrenaline$packedAquiferLocations,
-            adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ,
-            baseX, baseY, baseZ, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials);
+        if (!adrenaline$nativeContextInitialized) {
+            adrenaline$nativeContext = NativeAquiferSampler.createContext(adrenaline$packedAquiferLocations,
+                adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ);
+            adrenaline$nativeContextInitialized = true;
+        }
+        boolean prepared = adrenaline$nativeContext != null
+            ? NativeAquiferSampler.prepareContext(adrenaline$nativeContext, densityValues, adrenaline$nativeCandidates,
+                adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, baseX, baseY, baseZ, cellWidth, cellHeight,
+                adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials)
+            : NativeAquiferSampler.prepare(densityValues, adrenaline$nativeCandidates, adrenaline$packedAquiferLocations,
+                adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ,
+                baseX, baseY, baseZ, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials);
         if (!prepared) {
             return false;
         }
