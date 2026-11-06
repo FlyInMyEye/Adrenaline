@@ -14,6 +14,10 @@ public final class NativeCellDensityEvaluator implements CellDensityEvaluator {
         this.fallback = fallback;
     }
 
+    public NativeDensityProgram program() {
+        return this.program;
+    }
+
     @Override
     public void fill(double[] values, DensityFunction.ContextProvider contextProvider) {
         boolean nativeResult = false;

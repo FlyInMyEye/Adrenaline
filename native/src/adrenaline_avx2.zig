@@ -81,3 +81,7 @@ pub export fn adrenaline_fill_air_avx2(density: [*]const f64, materials: [*]i8, 
 pub export fn adrenaline_density_slice_avx2(program: [*]const u8, program_length: usize, x: i32, y: i32, z: i32, step: i32, count: usize, inputs: [*]const f64, input_length: usize, output: [*]f64) callconv(.c) c_int {
     return @intFromBool(density_program.evaluate_density_slice(program[0..program_length], x, y, z, step, output[0..count], inputs[0..input_length]));
 }
+
+pub export fn adrenaline_density_lattice_avx2(program: [*]const u8, program_length: usize, x: i32, y: i32, z: i32, width: usize, height: usize, step_xz: i32, step_y: i32, inputs: [*]const f64, input_length: usize, output: [*]f64) callconv(.c) c_int {
+    return @intFromBool(density_program.evaluate_density_lattice(program[0..program_length], x, y, z, width, height, step_xz, step_y, output[0 .. width * width * height], inputs[0..input_length]));
+}
