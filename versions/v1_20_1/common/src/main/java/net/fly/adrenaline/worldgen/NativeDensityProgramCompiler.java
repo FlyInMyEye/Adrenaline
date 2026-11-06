@@ -34,15 +34,19 @@ public final class NativeDensityProgramCompiler {
     }
 
     public static Result compile(DensityFunction root) {
-        return compile(root, false);
+        return compile(root, false, false);
+    }
+
+    public static Result compileSlice(DensityFunction root) {
+        return compile(root, false, true);
     }
 
     public static Result compileColumn(DensityFunction root) {
-        return compile(root, true);
+        return compile(root, true, false);
     }
 
-    private static Result compile(DensityFunction root, boolean column) {
-        Builder builder = new Builder(column);
+    private static Result compile(DensityFunction root, boolean column, boolean slice) {
+        Builder builder = new Builder(column, slice);
         try {
             if (!builder.emit(root, 0)) {
                 return new Result(null, builder.rejection == null ? root.getClass().getName() : builder.rejection);
@@ -82,9 +86,11 @@ public final class NativeDensityProgramCompiler {
         private boolean emptyBlender;
         private String rejection;
         private final boolean column;
+        private final boolean slice;
 
-        private Builder(boolean column) {
+        private Builder(boolean column, boolean slice) {
             this.column = column;
+            this.slice = slice;
         }
 
         private boolean emit(DensityFunction function, int depth) throws ReflectiveOperationException {
@@ -132,6 +138,9 @@ public final class NativeDensityProgramCompiler {
             if (function instanceof DensityFunctions.MarkerOrMarked marker && function.getClass() == MARKER) {
                 return this.emit(marker.wrapped(), depth + 1);
             }
+            if (this.slice && function instanceof DensityFunctions.MarkerOrMarked marker && marker.type() == CACHE_ONCE) {
+                return this.emit(marker.wrapped(), depth + 1);
+            }
             if (this.column && function instanceof DensityFunctions.MarkerOrMarked marker
                 && (marker.type() == CACHE_ONCE || marker.type() == CACHE_ALL || marker.type() == INTERPOLATED)) {
                 return this.emit(marker.wrapped(), depth + 1);
@@ -164,6 +173,9 @@ public final class NativeDensityProgramCompiler {
             }
             if (function instanceof AdrenalineReciprocalFunctionAccess reciprocal) {
                 return this.emit(reciprocal.adrenaline$getReciprocalInput(), depth + 1) && this.put(NativeDensityProgram.RECIPROCAL);
+            }
+            if (this.slice && (function instanceof AdrenalineNoiseFunctionAccess || function instanceof AdrenalineBlendedNoiseAccess)) {
+                return this.emitInput(function);
             }
             if (function instanceof AdrenalineBlendedNoiseAccess blended) {
                 BlendedNativeSampler.Data data = blended.adrenaline$getNativeData();
@@ -537,6 +549,10 @@ public final class NativeDensityProgramCompiler {
         }
 
         private boolean emitInterpolator(AdrenalineNativeInterpolatorAccess interpolator) {
+            if (this.slice) {
+                this.rejection = "interpolator in slice";
+                return false;
+            }
             this.code.put(NativeDensityProgram.INTERPOLATOR);
             int offset = this.code.position();
             this.interpolators.add(new NativeDensityProgram.InterpolatorBinding(interpolator, offset));

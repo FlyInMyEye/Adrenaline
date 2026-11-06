@@ -36,8 +36,16 @@ public final class CellDensityCompiler {
     }
 
     public static CellDensityEvaluator compile(DensityFunction root) {
+        return compile(root, false);
+    }
+
+    public static CellDensityEvaluator compileSlice(DensityFunction root) {
+        return compile(root, true);
+    }
+
+    private static CellDensityEvaluator compile(DensityFunction root, boolean slice) {
         NativeDensityProgram program = AdrenalineConfig.nativeDensityEvaluationEnabled()
-            ? NativeDensityProgramCompiler.compile(root).program() : null;
+            ? (slice ? NativeDensityProgramCompiler.compileSlice(root) : NativeDensityProgramCompiler.compile(root)).program() : null;
         CellDensityEvaluator evaluator = compileJava(root);
         if (program != null) {
             return new NativeCellDensityEvaluator(program, evaluator == null ? root::fillArray : evaluator);
