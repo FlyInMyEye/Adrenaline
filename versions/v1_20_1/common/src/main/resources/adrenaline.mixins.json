@@ -27,6 +27,7 @@
     "MixinStructureCheck",
     "MixinChunkSerializer",
     "MixinPalettedContainerPacking",
+    "MixinPalettedContainerData",
     "MixinChunkAccessAccessor",
     "MixinProtoChunkHeightmaps",
     "MixinLevelChunkSectionAccessor",
