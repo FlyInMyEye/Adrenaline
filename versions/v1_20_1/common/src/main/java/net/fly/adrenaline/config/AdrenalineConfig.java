@@ -361,6 +361,12 @@ public class AdrenalineConfig {
         return nativePerlinBatchingEnabled() && get().approximateNativePerlin;
     }
 
+    public static boolean nativeGeodeFilteringEnabled() {
+        return AdrenalineNatives.isAvailable() && get().nativeGeodeFiltering
+            && !OptimizationTakeoverRegistry.isControlled(Optimization.GEODE_FILTER)
+            && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_PERLIN);
+    }
+
     public static boolean nativeDensityEvaluationEnabled() {
         return AdrenalineNatives.isAvailable() && get().nativeDensityEvaluation;
     }
@@ -612,6 +618,7 @@ public class AdrenalineConfig {
         @WorkInProgress
         public boolean approximateNativePerlin = false;
         public boolean nativeDensityEvaluation = true;
+        public boolean nativeGeodeFiltering = true;
         public boolean nativeAquiferBatching = true;
         public int nativeSettingsVersion = 1;
         public int settingsVersion;
@@ -700,6 +707,7 @@ public class AdrenalineConfig {
             this.nativePerlinBatching = other.nativePerlinBatching;
             this.approximateNativePerlin = other.approximateNativePerlin;
             this.nativeDensityEvaluation = other.nativeDensityEvaluation;
+            this.nativeGeodeFiltering = other.nativeGeodeFiltering;
             this.nativeAquiferBatching = other.nativeAquiferBatching;
             this.nativeSettingsVersion = other.nativeSettingsVersion;
             this.settingsVersion = other.settingsVersion;
@@ -759,6 +767,7 @@ public class AdrenalineConfig {
             this.surfaceColumnOptimizations = false;
             this.nativePerlinBatching = false;
             this.nativeDensityEvaluation = false;
+            this.nativeGeodeFiltering = false;
             this.nativeAquiferBatching = false;
             this.fastLegacyRandom = false;
         }
