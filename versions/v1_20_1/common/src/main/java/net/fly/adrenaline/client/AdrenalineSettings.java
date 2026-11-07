@@ -102,6 +102,7 @@ final class AdrenalineSettings {
         settings.add(toggle("aquiferStatusCacheOptimizations", "aquifer_status_cache_optimizations", Group.AQUIFERS, false, Impact.MEDIUM, d -> d.aquiferStatusCacheOptimizations, (d, v) -> d.aquiferStatusCacheOptimizations = v).controlled(Optimization.AQUIFER).nativeBackend(Feature.AQUIFER).requires(d -> d.nativeAquiferBatching && d.aquiferOptimizations, "native_aquifer_batching"));
         settings.add(toggle("nativeBlendedNoise", "native_blended_noise", Group.NOISE, false, Impact.HIGH, d -> d.nativeBlendedNoise, (d, v) -> d.nativeBlendedNoise = v).controlled(Optimization.NATIVE_BLENDED_NOISE).nativeBackend(Feature.BLENDED_NOISE).requires(d -> d.noiseSliceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_SLICES), "noise_slice_optimizations"));
         settings.add(toggle("nativeSurfaceNoise", "native_surface_noise", Group.SURFACE_SAMPLING, false, Impact.MEDIUM, d -> d.nativeSurfaceNoise, (d, v) -> d.nativeSurfaceNoise = v).nativeBackend(Feature.PERLIN));
+        settings.add(toggle("nativeGeodeFiltering", "native_geode_filtering", Group.FEATURES, false, Impact.HIGH, d -> d.nativeGeodeFiltering, (d, v) -> d.nativeGeodeFiltering = v).controlled(Optimization.GEODE_FILTER, Optimization.NATIVE_PERLIN).nativeBackend());
         settings.add(toggle("inlineGenerationTasks", "inline_generation_tasks", Group.SCHEDULING, false, Impact.MEDIUM, d -> d.inlineGenerationTasks, (d, v) -> d.inlineGenerationTasks = v).controlled(Optimization.INLINE_GENERATION_TASKS));
         if (BuildConfig.DEBUG) {
             settings.add(toggle("showThreadVisualizer", "show_thread_visualizer", Group.DIAGNOSTICS, false, Impact.LOW, d -> d.showThreadVisualizer, (d, v) -> d.showThreadVisualizer = v));
@@ -193,7 +194,7 @@ final class AdrenalineSettings {
     }
 
     enum Group {
-        ALL, SCHEDULING, STAGES, TERRAIN, DENSITY, NOISE, INTERPOLATION, BIOMES, AQUIFERS, ORE, SURFACE_RULES, SURFACE_SAMPLING, STORAGE, SAVING, STARTUP, WARMUP, DIAGNOSTICS;
+        ALL, SCHEDULING, STAGES, TERRAIN, DENSITY, NOISE, INTERPOLATION, BIOMES, AQUIFERS, ORE, FEATURES, SURFACE_RULES, SURFACE_SAMPLING, STORAGE, SAVING, STARTUP, WARMUP, DIAGNOSTICS;
 
         Component title() {
             return Component.translatable("gui.adrenaline.config.group." + this.name().toLowerCase(java.util.Locale.ROOT));
