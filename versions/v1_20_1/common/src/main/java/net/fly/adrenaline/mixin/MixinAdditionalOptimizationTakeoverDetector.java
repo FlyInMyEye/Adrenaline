@@ -11,7 +11,8 @@ import org.spongepowered.asm.mixin.Mixin;
     "net.minecraft.world.level.levelgen.DensityFunctions$Noise",
     "net.minecraft.world.level.levelgen.SurfaceRules$Context",
     "net.minecraft.world.level.levelgen.RandomState$1",
-    "net.minecraft.world.level.levelgen.feature.GeodeFeature"
+    "net.minecraft.world.level.levelgen.feature.GeodeFeature",
+    "net.minecraft.world.level.chunk.PalettedContainer$Data"
 }, priority = 1)
 public class MixinAdditionalOptimizationTakeoverDetector {
 }
