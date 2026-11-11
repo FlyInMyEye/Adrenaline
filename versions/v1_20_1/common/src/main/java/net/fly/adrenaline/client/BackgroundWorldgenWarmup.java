@@ -98,7 +98,7 @@ public final class BackgroundWorldgenWarmup {
         stop(minecraft);
         if (loading != null || WorldCreationContextWaiter.isPreloading()) {
             Screen previous = minecraft.screen;
-            Screen waiting = new GenericDirtMessageScreen(Component.translatable("selectWorld.preparing"));
+            Screen waiting = new GenericDirtMessageScreen(Component.translatable("createWorld.preparing"));
             minecraft.setScreen(waiting);
             try {
                 minecraft.managedBlock(() -> {
