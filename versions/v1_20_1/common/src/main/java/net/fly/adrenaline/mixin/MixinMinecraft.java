@@ -75,6 +75,7 @@ public class MixinMinecraft {
     private void adrenaline$finishBackgroundSaveBeforeShutdown(CallbackInfo ci) {
         BackgroundWorldgenWarmup.stop((Minecraft) (Object) this);
         BackgroundWorldSave.awaitCompletion();
+        WorldDeletion.awaitCompletion();
     }
 
     @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;isReady()Z"), cancellable = true)

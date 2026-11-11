@@ -103,6 +103,7 @@
     "MixinClientOptimizationTakeoverDetector",
     "MixinLevelLoadingScreen",
     "MixinLevelStorageSource",
+    "MixinWorldSelectionList",
     "MixinDirectoryLock",
     "MixinGui",
     "MixinDebugScreenOverlay",

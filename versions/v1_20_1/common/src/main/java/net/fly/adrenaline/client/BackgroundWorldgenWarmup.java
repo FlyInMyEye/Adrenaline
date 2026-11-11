@@ -2,6 +2,7 @@ package net.fly.adrenaline.client;
 
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.MixinMinecraftFrameInvoker;
@@ -37,12 +38,14 @@ import net.minecraft.world.level.storage.PrimaryLevelData;
 public final class BackgroundWorldgenWarmup {
 
     private static final String LEVEL_PREFIX = "adrenaline_warmup_";
+    private static final Pattern GENERATED_LEVEL = Pattern.compile(LEVEL_PREFIX + "[0-9a-f]{32}");
     private static final char[] SPINNER = {'-', '\\', '|', '/'};
     private static final ThreadLocal<Boolean> WARMUP_CALL = ThreadLocal.withInitial(() -> false);
 
     private static boolean started;
+    private static boolean recoveryStarted;
     private static boolean running;
-    private static String levelId;
+    private static volatile String levelId;
     private static volatile IntegratedServer server;
     private static CompletableFuture<WorldStem> loading;
 
@@ -51,6 +54,10 @@ public final class BackgroundWorldgenWarmup {
             return;
         }
         Screen screen = minecraft.screen;
+        if (!recoveryStarted && screen instanceof TitleScreen) {
+            recoveryStarted = true;
+            WorldDeletion.recoverWarmupWorlds(minecraft);
+        }
         if (!AdrenalineConfig.prepareWorldCreationContext()) {
             WorldCreationContextWaiter.consume();
         }
@@ -123,6 +130,10 @@ public final class BackgroundWorldgenWarmup {
 
     public static boolean isWarmupLevel(String requestedLevelId) {
         return requestedLevelId.startsWith(LEVEL_PREFIX);
+    }
+
+    public static boolean isStaleWarmupLevel(String requestedLevelId) {
+        return !requestedLevelId.equals(levelId) && GENERATED_LEVEL.matcher(requestedLevelId).matches();
     }
 
     public static void detachWorldLoad(IntegratedServer detachedServer) {
