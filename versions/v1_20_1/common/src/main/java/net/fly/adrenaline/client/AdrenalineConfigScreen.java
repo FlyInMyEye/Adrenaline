@@ -25,17 +25,14 @@ import net.minecraft.network.chat.MutableComponent;
 import org.lwjgl.glfw.GLFW;
 
 public class AdrenalineConfigScreen extends Screen {
+    private static final int CATEGORY_COLUMN_WIDTH = 120;
+    private static final int MIN_OPTIONS_WIDTH = 320;
     private final Screen parent;
     private final Session session;
     private final boolean advanced;
     private SettingsList options;
-    private SettingsList categories;
     private EditBox search;
     private Button apply;
-    private Button categoryButton;
-    private boolean sidebar;
-    private int contentLeft;
-    private int contentWidth;
     private int listTop;
     private int listBottom;
     private Group group = Group.ALL;
@@ -60,19 +57,17 @@ public class AdrenalineConfigScreen extends Screen {
 
     @Override
     protected void init() {
-        this.contentWidth = Math.min(this.width - 32, this.advanced ? 760 : 560);
-        this.contentLeft = (this.width - this.contentWidth) / 2;
-        this.sidebar = this.advanced && this.contentWidth >= 680;
-        int sidebarWidth = this.sidebar ? 120 : 0;
+        int contentWidth = Math.min(this.width - 32, this.advanced ? 760 : 560);
+        int left = (this.width - contentWidth) / 2;
+        int sidebarWidth = this.advanced && contentWidth >= CATEGORY_COLUMN_WIDTH + MIN_OPTIONS_WIDTH ? CATEGORY_COLUMN_WIDTH : 0;
+        if (sidebarWidth == 0) {
+            this.group = Group.ALL;
+        }
         this.listTop = this.advanced ? 64 : 36;
-        boolean twoFooterRows = this.contentWidth < 400;
+        boolean twoFooterRows = contentWidth < 400;
         this.listBottom = this.height - (twoFooterRows ? 62 : 36);
-        int left = this.contentLeft;
-        int contentWidth = this.contentWidth;
-        this.categories = null;
-        this.categoryButton = null;
         if (this.advanced) {
-            int searchLeft = left + (this.sidebar ? sidebarWidth : 128);
+            int searchLeft = left + sidebarWidth;
             this.search = new EditBox(this.font, searchLeft, 36, contentWidth - (searchLeft - left), 20,
                 Component.translatable("gui.adrenaline.config.search"));
             this.search.setHint(Component.translatable("gui.adrenaline.config.search"));
@@ -83,12 +78,9 @@ public class AdrenalineConfigScreen extends Screen {
                 this.populateOptions(false);
             });
             this.addRenderableWidget(this.search);
-            if (this.sidebar) {
-                this.categories = this.addRenderableWidget(this.createCategories(sidebarWidth - 8, this.listTop));
-                this.categories.setLeftPos(left);
-            } else {
-                this.categoryButton = this.addRenderableWidget(Button.builder(this.group.title(), button -> this.toggleCategories())
-                    .bounds(left, 36, 120, 20).build());
+            if (sidebarWidth > 0) {
+                SettingsList categories = this.addRenderableWidget(this.createCategories(sidebarWidth - 8, this.search.getY() - 4));
+                categories.setLeftPos(left);
             }
         }
         this.options = this.addRenderableWidget(new SettingsList(contentWidth - sidebarWidth, this.listTop, 24));
@@ -231,12 +223,7 @@ public class AdrenalineConfigScreen extends Screen {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
-        if (!this.sidebar && this.categories != null && key == GLFW.GLFW_KEY_ESCAPE) {
-            this.closeCategories();
-            return true;
-        }
         if (this.search != null && key == GLFW.GLFW_KEY_F && hasControlDown()) {
-            this.closeCategories();
             this.setFocused(this.search);
             this.search.setFocused(true);
             return true;
@@ -262,52 +249,6 @@ public class AdrenalineConfigScreen extends Screen {
             }
         }
         return list;
-    }
-
-    private void toggleCategories() {
-        if (this.categories != null) {
-            this.closeCategories();
-            return;
-        }
-        this.categories = this.createCategories(160, this.listTop);
-        this.categories.setLeftPos(this.contentLeft);
-        this.addRenderableWidget(this.categories);
-        this.setFocused(this.categories);
-    }
-
-    private void closeCategories() {
-        if (!this.sidebar && this.categories != null) {
-            this.removeWidget(this.categories);
-            this.categories = null;
-            this.setFocused(this.categoryButton);
-        }
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (!this.sidebar && this.categories != null) {
-            this.categories.mouseScrolled(mouseX, mouseY, delta);
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, delta);
-    }
-
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!this.sidebar && this.categories != null) {
-            if (this.categories.isMouseOver(mouseX, mouseY)) {
-                SettingsList popup = this.categories;
-                boolean handled = popup.mouseClicked(mouseX, mouseY, button);
-                if (handled && this.categories == popup) {
-                    this.setFocused(popup);
-                    this.setDragging(button == 0);
-                }
-                return handled;
-            }
-            this.closeCategories();
-            return true;
-        }
-        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private final class SettingsList extends ContainerObjectSelectionList<Row> {
@@ -340,21 +281,6 @@ public class AdrenalineConfigScreen extends Screen {
         @Override
         protected int getScrollbarPosition() {
             return this.x1 - 8;
-        }
-
-        @Override
-        public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-            boolean popup = this == AdrenalineConfigScreen.this.categories && !AdrenalineConfigScreen.this.sidebar;
-            if (popup) {
-                graphics.pose().pushPose();
-                graphics.pose().translate(0, 0, 200);
-                graphics.fill(this.x0, this.y0 - 2, this.x1, this.y1 + 2, 0xFF202020);
-            }
-            boolean covered = this == AdrenalineConfigScreen.this.options && !AdrenalineConfigScreen.this.sidebar && AdrenalineConfigScreen.this.categories != null;
-            super.render(graphics, covered ? -1 : mouseX, covered ? -1 : mouseY, delta);
-            if (popup) {
-                graphics.pose().popPose();
-            }
         }
     }
 
@@ -396,10 +322,6 @@ public class AdrenalineConfigScreen extends Screen {
             this.category = category;
             this.button = Button.builder(category.title(), pressed -> {
                 AdrenalineConfigScreen.this.group = category;
-                if (AdrenalineConfigScreen.this.categoryButton != null) {
-                    AdrenalineConfigScreen.this.categoryButton.setMessage(category.title());
-                }
-                AdrenalineConfigScreen.this.closeCategories();
                 AdrenalineConfigScreen.this.populateOptions(false);
             }).bounds(0, 0, 100, 20).build();
             this.widgets.add(this.button);
