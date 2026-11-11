@@ -129,8 +129,8 @@ def generateForgeMixinConfigs = tasks.register('generateForgeMixinConfigs') {
             def config = new groovy.json.JsonSlurper().parse(inputFile)
             config.refmap = "${modId}.refmap.json".toString()
             if (inputFile.name == "${modId}.mixins.json") {
-                config.client.removeAll(['MixinGui', 'MixinDebugScreenOverlay', 'MixinTitleScreenBranding'])
-                config.client.addAll(['MixinForgeLoadingOverlay', 'MixinBrandingControl'])
+                config.client.removeAll(['MixinGui', 'MixinDebugScreenOverlay'])
+                config.client.addAll(['MixinForgeLoadingOverlay'])
             }
             new File(outputDirectory, inputFile.name).text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(config)) + '\n'
         }
