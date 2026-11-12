@@ -6,38 +6,19 @@ plugins {
     id 'org.spongepowered.mixin' version '0.7.+'
 }
 
-def workspaceProperties = new Properties()
-def workspaceGradleProperties = file('../../../gradle.properties')
-workspaceGradleProperties.withInputStream { input -> workspaceProperties.load(input) }
-def sharedProperty = { key -> workspaceProperties.getProperty(key) }
+ext.minecraftVersion = '1.20.1'
+ext.loaderId = 'forge'
 
-def modId = sharedProperty('mod_id')
-def modName = sharedProperty('mod_name')
-def modGroupId = sharedProperty('mod_group_id')
-def modVersion = sharedProperty('mod_version')
-def modAuthors = sharedProperty('mod_authors')
-def modLicense = sharedProperty('mod_license')
-def modDescription = sharedProperty('mod_description')
-def minecraftVersion = '1.20.1'
+apply from: '../../../gradle/mod-common.gradle'
+
 def minecraftVersionRange = '[1.20.1,1.21)'
 def forgeVersion = '47.4.10'
 def forgeVersionRange = '[47,)'
 def loaderVersionRange = '[47,)'
-def prodBuild = providers.gradleProperty('prodBuild').map { it.toBoolean() }.orElse(false)
-def generatedBuildConfigDir = layout.buildDirectory.dir('generated/sources/buildConfig/java')
 def generatedForgeMixinsDir = layout.buildDirectory.dir('generated/resources/forgeMixins')
-
-version = modVersion
-group = modGroupId
-
-base {
-    archivesName = 'adrenaline-forge'
-}
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
-sourceSets.main.java.setSrcDirs(['../../../common/src/main/java', '../common/src/main/java', 'src/main/java'])
-sourceSets.main.java.srcDir generatedBuildConfigDir
 sourceSets.main.resources.setSrcDirs(['../../../assets', 'src/main/resources', 'src/generated/resources'])
 
 minecraft {
@@ -95,24 +76,6 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
-tasks.register('generateBuildConfig') {
-    inputs.property('prodBuild', prodBuild)
-    outputs.dir(generatedBuildConfigDir)
-    doLast {
-        File outputFile = generatedBuildConfigDir.get().file('net/fly/adrenaline/BuildConfig.java').asFile
-        outputFile.parentFile.mkdirs()
-        outputFile.text = """package net.fly.adrenaline;
-
-public final class BuildConfig {
-    public static final boolean DEBUG = ${!prodBuild.get()};
-
-    private BuildConfig() {
-    }
-}
-"""
-    }
-}
-
 def generateForgeMixinConfigs = tasks.register('generateForgeMixinConfigs') {
     def sharedMixinConfigs = files(
         "../common/src/main/resources/${modId}.mixins.json",
@@ -139,27 +102,13 @@ def generateForgeMixinConfigs = tasks.register('generateForgeMixinConfigs') {
 
 sourceSets.main.resources.srcDir(generateForgeMixinConfigs)
 
-tasks.named('compileJava', JavaCompile).configure {
-    dependsOn tasks.named('generateBuildConfig')
-}
-
 tasks.named('processResources', ProcessResources).configure {
-    from('../../../native/build') {
-        into 'adrenaline/natives'
-        include '**/*.so', '**/*.dll', '**/*.dylib'
-    }
-    def replaceProperties = [
+    def replaceProperties = modProperties + [
         minecraft_version: minecraftVersion,
         minecraft_version_range: minecraftVersionRange,
         forge_version: forgeVersion,
         forge_version_range: forgeVersionRange,
-        loader_version_range: loaderVersionRange,
-        mod_id: modId,
-        mod_name: modName,
-        mod_license: modLicense,
-        mod_version: modVersion,
-        mod_authors: modAuthors,
-        mod_description: modDescription
+        loader_version_range: loaderVersionRange
     ]
     inputs.properties replaceProperties
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
@@ -168,10 +117,6 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 tasks.named('jar', Jar).configure {
-    from('../../../LICENSE') {
-        into 'META-INF'
-    }
-
     if (prodBuild.get()) {
         archiveFileName.set("adrenaline-forge-1.20.1-${modVersion}-prod-slim.jar")
         exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
@@ -195,9 +140,6 @@ tasks.named('jar', Jar).configure {
 }
 
 tasks.named('jarJar', Jar).configure {
-    from('../../../LICENSE') {
-        into 'META-INF'
-    }
     if (prodBuild.get()) {
         archiveFileName.set("adrenaline-forge-1.20.1-${modVersion}-prod.jar")
         exclude('net/fly/adrenaline/client/WorldgenStatsOverlay.class')
@@ -226,11 +168,7 @@ publishing {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
-}
-
 tasks.register('buildProd', GradleBuild) {
     tasks = ['build']
-    startParameter.projectProperties.put('prodBuild', 'true')
+    startParameter.projectProperties = new LinkedHashMap(gradle.startParameter.projectProperties) + [prodBuild: 'true']
 }

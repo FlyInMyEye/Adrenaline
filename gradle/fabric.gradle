@@ -1,0 +1,28 @@
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.fabricmc.net/' }
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+loom {
+    mixin {
+        defaultRefmapName.set("${modId}.refmap.json")
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = javaRelease
+}
+tasks.named('processResources') {
+    inputs.property('mod_version', modVersion)
+    filesMatching('fabric.mod.json') {
+        expand mod_version: modVersion
+    }
+}
+tasks.named('remapJar') {
+    archiveFileName.set("${modId}-fabric-${minecraftVersion}-${modVersion}.jar")
+}
+tasks.named('remapSourcesJar') {
+    archiveFileName.set("${modId}-fabric-${minecraftVersion}-${modVersion}-sources.jar")
+}

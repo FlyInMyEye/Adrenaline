@@ -1,0 +1,96 @@
+def nativeTargets = [
+    [triple: 'x86_64-linux-gnu', directory: 'linux-x86_64', library: 'libadrenaline_native.so', avx2: true],
+    [triple: 'aarch64-linux-gnu', directory: 'linux-aarch64', library: 'libadrenaline_native.so', avx2: false],
+    [triple: 'x86_64-windows-gnu', directory: 'windows-x86_64', library: 'adrenaline_native.dll', avx2: true],
+    [triple: 'aarch64-windows-gnu', directory: 'windows-aarch64', library: 'adrenaline_native.dll', avx2: false],
+    [triple: 'x86_64-macos', directory: 'macos-x86_64', library: 'libadrenaline_native.dylib', avx2: true],
+    [triple: 'aarch64-macos', directory: 'macos-aarch64', library: 'libadrenaline_native.dylib', avx2: false]
+]
+
+tasks.register('buildNative') {
+    inputs.dir('native/src')
+    outputs.dir('native/build')
+    doLast {
+        def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+        def macos = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('mac')
+        def javaHomes = [System.getenv('JAVA_HOME'), System.getProperty('java.home')]
+            .findAll { value -> value != null && !value.trim().isEmpty() }
+            .collect { value -> file(value) }
+        def javaHome = javaHomes.find { home -> file("${home}/include/jni.h").isFile() }
+        if (javaHome == null) {
+            throw new GradleException('A JDK with JNI headers is required to build Adrenaline natives.')
+        }
+        def jniInclude = file("${javaHome}/include")
+        def jniPlatform = file("${jniInclude}/${windows ? 'win32' : macos ? 'darwin' : 'linux'}")
+        if (!file("${jniPlatform}/jni_md.h").isFile()) {
+            throw new GradleException("The active JDK does not provide JNI headers for ${windows ? 'Windows' : macos ? 'macOS' : 'Linux'}.")
+        }
+        def zig = providers.gradleProperty('zig_executable').orElse(providers.environmentVariable('ZIG')).orNull
+        if (zig == null || zig.trim().isEmpty()) {
+            zig = windows ? 'zig.exe' : 'zig'
+        }
+        def directZig = false
+        try {
+            directZig = exec {
+                commandLine zig, 'version'
+                ignoreExitValue = true
+            }.exitValue == 0
+        } catch (Exception ignored) {
+        }
+        def shellQuote = { String value -> "'${value.replace("'", "'\\\"'\\\"'")}'" }
+        def runZig = { List<String> arguments ->
+            if (directZig) {
+                exec {
+                    commandLine(([zig] + arguments) as List<String>)
+                }
+                return
+            }
+            if (windows) {
+                throw new GradleException('Zig was not found. Install Zig or set -Pzig_executable=<path>.')
+            }
+            def command = ([zig] + arguments).collect(shellQuote).join(' ')
+            exec {
+                commandLine 'nix-shell', '-p', 'zig', '--run', command
+            }
+        }
+        def output = file('native/build')
+        delete(output)
+        nativeTargets.each { target ->
+            def library = file("${output}/${target.directory}/${target.library}")
+            library.parentFile.mkdirs()
+            def cpuObject = file("${library}.cpu.o")
+            runZig([
+                'build-obj', '-lc', '-fPIC', '-O', 'ReleaseFast', '-target', target.triple,
+                file('native/src/cpu_features.c').absolutePath, '-femit-bin=' + cpuObject.absolutePath
+            ])
+            def linkInputs = [file('native/src/adrenaline_native.zig').absolutePath, cpuObject.absolutePath]
+            if (target.avx2) {
+                def avxObject = file("${library}.avx2.o")
+                runZig([
+                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
+                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
+                    file('native/src/adrenaline_avx2.zig').absolutePath, '-femit-bin=' + avxObject.absolutePath
+                ])
+                linkInputs.add(avxObject.absolutePath)
+                def smallAvxObject = file("${library}.avx2-small.o")
+                runZig([
+                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
+                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
+                    file('native/src/adrenaline_avx2_small.zig').absolutePath, '-femit-bin=' + smallAvxObject.absolutePath
+                ])
+                linkInputs.add(smallAvxObject.absolutePath)
+                def aquiferContextObject = file("${library}.aquifer-context.o")
+                runZig([
+                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
+                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
+                    file('native/src/aquifer_context_avx2.zig').absolutePath, '-femit-bin=' + aquiferContextObject.absolutePath
+                ])
+                linkInputs.add(aquiferContextObject.absolutePath)
+            }
+            runZig(([
+                'build-lib', '-dynamic', '-lc', '-fPIC', '-O', 'ReleaseFast', '-target', target.triple,
+                '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath
+            ] + linkInputs + ['-femit-bin=' + library.absolutePath]) as List<String>)
+        }
+    }
+}
