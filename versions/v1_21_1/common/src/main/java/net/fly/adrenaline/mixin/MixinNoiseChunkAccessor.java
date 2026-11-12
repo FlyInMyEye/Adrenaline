@@ -1,0 +1,41 @@
+package net.fly.adrenaline.mixin;
+
+import java.util.List;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.NoiseChunk;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
+import org.spongepowered.asm.mixin.gen.Invoker;
+
+@Mixin(NoiseChunk.class)
+public interface MixinNoiseChunkAccessor {
+
+    @Accessor("firstNoiseX") int adrenaline$firstNoiseX();
+    @Accessor("firstNoiseZ") int adrenaline$firstNoiseZ();
+    @Accessor("arrayInterpolationCounter") long adrenaline$arrayInterpolationCounter();
+    @Accessor("interpolating") boolean adrenaline$isInterpolating();
+
+    @Accessor("interpolators")
+    List<?> adrenaline$interpolators();
+
+    @Invoker("cellWidth")
+    int adrenaline$cellWidth();
+
+    @Invoker("cellHeight")
+    int adrenaline$cellHeight();
+
+    @Invoker("getInterpolatedState")
+    BlockState adrenaline$getInterpolatedState();
+
+    @Accessor("fillingCell")
+    boolean adrenaline$isFillingCell();
+
+    @Accessor("inCellX")
+    int adrenaline$inCellX();
+
+    @Accessor("inCellY")
+    int adrenaline$inCellY();
+
+    @Accessor("inCellZ")
+    int adrenaline$inCellZ();
+}
