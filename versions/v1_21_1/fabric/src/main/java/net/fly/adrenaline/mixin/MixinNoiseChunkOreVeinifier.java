@@ -157,7 +157,8 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
 
     @Override
     public boolean adrenaline$hasPrecomputedMaterialPath() {
-        return this.adrenaline$hasDirectMaterialPath && (this.adrenaline$oreVeinFiller == null || this.adrenaline$veinToggleValues != null);
+        return AdrenalineConfig.cellCacheOptimizationsEnabled() && this.adrenaline$hasDirectMaterialPath
+            && (this.adrenaline$oreVeinFiller == null || this.adrenaline$veinToggleValues != null);
     }
 
     @Override
@@ -206,7 +207,7 @@ public class MixinNoiseChunkOreVeinifier implements AdrenalineNoiseChunkMaterial
         if (this.adrenaline$oreVeinFiller == null) {
             return null;
         }
-        if (this.adrenaline$veinToggleValues == null) {
+        if (this.adrenaline$veinToggleValues == null || !AdrenalineConfig.cellCacheOptimizationsEnabled()) {
             return this.adrenaline$oreVeinFiller.calculate(context);
         }
 

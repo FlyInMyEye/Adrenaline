@@ -7,6 +7,8 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
 import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
+import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkCoordinateAccess;
+import net.fly.adrenaline.worldgen.AdrenalineNoiseChunkMaterialAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
@@ -24,7 +26,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
-public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
+public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess, AdrenalineNoiseChunkCoordinateAccess {
     @Shadow private int cellCountXZ;
     @Shadow private int cellCountY;
     @Shadow private DensityFunction.ContextProvider sliceFillingContextProvider;
@@ -43,6 +45,22 @@ public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
     @Shadow private boolean fillingCell;
     @Shadow private List<?> interpolators;
     @Shadow private List<?> cellCaches;
+
+    @Override
+    public void adrenaline$updateYCoordinate(int blockY) {
+        this.inCellY = blockY - this.cellStartBlockY;
+    }
+
+    @Override
+    public void adrenaline$updateXCoordinate(int blockX) {
+        this.inCellX = blockX - this.cellStartBlockX;
+    }
+
+    @Override
+    public void adrenaline$updateZCoordinate(int blockZ) {
+        this.inCellZ = blockZ - this.cellStartBlockZ;
+        this.interpolationCounter++;
+    }
 
     @Override
     public int adrenaline$getCellStartBlockX() {
@@ -285,6 +303,7 @@ public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
             }
         }
 
+        ((AdrenalineNoiseChunkMaterialAccess) this).adrenaline$fillMaterialArrays((NoiseChunk) (Object) this);
         this.arrayInterpolationCounter++;
     }
 
