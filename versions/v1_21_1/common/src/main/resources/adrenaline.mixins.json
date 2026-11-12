@@ -53,6 +53,7 @@
     "MixinNoiseChunkOreVeinifier",
     "MixinMaterialRuleList",
     "MixinOreVeinifierInvoker",
+    "MixinHeightmapAccessor",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {

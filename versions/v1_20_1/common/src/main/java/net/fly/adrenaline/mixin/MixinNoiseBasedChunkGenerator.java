@@ -142,7 +142,7 @@ public class MixinNoiseBasedChunkGenerator {
         Aquifer aquifer = noiseChunk.aquifer();
         AdrenalineNoiseChunkMaterialAccess materialAccess = (AdrenalineNoiseChunkMaterialAccess) noiseChunk;
         boolean directMaterialPath = materialAccess.adrenaline$hasDirectMaterialPath();
-        boolean precomputedMaterialPath = directMaterialPath
+        boolean precomputedMaterialPath = AdrenalineConfig.cellCacheOptimizationsEnabled() && directMaterialPath
             && materialAccess.adrenaline$hasPrecomputedMaterialPath()
             && aquifer instanceof AdrenalineFastAquiferAccess fastAquifer
             && fastAquifer.adrenaline$supportsPrecomputedMaterials();

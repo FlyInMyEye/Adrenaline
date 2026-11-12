@@ -611,12 +611,10 @@ public class AdrenalineConfig {
         public boolean nativeSurfaceRules = true;
         @WorkInProgress
         public boolean surfaceColumnOptimizations = true;
-        @WorkInProgress
         public boolean terrainFillOptimizations = true;
         @WorkInProgress
         public boolean surfaceOptimizations = true;
         public boolean noiseChunkOptimizations = true;
-        @WorkInProgress
         public boolean materialRuleOptimizations = true;
         public boolean aquiferOptimizations = true;
         public boolean beardifierOptimizations = true;
@@ -667,7 +665,6 @@ public class AdrenalineConfig {
         public boolean paletteResizeOptimizations = true;
         @WorkInProgress
         public boolean oreTargetOptimizations = true;
-        @WorkInProgress
         public boolean nativeAquiferBatching = true;
         public int nativeSettingsVersion = 1;
         public int settingsVersion;
