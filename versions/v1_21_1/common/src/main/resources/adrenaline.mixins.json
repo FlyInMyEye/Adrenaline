@@ -50,6 +50,9 @@
     "MixinNoiseChunkFlatCacheAllocation",
     "MixinAquiferFluidStatus",
     "MixinNoiseBasedAquifer",
+    "MixinNoiseChunkOreVeinifier",
+    "MixinMaterialRuleList",
+    "MixinOreVeinifierInvoker",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
