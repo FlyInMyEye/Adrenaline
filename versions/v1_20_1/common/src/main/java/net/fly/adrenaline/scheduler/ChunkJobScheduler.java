@@ -4,11 +4,9 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -42,7 +40,7 @@ public final class ChunkJobScheduler {
     private final LinkedHashSet<ChunkJob> conflictPending = new LinkedHashSet<>();
     private final HashMap<Long, Set<ChunkJob>> waitIndex = new HashMap<>();
 
-    private final ArrayDeque<ChunkJob> capacityQueue = new ArrayDeque<>();
+    private final GenerationTaskQueue<ChunkJob> capacityQueue = new GenerationTaskQueue<>();
 
     private ChunkJobScheduler() {
     }
@@ -229,29 +227,12 @@ public final class ChunkJobScheduler {
     }
 
     private ChunkJob pollCapacityJob() {
-        AdrenalineConfig.StagePriority priority = AdrenalineConfig.stagePriority();
-        if (priority == AdrenalineConfig.StagePriority.FIFO) {
-            return this.capacityQueue.pollFirst();
-        }
-        Iterator<ChunkJob> iterator = this.capacityQueue.iterator();
-        ChunkJob selected = iterator.next();
-        int highestStage = selected.stageIndex();
-        long closestDistance = selected.proximity();
-        while (iterator.hasNext()) {
-            ChunkJob candidate = iterator.next();
-            int stage = candidate.stageIndex();
-            long distance = candidate.proximity();
-            boolean preferred = priority == AdrenalineConfig.StagePriority.HIGHEST
-                ? stage > highestStage || stage == highestStage && distance < closestDistance
-                : distance < closestDistance || distance == closestDistance && stage > highestStage;
-            if (preferred) {
-                selected = candidate;
-                highestStage = stage;
-                closestDistance = distance;
-            }
-        }
-        this.capacityQueue.remove(selected);
-        return selected;
+        GenerationTaskQueue.Priority priority = switch (AdrenalineConfig.stagePriority()) {
+            case FIFO -> GenerationTaskQueue.Priority.FIFO;
+            case HIGHEST -> GenerationTaskQueue.Priority.HIGHEST;
+            case NEAREST -> GenerationTaskQueue.Priority.NEAREST;
+        };
+        return this.capacityQueue.poll(priority);
     }
 
     public void cancel(Executor cancellationExecutor) {
@@ -262,7 +243,9 @@ public final class ChunkJobScheduler {
             pendingCount = this.conflictPending.size() + this.capacityQueue.size();
             jobsToCancel = new ArrayList<>(this.conflictPending.size() + this.capacityQueue.size() + this.activeJobs.size());
             jobsToCancel.addAll(this.conflictPending);
-            jobsToCancel.addAll(this.capacityQueue);
+            for (ChunkJob job : this.capacityQueue) {
+                jobsToCancel.add(job);
+            }
             jobsToCancel.addAll(this.activeJobs);
             activeJobCount = this.activeJobs.size();
             this.epoch++;

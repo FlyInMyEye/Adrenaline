@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-public final class ChunkJob implements Runnable {
+public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry {
 
     private static final ConcurrentHashMap<ServerLevel, long[]> PRIORITY_FOCI = new ConcurrentHashMap<>();
     private static final ThreadLocal<ChunkJob> CURRENT_JOB = new ThreadLocal<>();
@@ -121,11 +121,13 @@ public final class ChunkJob implements Runnable {
         return this;
     }
 
-    int stageIndex() {
+    @Override
+    public int stageIndex() {
         return this.waitingStatus == null ? Integer.MIN_VALUE : this.waitingStatus.getIndex();
     }
 
-    long proximity() {
+    @Override
+    public long proximity() {
         if (this.priorityLevel == null || this.priorityPos == null) {
             return Long.MAX_VALUE;
         }
