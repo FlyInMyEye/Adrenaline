@@ -2,190 +2,45 @@ plugins {
     id 'base'
 }
 
-def nativeTargets = [
-    [triple: 'x86_64-linux-gnu', directory: 'linux-x86_64', library: 'libadrenaline_native.so', avx2: true],
-    [triple: 'aarch64-linux-gnu', directory: 'linux-aarch64', library: 'libadrenaline_native.so', avx2: false],
-    [triple: 'x86_64-windows-gnu', directory: 'windows-x86_64', library: 'adrenaline_native.dll', avx2: true],
-    [triple: 'aarch64-windows-gnu', directory: 'windows-aarch64', library: 'adrenaline_native.dll', avx2: false],
-    [triple: 'x86_64-macos', directory: 'macos-x86_64', library: 'libadrenaline_native.dylib', avx2: true],
-    [triple: 'aarch64-macos', directory: 'macos-aarch64', library: 'libadrenaline_native.dylib', avx2: false]
+apply from: 'gradle/natives.gradle'
+
+def buildTargets = [
+    [version: 'v1_20_1', loader: 'fabric', java: 21],
+    [version: 'v1_20_1', loader: 'forge', java: 17],
+    [version: 'v1_21_1', loader: 'fabric', java: 21],
+    [version: 'v1_21_1', loader: 'forge', java: 21],
+    [version: 'v1_21_1', loader: 'neoforge', java: 21]
 ]
 
-tasks.register('buildNative') {
-    inputs.dir('native/src')
-    outputs.dir('native/build')
-    doLast {
-        def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
-        def macos = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('mac')
-        def javaHomes = [System.getenv('JAVA_HOME'), System.getProperty('java.home')]
-            .findAll { value -> value != null && !value.trim().isEmpty() }
-            .collect { value -> file(value) }
-        def javaHome = javaHomes.find { home -> file("${home}/include/jni.h").isFile() }
-        if (javaHome == null) {
-            throw new GradleException('A JDK with JNI headers is required to build Adrenaline natives.')
-        }
-        def jniInclude = file("${javaHome}/include")
-        def jniPlatform = file("${jniInclude}/${windows ? 'win32' : macos ? 'darwin' : 'linux'}")
-        if (!file("${jniPlatform}/jni_md.h").isFile()) {
-            throw new GradleException("The active JDK does not provide JNI headers for ${windows ? 'Windows' : macos ? 'macOS' : 'Linux'}.")
-        }
-        def zig = providers.gradleProperty('zig_executable').orElse(providers.environmentVariable('ZIG')).orNull
-        if (zig == null || zig.trim().isEmpty()) {
-            zig = windows ? 'zig.exe' : 'zig'
-        }
-        def directZig = false
-        try {
-            directZig = exec {
-                commandLine zig, 'version'
-                ignoreExitValue = true
-            }.exitValue == 0
-        } catch (Exception ignored) {
-        }
-        def shellQuote = { String value -> "'${value.replace("'", "'\\\"'\\\"'")}'" }
-        def runZig = { List<String> arguments ->
-            if (directZig) {
-                exec {
-                    commandLine(([zig] + arguments) as List<String>)
-                }
-                return
+def buildAll = tasks.register('buildAll')
+def buildProd = tasks.register('buildProd')
+buildTargets.each { target ->
+    [false, true].each { production ->
+        def suffix = "${target.version}_${target.loader}"
+        def taskName = "${production ? 'buildProd' : 'build'}_${suffix}"
+        def buildTask = tasks.register(taskName, Exec) {
+            group = 'build'
+            description = "Build ${suffix} (${production ? 'production' : 'debug'})."
+            dependsOn 'buildNative'
+            workingDir file("versions/${target.version}/${target.loader}")
+            def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+            commandLine windows ? ['cmd', '/c', 'gradlew.bat'] : ['./gradlew']
+            args '--no-daemon', 'build', "-PprodBuild=${production}", '-PnativeBuildPrepared=true'
+            if (gradle.startParameter.offline) {
+                args '--offline'
             }
-            if (windows) {
-                throw new GradleException('Zig was not found. Install Zig or set -Pzig_executable=<path>.')
-            }
-            def command = ([zig] + arguments).collect(shellQuote).join(' ')
-            exec {
-                commandLine 'nix-shell', '-p', 'zig', '--run', command
+            def javaHome = providers.gradleProperty("java_${target.java}_home")
+                .orElse(providers.environmentVariable("JAVA${target.java}_HOME"))
+                .orElse(providers.environmentVariable('JAVA_HOME')).orNull
+            if (javaHome != null && !javaHome.trim().isEmpty()) {
+                environment 'JAVA_HOME', javaHome
             }
         }
-        def output = file('native/build')
-        delete(output)
-        nativeTargets.each { target ->
-            def library = file("${output}/${target.directory}/${target.library}")
-            library.parentFile.mkdirs()
-            def cpuObject = file("${library}.cpu.o")
-            runZig([
-                'build-obj', '-lc', '-fPIC', '-O', 'ReleaseFast', '-target', target.triple,
-                file('native/src/cpu_features.c').absolutePath, '-femit-bin=' + cpuObject.absolutePath
-            ])
-            def linkInputs = [file('native/src/adrenaline_native.zig').absolutePath, cpuObject.absolutePath]
-            if (target.avx2) {
-                def avxObject = file("${library}.avx2.o")
-                runZig([
-                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
-                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
-                    file('native/src/adrenaline_avx2.zig').absolutePath, '-femit-bin=' + avxObject.absolutePath
-                ])
-                linkInputs.add(avxObject.absolutePath)
-                def smallAvxObject = file("${library}.avx2-small.o")
-                runZig([
-                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
-                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
-                    file('native/src/adrenaline_avx2_small.zig').absolutePath, '-femit-bin=' + smallAvxObject.absolutePath
-                ])
-                linkInputs.add(smallAvxObject.absolutePath)
-                def aquiferContextObject = file("${library}.aquifer-context.o")
-                runZig([
-                    'build-obj', '-lc', '-O', 'ReleaseFast', '-target', target.triple, '-mcpu=haswell',
-                    '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath,
-                    file('native/src/aquifer_context_avx2.zig').absolutePath, '-femit-bin=' + aquiferContextObject.absolutePath
-                ])
-                linkInputs.add(aquiferContextObject.absolutePath)
-            }
-            runZig(([
-                'build-lib', '-dynamic', '-lc', '-fPIC', '-O', 'ReleaseFast', '-target', target.triple,
-                '-I', jniInclude.absolutePath, '-I', jniPlatform.absolutePath
-            ] + linkInputs + ['-femit-bin=' + library.absolutePath]) as List<String>)
-        }
+        (production ? buildProd : buildAll).configure { dependsOn buildTask }
     }
 }
-
 tasks.named('build') {
-    dependsOn tasks.named('buildNative')
-}
-
-tasks.register('build_v1_20_1_fabric', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_20_1/fabric')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'build'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'build'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_21_home').orElse(providers.environmentVariable('JAVA21_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
-}
-
-tasks.register('build_v1_20_1_forge', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_20_1/forge')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'build'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'build'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_17_home').orElse(providers.environmentVariable('JAVA17_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
-}
-
-tasks.register('build_v1_21_1_fabric', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_21_1/fabric')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'build'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'build'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_21_home').orElse(providers.environmentVariable('JAVA21_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
-}
-
-tasks.register('build_v1_21_1_forge', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_21_1/forge')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'build'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'build'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_21_home').orElse(providers.environmentVariable('JAVA21_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
-}
-
-tasks.register('build_v1_21_1_neoforge', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_21_1/neoforge')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'build'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'build'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_21_home').orElse(providers.environmentVariable('JAVA21_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
+    dependsOn buildAll
 }
 
 tasks.register('publish_v1_20_1_fabric_modrinth', Exec) {
@@ -441,52 +296,6 @@ tasks.register('publish_v1_21_1_neoforge_everywhere', Exec) {
             environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
         }
     }
-}
-
-tasks.register('buildAll') {
-    dependsOn 'build_v1_20_1_fabric', 'build_v1_20_1_forge', 'build_v1_21_1_fabric', 'build_v1_21_1_forge', 'build_v1_21_1_neoforge'
-}
-
-tasks.named('build') {
-    dependsOn 'buildAll'
-}
-
-tasks.register('buildProd_v1_20_1_forge', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_20_1/forge')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'buildProd'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'buildProd'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_17_home').orElse(providers.environmentVariable('JAVA17_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
-}
-
-tasks.register('buildProd_v1_20_1_fabric', Exec) {
-    dependsOn 'buildNative'
-    workingDir file('versions/v1_20_1/fabric')
-    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
-        commandLine 'cmd', '/c', 'gradlew.bat', '--no-daemon', 'build', '-PprodBuild=true'
-    } else {
-        commandLine './gradlew', '--no-daemon', 'build', '-PprodBuild=true'
-    }
-    def resolvedJavaHome = providers.gradleProperty('java_21_home').orElse(providers.environmentVariable('JAVA21_HOME')).orElse(providers.environmentVariable('JAVA_HOME')).orNull
-    if (resolvedJavaHome != null && !resolvedJavaHome.toString().trim().isEmpty()) {
-        environment 'JAVA_HOME', resolvedJavaHome
-        if (!System.getProperty('os.name').toLowerCase().contains('windows')) {
-            environment 'PATH', "${resolvedJavaHome}/bin:${System.getenv('PATH')}"
-        }
-    }
-}
-
-tasks.register('buildProd') {
-    dependsOn 'buildProd_v1_20_1_fabric', 'buildProd_v1_20_1_forge', 'build_v1_21_1_fabric', 'build_v1_21_1_forge', 'build_v1_21_1_neoforge'
 }
 
 tasks.register('publishAllToModrinth') {

@@ -1,0 +1,76 @@
+def workspaceProperties = new Properties()
+file('../../../gradle.properties').withInputStream { input -> workspaceProperties.load(input) }
+ext.modProperties = ['mod_id', 'mod_name', 'mod_group_id', 'mod_version', 'mod_authors', 'mod_license', 'mod_description']
+    .collectEntries { key -> [(key): workspaceProperties.getProperty(key)] }
+ext.modId = modProperties.mod_id
+ext.modName = modProperties.mod_name
+ext.modVersion = modProperties.mod_version
+ext.modAuthors = modProperties.mod_authors
+
+version = modVersion
+group = modProperties.mod_group_id
+base.archivesName = "${modId}-${loaderId}"
+
+tasks.named('jar') {
+    archiveFileName.set("${modId}-${loaderId}-${minecraftVersion}-${modVersion}.jar")
+}
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+ext.prodBuild = providers.gradleProperty('prodBuild').map { it.toBoolean() }.orElse(false)
+def generatedBuildConfigDir = layout.buildDirectory.dir('generated/sources/buildConfig/java')
+sourceSets.main.java.srcDirs('../../../common/src/main/java', '../common/src/main/java', generatedBuildConfigDir)
+
+java.withSourcesJar()
+
+def generateBuildConfig = tasks.register('generateBuildConfig') {
+    inputs.property('prodBuild', prodBuild)
+    outputs.dir(generatedBuildConfigDir)
+    doLast {
+        def outputFile = generatedBuildConfigDir.get().file('net/fly/adrenaline/BuildConfig.java').asFile
+        outputFile.parentFile.mkdirs()
+        outputFile.text = """package net.fly.adrenaline;
+
+public final class BuildConfig {
+    public static final boolean DEBUG = ${!prodBuild.get()};
+
+    private BuildConfig() {
+    }
+}
+"""
+    }
+}
+
+tasks.named('compileJava') {
+    dependsOn generateBuildConfig
+}
+tasks.named('sourcesJar') {
+    dependsOn generateBuildConfig
+}
+tasks.withType(Jar).configureEach {
+    from('../../../LICENSE') {
+        into 'META-INF'
+    }
+}
+
+def buildNative = tasks.register('buildNative', Exec) {
+    onlyIf { !providers.gradleProperty('nativeBuildPrepared').map { it.toBoolean() }.getOrElse(false) }
+    workingDir file('../../..')
+    def windows = System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')
+    commandLine windows ? ['cmd', '/c', 'gradlew.bat'] : ['./gradlew']
+    args '--no-daemon', 'buildNative', "-Dorg.gradle.java.home=${System.getProperty('java.home')}"
+    def zig = providers.gradleProperty('zig_executable').orNull
+    if (zig != null) {
+        args "-Pzig_executable=${zig}"
+    }
+    environment 'JAVA_HOME', System.getProperty('java.home')
+}
+
+tasks.named('processResources') {
+    dependsOn buildNative
+    from('../../../native/build') {
+        into 'adrenaline/natives'
+        include '**/*.so', '**/*.dll', '**/*.dylib'
+    }
+}
