@@ -1,23 +1,18 @@
 package net.fly.adrenaline.util;
 
 import com.mojang.math.OctahedralGroup;
-import java.util.concurrent.atomic.AtomicBoolean;
 import net.minecraft.core.Direction;
 import net.minecraft.core.FrontAndTop;
 
 public final class WorldgenWarmup {
 
-    private static final AtomicBoolean OCTAHEDRAL_GROUPS_WARMED = new AtomicBoolean();
+    private static boolean octahedralGroupsWarmed;
 
     private WorldgenWarmup() {
     }
 
-    public static void warmSharedCaches() {
-        warmOctahedralGroups();
-    }
-
-    private static void warmOctahedralGroups() {
-        if (!OCTAHEDRAL_GROUPS_WARMED.compareAndSet(false, true)) {
+    public static synchronized void warmSharedCaches() {
+        if (octahedralGroupsWarmed) {
             return;
         }
 
@@ -29,5 +24,6 @@ public final class WorldgenWarmup {
                 group.rotate(frontAndTop);
             }
         }
+        octahedralGroupsWarmed = true;
     }
 }
