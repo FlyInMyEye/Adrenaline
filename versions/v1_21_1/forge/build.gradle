@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 ext.minecraftVersion = '1.21.1'
@@ -23,6 +24,7 @@ def mapping_version = '1.21.1'
 sourceSets.main.resources.srcDir('../../../assets')
 sourceSets.main.resources.srcDir('../common/src/main/resources')
 sourceSets.main.resources.srcDir('src/generated/resources')
+sourceSets.main.output.resourcesDir = sourceSets.main.java.destinationDirectory.get().asFile
 
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
@@ -59,6 +61,10 @@ repositories {
 }
 
 dependencies {
+    compileOnly(annotationProcessor('io.github.llamalad7:mixinextras-common:0.5.4'))
+    implementation(jarJar('io.github.llamalad7:mixinextras-forge:0.5.4')) {
+        jarJar.ranged(it, '[0.5.4,)')
+    }
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf('maven.modrinth:flys-config-lib:wO2v4USw')
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
@@ -91,8 +97,38 @@ tasks.named('processResources', ProcessResources).configure {
         forge_version_range: '[52,)',
         loader_version_range: '[52,)'
     ]
+    inputs.property('mixinRefmap', "${modId}.refmap.json")
+    doLast {
+        def configFile = new File(destinationDir, "${modId}.mixins.json")
+        def config = new groovy.json.JsonSlurper().parse(configFile)
+        config.refmap = "${modId}.refmap.json".toString()
+        configFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(config)) + '\n'
+    }
     inputs.properties replaceProperties
     filesMatching(['META-INF/mods.toml', 'mcmod.info', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
+}
+
+mixin {
+    add sourceSets.main, "${modId}.refmap.json"
+    config "${modId}.mixins.json"
+}
+
+tasks.named('jar', Jar).configure {
+    archiveFileName.set("${modId}-${loaderId}-${minecraftVersion}-${modVersion}-slim.jar")
+}
+
+tasks.named('jarJar', Jar).configure {
+    archiveClassifier.set('')
+    archiveFileName.set("${modId}-${loaderId}-${minecraftVersion}-${modVersion}.jar")
+    destinationDirectory.set(layout.buildDirectory.dir('libs'))
+}
+
+reobf {
+    jarJar {}
+}
+
+tasks.named('jarJar') {
+    finalizedBy 'reobfJarJar'
 }

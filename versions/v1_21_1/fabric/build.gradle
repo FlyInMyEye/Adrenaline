@@ -22,6 +22,7 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:0.18.6"
     modImplementation "net.fabricmc.fabric-api:fabric-api:0.116.10+1.21.1"
     modImplementation 'maven.modrinth:flys-config-lib:1S8JUUJp'
+    include modImplementation('io.github.llamalad7:mixinextras-fabric:0.5.4')
 }
 
 apply from: '../../../gradle/fabric.gradle'
