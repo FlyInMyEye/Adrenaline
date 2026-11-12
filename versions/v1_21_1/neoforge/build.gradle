@@ -50,6 +50,11 @@ neoForge {
 
 dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
+    implementation 'maven.modrinth:flys-config-lib:pZm3Ntve'
     compileOnly 'org.spongepowered:mixin:0.8.5'
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+repositories {
+    maven { url = 'https://api.modrinth.com/maven' }
 }
