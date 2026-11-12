@@ -20,7 +20,8 @@
   "id": "adrenaline",
   "license": "GPL-3.0-only",
   "mixins": [
-    "adrenaline.mixins.json"
+    "adrenaline.mixins.json",
+    "adrenaline.fabric.mixins.json"
   ],
   "name": "Adrenaline",
   "schemaVersion": 1,

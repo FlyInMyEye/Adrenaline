@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.fly.adrenaline.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MixinChunkMap",
+    "MixinNoiseBasedChunkGenerator",
+    "MixinStructureCheck",
+    "MixinStructureTemplatePalette"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
