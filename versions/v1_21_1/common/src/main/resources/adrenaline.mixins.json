@@ -48,6 +48,8 @@
     "MixinNoiseChunkCacheAllInCell",
     "MixinNoiseChunkCacheOnce",
     "MixinNoiseChunkFlatCacheAllocation",
+    "MixinAquiferFluidStatus",
+    "MixinNoiseBasedAquifer",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {

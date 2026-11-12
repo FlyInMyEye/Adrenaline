@@ -574,7 +574,6 @@ public class AdrenalineConfig {
         public boolean surfaceBiomeOptimizations = true;
         @WorkInProgress
         public boolean surfaceBandNoiseOptimizations = true;
-        @WorkInProgress
         public boolean aquiferStatusCacheOptimizations = true;
         public boolean nativeBlendedNoise = true;
         @WorkInProgress
@@ -619,7 +618,6 @@ public class AdrenalineConfig {
         public boolean noiseChunkOptimizations = true;
         @WorkInProgress
         public boolean materialRuleOptimizations = true;
-        @WorkInProgress
         public boolean aquiferOptimizations = true;
         public boolean beardifierOptimizations = true;
         @WorkInProgress

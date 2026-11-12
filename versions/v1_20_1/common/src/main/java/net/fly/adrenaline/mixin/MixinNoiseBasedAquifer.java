@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -20,7 +22,6 @@ import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.PositionalRandomFactory;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -181,14 +182,14 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         }
     }
 
-    @Overwrite
+    @WrapMethod(method = "computeSubstance")
     @Nullable
     @ControlsOptimization(Optimization.AQUIFER)
-    public BlockState computeSubstance(DensityFunction.FunctionContext context, double density) {
+    private BlockState adrenaline$computeSubstance(DensityFunction.FunctionContext context, double density, Operation<BlockState> original) {
         if (AdrenalineConfig.aquiferOptimizationsEnabled() && adrenaline$packedAquiferLocations != null) {
             return adrenaline$computeSubstanceFast(context, density);
         }
-        return adrenaline$computeSubstanceVanilla(context, density);
+        return original.call(context, density);
     }
 
     @Override
@@ -457,111 +458,6 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         }
 
         Aquifer.FluidStatus thirdStatus = adrenaline$getAquiferStatus(thirdNearest & 4095);
-        double nearestThirdSimilarity = adrenaline$similarity(nearestDistance, thirdDistance);
-        if (nearestThirdSimilarity > 0.0D
-            && density + nearestSimilarity * nearestThirdSimilarity * calculatePressure(context, barrierNoise, nearestStatus, thirdStatus) > 0.0D) {
-            shouldScheduleFluidUpdate = false;
-            return null;
-        }
-
-        double secondThirdSimilarity = adrenaline$similarity(secondDistance, thirdDistance);
-        if (secondThirdSimilarity > 0.0D
-            && density + nearestSimilarity * secondThirdSimilarity * calculatePressure(context, barrierNoise, secondStatus, thirdStatus) > 0.0D) {
-            shouldScheduleFluidUpdate = false;
-            return null;
-        }
-
-        shouldScheduleFluidUpdate = true;
-        return result;
-    }
-
-    @Unique
-    @Nullable
-    private BlockState adrenaline$computeSubstanceVanilla(DensityFunction.FunctionContext context, double density) {
-        int x = context.blockX();
-        int y = context.blockY();
-        int z = context.blockZ();
-        if (density > 0.0D) {
-            shouldScheduleFluidUpdate = false;
-            return null;
-        }
-
-        Aquifer.FluidStatus globalStatus = globalFluidPicker.computeFluid(x, y, z);
-        if (globalStatus.at(y).is(Blocks.LAVA)) {
-            shouldScheduleFluidUpdate = false;
-            return Blocks.LAVA.defaultBlockState();
-        }
-
-        int gridX = Math.floorDiv(x - 5, 16);
-        int gridY = Math.floorDiv(y + 1, 12);
-        int gridZ = Math.floorDiv(z - 5, 16);
-        int nearestDistance = Integer.MAX_VALUE;
-        int secondDistance = Integer.MAX_VALUE;
-        int thirdDistance = Integer.MAX_VALUE;
-        long nearestLocation = 0L;
-        long secondLocation = 0L;
-        long thirdLocation = 0L;
-
-        for (int offsetX = 0; offsetX <= 1; offsetX++) {
-            for (int offsetY = -1; offsetY <= 1; offsetY++) {
-                for (int offsetZ = 0; offsetZ <= 1; offsetZ++) {
-                    int centerGridX = gridX + offsetX;
-                    int centerGridY = gridY + offsetY;
-                    int centerGridZ = gridZ + offsetZ;
-                    int cacheIndex = ((centerGridY - minGridY) * gridSizeZ + centerGridZ - minGridZ) * gridSizeX
-                        + centerGridX - minGridX;
-                    long location = aquiferLocationCache[cacheIndex];
-                    if (location == Long.MAX_VALUE) {
-                        RandomSource random = positionalRandomFactory.at(centerGridX, centerGridY, centerGridZ);
-                        location = BlockPos.asLong(centerGridX * 16 + random.nextInt(10), centerGridY * 12 + random.nextInt(9),
-                            centerGridZ * 16 + random.nextInt(10));
-                        aquiferLocationCache[cacheIndex] = location;
-                    }
-
-                    int deltaX = BlockPos.getX(location) - x;
-                    int deltaY = BlockPos.getY(location) - y;
-                    int deltaZ = BlockPos.getZ(location) - z;
-                    int distance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
-                    if (nearestDistance >= distance) {
-                        thirdLocation = secondLocation;
-                        secondLocation = nearestLocation;
-                        nearestLocation = location;
-                        thirdDistance = secondDistance;
-                        secondDistance = nearestDistance;
-                        nearestDistance = distance;
-                    } else if (secondDistance >= distance) {
-                        thirdLocation = secondLocation;
-                        secondLocation = location;
-                        thirdDistance = secondDistance;
-                        secondDistance = distance;
-                    } else if (thirdDistance >= distance) {
-                        thirdLocation = location;
-                        thirdDistance = distance;
-                    }
-                }
-            }
-        }
-
-        Aquifer.FluidStatus nearestStatus = getAquiferStatus(nearestLocation);
-        double nearestSimilarity = adrenaline$similarity(nearestDistance, secondDistance);
-        BlockState result = nearestStatus.at(y);
-        if (nearestSimilarity <= 0.0D) {
-            shouldScheduleFluidUpdate = nearestSimilarity >= -0.76D;
-            return result;
-        }
-        if (result.is(Blocks.WATER) && globalFluidPicker.computeFluid(x, y - 1, z).at(y - 1).is(Blocks.LAVA)) {
-            shouldScheduleFluidUpdate = true;
-            return result;
-        }
-
-        MutableDouble barrierNoise = new MutableDouble(Double.NaN);
-        Aquifer.FluidStatus secondStatus = getAquiferStatus(secondLocation);
-        if (density + nearestSimilarity * calculatePressure(context, barrierNoise, nearestStatus, secondStatus) > 0.0D) {
-            shouldScheduleFluidUpdate = false;
-            return null;
-        }
-
-        Aquifer.FluidStatus thirdStatus = getAquiferStatus(thirdLocation);
         double nearestThirdSimilarity = adrenaline$similarity(nearestDistance, thirdDistance);
         if (nearestThirdSimilarity > 0.0D
             && density + nearestSimilarity * nearestThirdSimilarity * calculatePressure(context, barrierNoise, nearestStatus, thirdStatus) > 0.0D) {
