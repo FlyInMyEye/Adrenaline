@@ -3,7 +3,7 @@ package net.fly.adrenaline.scheduler;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
-import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
+import net.fly.adrenaline.scheduler.GenerationJob.WaitReason;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import net.minecraft.world.level.ChunkPos;
 
-public final class ChunkJobScheduler {
+public final class ChunkJobScheduler implements GenerationJob.Execution {
 
     public static final int WORKER_IDLE = GenerationWorkers.IDLE;
     public static final int WORKER_ACTIVE = GenerationWorkers.ACTIVE;
@@ -28,10 +28,10 @@ public final class ChunkJobScheduler {
     private boolean cancelling;
 
     private int runningCount;
-    private final GenerationFootprints<ChunkJob> footprints = new GenerationFootprints<>();
-    private final HashSet<ChunkJob> activeJobs = new HashSet<>();
+    private final GenerationFootprints<GenerationJob> footprints = new GenerationFootprints<>();
+    private final HashSet<GenerationJob> activeJobs = new HashSet<>();
 
-    private final GenerationTaskQueue<ChunkJob> capacityQueue = new GenerationTaskQueue<>();
+    private final GenerationTaskQueue<GenerationJob> capacityQueue = new GenerationTaskQueue<>();
 
     private ChunkJobScheduler() {
     }
@@ -92,7 +92,7 @@ public final class ChunkJobScheduler {
     public synchronized long[] activeChunkSnapshot() {
         long[] snapshot = new long[this.activeJobs.size()];
         int count = 0;
-        for (ChunkJob job : this.activeJobs) {
+        for (GenerationJob job : this.activeJobs) {
             if (!job.isExecuting()) {
                 continue;
             }
@@ -109,11 +109,13 @@ public final class ChunkJobScheduler {
         return trimmed;
     }
 
+    @Override
     public void markCurrentWorkerActive() {
         this.workers.markCurrentWorker(WORKER_ACTIVE);
     }
 
-    void markCurrentWorkerIdle() {
+    @Override
+    public void markCurrentWorkerIdle() {
         this.workers.markCurrentWorker(WORKER_IDLE);
     }
 
@@ -132,13 +134,13 @@ public final class ChunkJobScheduler {
         this.refreshPoolIfNeeded();
         job.setSchedulerEpoch(this.epoch);
         if (this.footprints.conflicts(job.footprint())) {
-            job.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
+            job.transitionWaiting(WaitReason.FOOTPRINT_CONFLICT);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 GlobalCommon.LOGGER.info("Queued conflicting job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
             this.footprints.addWaiting(job);
         } else if (runningCount >= maxActive) {
-            job.transitionWaiting(WaitingReason.CAPACITY);
+            job.transitionWaiting(WaitReason.CAPACITY);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 GlobalCommon.LOGGER.info("Queued capacity job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
@@ -148,7 +150,8 @@ public final class ChunkJobScheduler {
         }
     }
 
-    synchronized boolean begin(ChunkJob job) {
+    @Override
+    public synchronized boolean begin(GenerationJob job) {
         if (this.cancelling || job.schedulerEpoch() != this.epoch) {
             return false;
         }
@@ -157,7 +160,8 @@ public final class ChunkJobScheduler {
         return true;
     }
 
-    synchronized void onComplete(ChunkJob job) {
+    @Override
+    public synchronized void onComplete(GenerationJob job) {
         this.activeJobs.remove(job);
         notifyAll();
         if (job.schedulerEpoch() != this.epoch) {
@@ -167,10 +171,10 @@ public final class ChunkJobScheduler {
         if (job.releaseCapacity()) {
             this.runningCount--;
         }
-        List<ChunkJob> ready = this.footprints.release(job.footprint());
+        List<GenerationJob> ready = this.footprints.release(job.footprint());
         notifyAll();
-        for (ChunkJob candidate : ready) {
-            candidate.transitionWaiting(WaitingReason.CAPACITY);
+        for (GenerationJob candidate : ready) {
+            candidate.transitionWaiting(WaitReason.CAPACITY);
             capacityQueue.addLast(candidate);
         }
 
@@ -179,9 +183,9 @@ public final class ChunkJobScheduler {
 
     private void drainCapacityQueue() {
         while (runningCount < maxActive && !capacityQueue.isEmpty()) {
-            ChunkJob queuedJob = this.pollCapacityJob();
+            GenerationJob queuedJob = this.pollCapacityJob();
             if (this.footprints.conflicts(queuedJob.footprint())) {
-                queuedJob.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
+                queuedJob.transitionWaiting(WaitReason.FOOTPRINT_CONFLICT);
                 this.footprints.addWaiting(queuedJob);
             } else {
                 dispatch(queuedJob);
@@ -189,7 +193,7 @@ public final class ChunkJobScheduler {
         }
     }
 
-    private ChunkJob pollCapacityJob() {
+    private GenerationJob pollCapacityJob() {
         GenerationTaskQueue.Priority priority = switch (AdrenalineConfig.stagePriority()) {
             case FIFO -> GenerationTaskQueue.Priority.FIFO;
             case HIGHEST -> GenerationTaskQueue.Priority.HIGHEST;
@@ -199,14 +203,14 @@ public final class ChunkJobScheduler {
     }
 
     public void cancel(Executor cancellationExecutor) {
-        List<ChunkJob> jobsToCancel;
+        List<GenerationJob> jobsToCancel;
         int pendingCount;
         int activeJobCount;
         synchronized (this) {
             pendingCount = this.footprints.waitingCount() + this.capacityQueue.size();
             jobsToCancel = new ArrayList<>(this.footprints.waitingCount() + this.capacityQueue.size() + this.activeJobs.size());
             this.footprints.copyWaitingTo(jobsToCancel);
-            for (ChunkJob job : this.capacityQueue) {
+            for (GenerationJob job : this.capacityQueue) {
                 jobsToCancel.add(job);
             }
             jobsToCancel.addAll(this.activeJobs);
@@ -220,7 +224,7 @@ public final class ChunkJobScheduler {
             notifyAll();
         }
 
-        for (ChunkJob job : jobsToCancel) {
+        for (GenerationJob job : jobsToCancel) {
             cancellationExecutor.execute(job::cancel);
         }
         GlobalCommon.LOGGER.info("Cancelled {} pending worldgen jobs; {} active jobs will drain", pendingCount, activeJobCount);
@@ -230,7 +234,7 @@ public final class ChunkJobScheduler {
         this.cancelling = false;
     }
 
-    private void dispatch(ChunkJob job) {
+    private void dispatch(GenerationJob job) {
         if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             GlobalCommon.LOGGER.info("Dispatching job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
         }
@@ -238,7 +242,7 @@ public final class ChunkJobScheduler {
         activeJobs.add(job);
         runningCount++;
         job.acquireCapacity();
-        job.transitionWaiting(WaitingReason.EXECUTOR_QUEUE);
+        job.transitionWaiting(WaitReason.EXECUTOR_QUEUE);
         this.workers.executor().execute(job);
     }
 

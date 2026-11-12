@@ -1,6 +1,11 @@
 package net.fly.adrenaline.scheduler;
 
-import net.fly.adrenaline.util.DeferredNotificationBuffer;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
 import net.minecraft.server.MinecraftServer;
@@ -9,34 +14,14 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
-
-public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry, GenerationFootprints.Entry {
+public final class ChunkJob extends GenerationJob {
 
     private static final ConcurrentHashMap<ServerLevel, long[]> PRIORITY_FOCI = new ConcurrentHashMap<>();
-    private static final ThreadLocal<ChunkJob> CURRENT_JOB = new ThreadLocal<>();
 
-    private final Set<Long> footprint;
-    private final Supplier<CompletableFuture<?>> work;
-    private final Runnable cancelWork;
-    private final ClassLoader contextClassLoader;
-    private final String debugLabel;
-    private final AtomicBoolean cancellationHandled = new AtomicBoolean();
-    private final AtomicInteger executingTasks = new AtomicInteger();
-    private long schedulerEpoch = Long.MIN_VALUE;
-    private volatile boolean started;
     private ChunkPos waitingPos;
     private ChunkStatus waitingStatus;
     private WaitingReason waitingReason;
     private long waitingStartedNanos;
-    private boolean capacityHeld;
     private ServerLevel priorityLevel;
     private ChunkPos priorityPos;
     private long[] cachedPriorityFoci;
@@ -70,50 +55,18 @@ public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry, Gene
     }
 
     public ChunkJob(Set<Long> footprint, Supplier<CompletableFuture<?>> work, Runnable cancelWork, ClassLoader contextClassLoader, String debugLabel) {
-        this.footprint = new HashSet<>(footprint);
-        this.work = work;
-        this.cancelWork = cancelWork;
-        this.contextClassLoader = contextClassLoader;
-        this.debugLabel = debugLabel;
+        super(footprint, work, cancelWork, contextClassLoader, debugLabel);
     }
 
     @Override
-    public Set<Long> footprint() {
-        return footprint;
-    }
-
-    public String debugLabel() {
-        return debugLabel;
-    }
-
-    long trackedPosition() {
+    public long trackedPosition() {
         ChunkPos pos = this.waitingPos;
         return pos == null ? Long.MIN_VALUE : pos.toLong();
     }
 
-    boolean isExecuting() {
-        return this.executingTasks.get() > 0;
-    }
-
-    public static <T> Supplier<T> trackExecution(Supplier<T> work) {
-        ChunkJob job = CURRENT_JOB.get();
-        return job == null ? work : () -> job.execute(work);
-    }
-
-    private <T> T execute(Supplier<T> work) {
-        ChunkJob previous = CURRENT_JOB.get();
-        CURRENT_JOB.set(this);
-        this.executingTasks.incrementAndGet();
-        try {
-            return work.get();
-        } finally {
-            this.executingTasks.decrementAndGet();
-            if (previous == null) {
-                CURRENT_JOB.remove();
-            } else {
-                CURRENT_JOB.set(previous);
-            }
-        }
+    @Override
+    protected Execution execution() {
+        return ChunkJobScheduler.get();
     }
 
     public ChunkJob trackWaiting(ChunkPos pos, ChunkStatus status) {
@@ -182,7 +135,8 @@ public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry, Gene
         PRIORITY_FOCI.clear();
     }
 
-    synchronized void transitionWaiting(WaitingReason reason) {
+    @Override
+    protected synchronized void transitionWaiting(WaitReason reason) {
         if (this.waitingPos == null || this.waitingStatus == null || !WorldgenStageStats.isEnabled()) {
             return;
         }
@@ -190,11 +144,16 @@ public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry, Gene
         if (this.waitingReason != null) {
             WorldgenStageStats.addWaitingInterval(this.waitingPos, this.waitingStatus, this.waitingReason, this.waitingStartedNanos, now);
         }
-        this.waitingReason = reason;
+        this.waitingReason = switch (reason) {
+            case FOOTPRINT_CONFLICT -> WaitingReason.FOOTPRINT_CONFLICT;
+            case CAPACITY -> WaitingReason.CAPACITY;
+            case EXECUTOR_QUEUE -> WaitingReason.EXECUTOR_QUEUE;
+        };
         this.waitingStartedNanos = now;
     }
 
-    synchronized void finishWaiting() {
+    @Override
+    protected synchronized void finishWaiting() {
         if (this.waitingReason == null) {
             return;
         }
@@ -202,76 +161,6 @@ public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry, Gene
         WorldgenStageStats.addWaitingInterval(this.waitingPos, this.waitingStatus, this.waitingReason, this.waitingStartedNanos, now);
         this.waitingReason = null;
         this.waitingStartedNanos = 0L;
-    }
-
-    void setSchedulerEpoch(long schedulerEpoch) {
-        this.schedulerEpoch = schedulerEpoch;
-    }
-
-    long schedulerEpoch() {
-        return schedulerEpoch;
-    }
-
-    void markStarted() {
-        this.started = true;
-    }
-
-    void acquireCapacity() {
-        this.capacityHeld = true;
-    }
-
-    boolean releaseCapacity() {
-        if (!this.capacityHeld) {
-            return false;
-        }
-        this.capacityHeld = false;
-        return true;
-    }
-
-    void cancel() {
-        this.finishWaiting();
-        if (!this.started && this.cancellationHandled.compareAndSet(false, true)) {
-            this.cancelWork.run();
-        }
-    }
-
-    @Override
-    public void run() {
-        Thread currentThread = Thread.currentThread();
-        ClassLoader previousClassLoader = currentThread.getContextClassLoader();
-        boolean handedOff = false;
-        try {
-            if (!ChunkJobScheduler.get().begin(this)) {
-                this.cancel();
-                return;
-            }
-            ChunkJobScheduler.get().markCurrentWorkerActive();
-            if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
-                currentThread.setContextClassLoader(this.contextClassLoader);
-            }
-            CompletableFuture<?> completion = this.execute(this.work);
-            DeferredNotificationBuffer.flush();
-            if (completion == null) {
-                completion = CompletableFuture.completedFuture(null);
-            }
-            completion.whenComplete((value, throwable) -> ChunkJobScheduler.get().onComplete(this));
-            handedOff = true;
-        } finally {
-            if (currentThread.getContextClassLoader() != previousClassLoader) {
-                currentThread.setContextClassLoader(previousClassLoader);
-            }
-            ChunkJobScheduler.get().markCurrentWorkerIdle();
-            if (!handedOff) {
-                ChunkJobScheduler.get().onComplete(this);
-            }
-        }
-    }
-
-    private static Supplier<CompletableFuture<?>> asAsync(Runnable work) {
-        return () -> {
-            work.run();
-            return CompletableFuture.completedFuture(null);
-        };
     }
 
     private static Set<Long> buildFootprint(ChunkPos center, int radius) {
