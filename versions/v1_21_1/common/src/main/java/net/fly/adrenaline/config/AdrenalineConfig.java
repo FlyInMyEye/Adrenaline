@@ -586,7 +586,6 @@ public class AdrenalineConfig {
         public boolean regionScanOptimizations = true;
         @WorkInProgress
         public boolean biomeCodecCache = true;
-        @WorkInProgress
         public boolean sectionTerrainOptimizations = true;
         @WorkInProgress
         public boolean surfaceNoiseOptimizations = true;

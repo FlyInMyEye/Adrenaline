@@ -54,6 +54,7 @@
     "MixinMaterialRuleList",
     "MixinOreVeinifierInvoker",
     "MixinHeightmapAccessor",
+    "MixinLevelChunkSectionAccessor",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
