@@ -11,7 +11,17 @@
     "MixinChunkStatusTasks",
     "MixinNoiseBasedChunkGenerator",
     "MixinStructureCheck",
-    "MixinStructureTemplatePalette"
+    "MixinStructureTemplatePalette",
+    "MixinRandomStateMapping",
+    "MixinRandomStateVisitor",
+    "MixinDensityFunctionsMapping",
+    "MixinDensityFunctionsHolderHolder",
+    "MixinDensityFunctionsMapped",
+    "MixinDensityFunctionsSpline",
+    "MixinDensityFunctionsSplineCoordinate",
+    "MixinCubicSplineMultipoint",
+    "MixinCubicSplineMultipointInvoker",
+    "MixinNoiseChunkMapping"
   ],
   "injectors": {
     "defaultRequire": 1
