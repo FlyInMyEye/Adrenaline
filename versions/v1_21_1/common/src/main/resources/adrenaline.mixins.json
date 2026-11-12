@@ -28,6 +28,14 @@
     "MixinNoiseInterpolator",
     "MixinNoiseChunkAccessor",
     "levelgen.AdrenalineMixinImprovedNoiseAccess",
+    "MixinDensityFunctionsAp2",
+    "MixinDensityFunctionsBlendDensity",
+    "MixinDensityFunctionsClamp",
+    "MixinDensityFunctionsMulOrAdd",
+    "MixinDensityFunctionsRangeChoice",
+    "MixinNoiseChunkCells",
+    "levelgen.AdrenalineMixinCacheAllInCellAccessor",
+    "levelgen.AdrenalineMixinNoiseInterpolatorView",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
