@@ -560,7 +560,6 @@ public class AdrenalineConfig {
         public Boolean worldgenOptimizations;
         @WorkInProgress
         public boolean noiseSliceOptimizations = true;
-        @WorkInProgress
         public boolean cellCacheOptimizations = true;
         public boolean cellInterpolationOptimizations = true;
         @WorkInProgress
@@ -619,7 +618,6 @@ public class AdrenalineConfig {
         public boolean terrainFillOptimizations = true;
         @WorkInProgress
         public boolean surfaceOptimizations = true;
-        @WorkInProgress
         public boolean noiseChunkOptimizations = true;
         @WorkInProgress
         public boolean materialRuleOptimizations = true;
