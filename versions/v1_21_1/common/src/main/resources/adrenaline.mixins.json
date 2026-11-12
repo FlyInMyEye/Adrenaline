@@ -12,6 +12,16 @@
     "MixinNoiseBasedChunkGenerator",
     "MixinStructureCheck",
     "MixinStructureTemplatePalette",
+    "MixinRandomStateMapping",
+    "MixinRandomStateVisitor",
+    "MixinDensityFunctionsMapping",
+    "MixinDensityFunctionsHolderHolder",
+    "MixinDensityFunctionsMapped",
+    "MixinDensityFunctionsSpline",
+    "MixinDensityFunctionsSplineCoordinate",
+    "MixinCubicSplineMultipoint",
+    "MixinCubicSplineMultipointInvoker",
+    "MixinNoiseChunkMapping",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {

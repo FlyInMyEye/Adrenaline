@@ -568,7 +568,6 @@ public class AdrenalineConfig {
         public boolean preliminarySurfaceOptimizations = true;
         @WorkInProgress
         public boolean densityWrapperOptimizations = true;
-        @WorkInProgress
         public boolean densitySplineOptimizations = true;
         @WorkInProgress
         public boolean surfaceContextOptimizations = true;
@@ -602,7 +601,6 @@ public class AdrenalineConfig {
         public boolean biomeFiddleOptimizations = true;
         @WorkInProgress
         public boolean biomeClimateOptimizations = true;
-        @WorkInProgress
         public boolean densityMappingOptimizations = true;
         @WorkInProgress
         public boolean blendingOptimizations = true;
