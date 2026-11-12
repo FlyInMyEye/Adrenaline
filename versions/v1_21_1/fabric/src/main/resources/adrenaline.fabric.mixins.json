@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "MixinChunkMap",
+    "MixinBeardifier",
     "MixinMinecraftServer",
     "MixinChunkStep",
     "MixinChunkStatusTasks",
