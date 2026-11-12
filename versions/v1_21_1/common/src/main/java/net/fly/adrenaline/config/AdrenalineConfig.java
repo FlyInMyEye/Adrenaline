@@ -665,7 +665,6 @@ public class AdrenalineConfig {
         public boolean nativePerlinBatching = true;
         @WorkInProgress
         public boolean approximateNativePerlin = false;
-        @WorkInProgress
         public boolean nativeDensityEvaluation = true;
         @WorkInProgress
         public boolean nativeGeodeFiltering = true;

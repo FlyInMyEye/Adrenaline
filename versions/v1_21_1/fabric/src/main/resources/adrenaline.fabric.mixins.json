@@ -35,7 +35,19 @@
     "MixinDensityFunctionsRangeChoice",
     "MixinNoiseChunkCells",
     "levelgen.AdrenalineMixinCacheAllInCellAccessor",
-    "levelgen.AdrenalineMixinNoiseInterpolatorView"
+    "levelgen.AdrenalineMixinNoiseInterpolatorView",
+    "MixinDensityFunctionsConstant",
+    "MixinDensityFunctionsBeardifierMarker",
+    "MixinDensityFunctionsYClampedGradient",
+    "MixinDensityFunctionsShift",
+    "MixinDensityFunctionsShiftA",
+    "MixinDensityFunctionsShiftB",
+    "MixinDensityFunctionsShiftedNoise",
+    "MixinDensityFunctionsWeirdScaledSampler",
+    "MixinDensityFunctionsNoise",
+    "MixinNoiseChunkCacheAllInCell",
+    "MixinNoiseChunkCacheOnce",
+    "MixinNoiseChunkFlatCacheAllocation"
   ],
   "injectors": {
     "defaultRequire": 1
