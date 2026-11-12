@@ -42,6 +42,8 @@
     "defaultRequire": 1
   },
   "client": [
+    "MixinOptionsScreen",
+    "MixinCreateWorldScreen",
     "MixinGuiStats",
     "MixinDebugScreenOverlay",
     "MixinMinecraftClientLifecycle"
