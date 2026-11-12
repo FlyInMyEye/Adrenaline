@@ -21,7 +21,13 @@
     "MixinDensityFunctionsSplineCoordinate",
     "MixinCubicSplineMultipoint",
     "MixinCubicSplineMultipointInvoker",
-    "MixinNoiseChunkMapping"
+    "MixinNoiseChunkMapping",
+    "MixinNormalNoise",
+    "MixinPerlinNoise",
+    "MixinBlendedNoise",
+    "MixinNoiseInterpolator",
+    "MixinNoiseChunkAccessor",
+    "levelgen.AdrenalineMixinImprovedNoiseAccess"
   ],
   "injectors": {
     "defaultRequire": 1

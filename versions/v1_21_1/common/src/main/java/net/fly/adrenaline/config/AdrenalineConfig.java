@@ -562,7 +562,6 @@ public class AdrenalineConfig {
         public boolean noiseSliceOptimizations = true;
         @WorkInProgress
         public boolean cellCacheOptimizations = true;
-        @WorkInProgress
         public boolean cellInterpolationOptimizations = true;
         @WorkInProgress
         public boolean preliminarySurfaceOptimizations = true;
@@ -665,7 +664,6 @@ public class AdrenalineConfig {
         public boolean parallelizeFull = true;
         @WorkInProgress
         public boolean fastLegacyRandom = true;
-        @WorkInProgress
         public boolean nativePerlinBatching = true;
         @WorkInProgress
         public boolean approximateNativePerlin = false;
