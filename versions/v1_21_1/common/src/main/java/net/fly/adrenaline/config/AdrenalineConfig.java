@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
+import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
 import net.fly.configlib.JsonConfigManager;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.slf4j.LoggerFactory;
@@ -94,6 +95,7 @@ public class AdrenalineConfig {
         if (manager != null) {
             manager.save(value);
         }
+        AdaptiveWorldgenWorkers.refreshSettings();
     }
 
     public static synchronized void reload() {
@@ -633,9 +635,7 @@ public class AdrenalineConfig {
         @WorkInProgress
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
-        @WorkInProgress
         public Boolean adaptiveGenerationWorkers;
-        @WorkInProgress
         public AdaptiveWorkerMode adaptiveWorkerMode = AdaptiveWorkerMode.QUARTER;
         @WorkInProgress
         public int serializationWorkerThreads = 0;
