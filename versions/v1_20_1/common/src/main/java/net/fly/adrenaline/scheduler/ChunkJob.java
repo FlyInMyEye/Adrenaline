@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry {
+public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry, GenerationFootprints.Entry {
 
     private static final ConcurrentHashMap<ServerLevel, long[]> PRIORITY_FOCI = new ConcurrentHashMap<>();
     private static final ThreadLocal<ChunkJob> CURRENT_JOB = new ThreadLocal<>();
@@ -77,6 +77,7 @@ public final class ChunkJob implements Runnable, GenerationTaskQueue.Entry {
         this.debugLabel = debugLabel;
     }
 
+    @Override
     public Set<Long> footprint() {
         return footprint;
     }

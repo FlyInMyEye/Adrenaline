@@ -5,9 +5,7 @@ import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -34,11 +32,8 @@ public final class ChunkJobScheduler {
     private boolean cancelling;
 
     private int runningCount;
-    private final HashSet<Long> activeFootprint = new HashSet<>();
+    private final GenerationFootprints<ChunkJob> footprints = new GenerationFootprints<>();
     private final HashSet<ChunkJob> activeJobs = new HashSet<>();
-
-    private final LinkedHashSet<ChunkJob> conflictPending = new LinkedHashSet<>();
-    private final HashMap<Long, Set<ChunkJob>> waitIndex = new HashMap<>();
 
     private final GenerationTaskQueue<ChunkJob> capacityQueue = new GenerationTaskQueue<>();
 
@@ -97,7 +92,7 @@ public final class ChunkJobScheduler {
         int processors = Runtime.getRuntime().availableProcessors();
         int[] snapshot = new int[processors];
         AtomicIntegerArray states = this.workerStates;
-        boolean waitingWork = this.pendingDependencies.get() > 0 || this.runningCount > 0 || !this.conflictPending.isEmpty() || !this.capacityQueue.isEmpty();
+        boolean waitingWork = this.pendingDependencies.get() > 0 || this.runningCount > 0 || this.footprints.waitingCount() > 0 || !this.capacityQueue.isEmpty();
         int configuredWorkers = Math.min(this.pool.getParallelism(), processors);
         for (int i = 0; i < configuredWorkers; i++) {
             int state = i < states.length() ? states.get(i) : WORKER_IDLE;
@@ -139,7 +134,7 @@ public final class ChunkJobScheduler {
 
     public synchronized void awaitNotActive(ChunkPos pos) throws InterruptedException {
         long key = pos.toLong();
-        while (activeFootprint.contains(key)) {
+        while (this.footprints.isActive(key)) {
             wait();
         }
     }
@@ -151,13 +146,12 @@ public final class ChunkJobScheduler {
         }
         this.refreshPoolIfNeeded();
         job.setSchedulerEpoch(this.epoch);
-        if (conflicts(job.footprint())) {
+        if (this.footprints.conflicts(job.footprint())) {
             job.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
                 GlobalCommon.LOGGER.info("Queued conflicting job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
             }
-            conflictPending.add(job);
-            indexJob(job);
+            this.footprints.addWaiting(job);
         } else if (runningCount >= maxActive) {
             job.transitionWaiting(WaitingReason.CAPACITY);
             if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
@@ -188,26 +182,11 @@ public final class ChunkJobScheduler {
         if (job.releaseCapacity()) {
             this.runningCount--;
         }
-        Set<Long> footprint = job.footprint();
-        this.activeFootprint.removeAll(footprint);
-
+        List<ChunkJob> ready = this.footprints.release(job.footprint());
         notifyAll();
-
-        Set<ChunkJob> candidates = new HashSet<>();
-        for (long key : footprint) {
-            Set<ChunkJob> waiters = waitIndex.get(key);
-            if (waiters != null) {
-                candidates.addAll(waiters);
-            }
-        }
-
-        for (ChunkJob candidate : new ArrayList<>(conflictPending)) {
-            if (candidates.contains(candidate) && !conflicts(candidate.footprint())) {
-                conflictPending.remove(candidate);
-                removeFromIndex(candidate);
-                candidate.transitionWaiting(WaitingReason.CAPACITY);
-                capacityQueue.addLast(candidate);
-            }
+        for (ChunkJob candidate : ready) {
+            candidate.transitionWaiting(WaitingReason.CAPACITY);
+            capacityQueue.addLast(candidate);
         }
 
         this.drainCapacityQueue();
@@ -216,10 +195,9 @@ public final class ChunkJobScheduler {
     private void drainCapacityQueue() {
         while (runningCount < maxActive && !capacityQueue.isEmpty()) {
             ChunkJob queuedJob = this.pollCapacityJob();
-            if (conflicts(queuedJob.footprint())) {
+            if (this.footprints.conflicts(queuedJob.footprint())) {
                 queuedJob.transitionWaiting(WaitingReason.FOOTPRINT_CONFLICT);
-                conflictPending.add(queuedJob);
-                indexJob(queuedJob);
+                this.footprints.addWaiting(queuedJob);
             } else {
                 dispatch(queuedJob);
             }
@@ -240,9 +218,9 @@ public final class ChunkJobScheduler {
         int pendingCount;
         int activeJobCount;
         synchronized (this) {
-            pendingCount = this.conflictPending.size() + this.capacityQueue.size();
-            jobsToCancel = new ArrayList<>(this.conflictPending.size() + this.capacityQueue.size() + this.activeJobs.size());
-            jobsToCancel.addAll(this.conflictPending);
+            pendingCount = this.footprints.waitingCount() + this.capacityQueue.size();
+            jobsToCancel = new ArrayList<>(this.footprints.waitingCount() + this.capacityQueue.size() + this.activeJobs.size());
+            this.footprints.copyWaitingTo(jobsToCancel);
             for (ChunkJob job : this.capacityQueue) {
                 jobsToCancel.add(job);
             }
@@ -251,9 +229,7 @@ public final class ChunkJobScheduler {
             this.epoch++;
             this.cancelling = true;
             this.runningCount = 0;
-            this.activeFootprint.clear();
-            this.conflictPending.clear();
-            this.waitIndex.clear();
+            this.footprints.clear();
             this.capacityQueue.clear();
             this.pendingDependencies.set(0);
             notifyAll();
@@ -269,38 +245,11 @@ public final class ChunkJobScheduler {
         this.cancelling = false;
     }
 
-    private void indexJob(ChunkJob job) {
-        for (long key : job.footprint()) {
-            waitIndex.computeIfAbsent(key, k -> new HashSet<>()).add(job);
-        }
-    }
-
-    private void removeFromIndex(ChunkJob job) {
-        for (long key : job.footprint()) {
-            Set<ChunkJob> waiters = waitIndex.get(key);
-            if (waiters != null) {
-                waiters.remove(job);
-                if (waiters.isEmpty()) {
-                    waitIndex.remove(key);
-                }
-            }
-        }
-    }
-
-    private boolean conflicts(Set<Long> footprint) {
-        for (long key : footprint) {
-            if (activeFootprint.contains(key)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private void dispatch(ChunkJob job) {
         if (BuildConfig.DEBUG && AdrenalineConfig.debugLoggingEnabled()) {
             GlobalCommon.LOGGER.info("Dispatching job {} with footprint {}", job.debugLabel(), summarizeFootprint(job.footprint()));
         }
-        activeFootprint.addAll(job.footprint());
+        this.footprints.acquire(job.footprint());
         activeJobs.add(job);
         runningCount++;
         job.acquireCapacity();
