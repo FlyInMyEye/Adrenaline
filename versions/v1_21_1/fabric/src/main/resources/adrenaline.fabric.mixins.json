@@ -47,7 +47,9 @@
     "MixinDensityFunctionsNoise",
     "MixinNoiseChunkCacheAllInCell",
     "MixinNoiseChunkCacheOnce",
-    "MixinNoiseChunkFlatCacheAllocation"
+    "MixinNoiseChunkFlatCacheAllocation",
+    "MixinAquiferFluidStatus",
+    "MixinNoiseBasedAquifer"
   ],
   "injectors": {
     "defaultRequire": 1
