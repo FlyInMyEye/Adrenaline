@@ -2,6 +2,7 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -25,6 +26,8 @@ public final class SurfaceRuleHooks {
 
     private static volatile Set<String> hooks;
     private static final Map<String, Set<String>> CALL_HOOKS = new ConcurrentHashMap<>();
+    private static final Map<String, Set<String>> DECLARED_HOOKS = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, Set<String>>> CALL_TARGETS = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, String>> FORWARDERS = new ConcurrentHashMap<>();
 
     private static final Map<String, Set<String>> SEQUENCES = new ConcurrentHashMap<>();
@@ -71,11 +74,27 @@ public final class SurfaceRuleHooks {
         FORWARDERS.put(type.name.replace('/', '.'), Map.copyOf(forwarders));
         boolean context = type.methods.stream().anyMatch(method -> method.name.equals("adrenaline$getMinSurfaceLevel"));
         Set<String> foreign = new HashSet<>();
+        Map<String, Set<String>> targets = new HashMap<>();
         for (MethodNode method : type.methods) {
             if (foreign(method.visibleAnnotations) || foreign(method.invisibleAnnotations)) {
                 foreign.add(method.name + method.desc);
             }
+            Set<String> calls = new HashSet<>();
+            for (var instruction : method.instructions) {
+                if (instruction instanceof MethodInsnNode call && call.owner.equals(type.name)) {
+                    calls.add(call.name + call.desc);
+                } else if (instruction instanceof InvokeDynamicInsnNode call) {
+                    for (Object argument : call.bsmArgs) {
+                        if (argument instanceof Handle handle && handle.getOwner().equals(type.name)) {
+                            calls.add(handle.getName() + handle.getDesc());
+                        }
+                    }
+                }
+            }
+            if (!calls.isEmpty()) targets.put(method.name + method.desc, Set.copyOf(calls));
         }
+        DECLARED_HOOKS.put(type.name.replace('/', '.'), Set.copyOf(foreign));
+        CALL_TARGETS.put(type.name.replace('/', '.'), Map.copyOf(targets));
         boolean changed;
         do {
             changed = false;
@@ -106,6 +125,23 @@ public final class SurfaceRuleHooks {
     public static boolean hooked(Class<?> type, String method) {
         Set<String> current = CALL_HOOKS.get(type.getName());
         return current == null ? SurfacePipelineCompatibility.hasForeignHooks(type) : current.contains(method);
+    }
+
+    public static boolean hookedOutside(Class<?> type, String method, Set<String> preservedCalls) {
+        Map<String, Set<String>> targets = CALL_TARGETS.get(type.getName());
+        Set<String> declared = DECLARED_HOOKS.get(type.getName());
+        return targets == null || declared == null ? hooked(type, method)
+            : hookedOutside(method, preservedCalls, targets, declared, new HashSet<>());
+    }
+
+    private static boolean hookedOutside(String method, Set<String> preservedCalls, Map<String, Set<String>> targets,
+                                         Set<String> declared, Set<String> visited) {
+        if (preservedCalls.contains(method) || !visited.add(method)) return false;
+        if (declared.contains(method)) return true;
+        for (String target : targets.getOrDefault(method, Set.of())) {
+            if (hookedOutside(target, preservedCalls, targets, declared, visited)) return true;
+        }
+        return false;
     }
 
     public static boolean hasHolderValueHooks(Class<?> type) {

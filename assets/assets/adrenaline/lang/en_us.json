@@ -29,6 +29,8 @@
   "gui.adrenaline.config.fast_legacy_random": "Fast Legacy Random",
   "gui.adrenaline.config.palette_resize_optimizations": "Palette resize copies",
   "tooltip.adrenaline.config.palette_resize_optimizations": "Reuses palette ID mappings when section storage grows and copies packed values in batches.",
+  "gui.adrenaline.config.ore_target_optimizations": "Ore replacement rules",
+  "tooltip.adrenaline.config.ore_target_optimizations": "Caches deterministic ore replacement rules while preserving target order and random air-exposure checks. Custom rules keep their original behavior.",
   "gui.adrenaline.config.native_geode_filtering": "Native geode filtering",
   "tooltip.adrenaline.config.native_geode_filtering": "Skips positions outside geodes using native batches. Block placement and random numbers follow the original generator.",
   "gui.adrenaline.config.group.features": "Features",
