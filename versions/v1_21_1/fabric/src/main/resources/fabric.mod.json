@@ -11,6 +11,9 @@
   },
   "description": "Generation multithreading, but better",
   "entrypoints": {
+    "client": [
+      "net.fly.adrenaline.AdrenalineFabricClient"
+    ],
     "modmenu": [
       "net.fly.adrenaline.client.AdrenalineModMenu"
     ],

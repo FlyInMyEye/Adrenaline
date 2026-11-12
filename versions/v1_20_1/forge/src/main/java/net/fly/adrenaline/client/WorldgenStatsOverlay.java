@@ -37,6 +37,7 @@ public final class WorldgenStatsOverlay {
                 .then(Commands.literal("chunk")
                     .then(Commands.argument("arguments", StringArgumentType.greedyString())))
                 .then(Commands.literal("stats")
+                    .executes(context -> setEnabled(context.getSource(), !WorldgenStageStats.isHudVisible()))
                     .then(Commands.literal("on").executes(context -> setEnabled(context.getSource(), true)))
                     .then(Commands.literal("off").executes(context -> setEnabled(context.getSource(), false))))
                 .then(Commands.literal("natives")
