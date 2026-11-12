@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.util.WorldgenStageStats;
 import java.util.function.BooleanSupplier;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJob;
@@ -22,6 +23,11 @@ public class MixinMinecraftServerLifecycle {
     @Inject(method = "stopServer", at = @At("RETURN"))
     private void adrenaline$clearPriorityFoci(CallbackInfo ci) {
         ChunkJobScheduler.clearServer((MinecraftServer) (Object) this);
+    }
+
+    @Inject(method = "runServer", at = @At("HEAD"))
+    private void adrenaline$resetWorldgenStats(CallbackInfo ci) {
+        WorldgenStageStats.reset();
     }
 
 }

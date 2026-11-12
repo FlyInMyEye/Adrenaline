@@ -2,12 +2,15 @@ package net.fly.adrenaline.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import java.util.concurrent.CompletableFuture;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.WorldgenWarmup;
+import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.util.WorldgenStageStats;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.GenerationChunkHolder;
@@ -30,6 +33,22 @@ public abstract class MixinChunkMap {
 
     @Shadow @Final private ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> worldgenMailbox;
     @Shadow @Final private ChunkGeneratorStructureState chunkGeneratorState;
+
+    @WrapMethod(method = "applyStep")
+    private CompletableFuture<ChunkAccess> adrenaline$measureScheduling(GenerationChunkHolder holder, ChunkStep step,
+            StaticCache2D<GenerationChunkHolder> cache, Operation<CompletableFuture<ChunkAccess>> original) {
+        if (!BuildConfig.DEBUG || step.targetStatus() == ChunkStatus.EMPTY
+                || !holder.getPersistedStatus().isBefore(step.targetStatus())) {
+            return original.call(holder, step, cache);
+        }
+        WorldgenStageStats.beginScheduling(holder.getPos(), step.targetStatus());
+        WorldgenStageStats.markDependenciesReady(holder.getPos(), step.targetStatus());
+        try {
+            return original.call(holder, step, cache);
+        } finally {
+            WorldgenStageStats.finishInitialScheduling(holder.getPos(), step.targetStatus());
+        }
+    }
 
     @WrapOperation(method = "applyStep", at = @At(value = "INVOKE",
         target = "Lnet/minecraft/world/level/chunk/status/ChunkStep;apply(Lnet/minecraft/world/level/chunk/status/WorldGenContext;Lnet/minecraft/util/StaticCache2D;Lnet/minecraft/world/level/chunk/ChunkAccess;)Ljava/util/concurrent/CompletableFuture;"))
