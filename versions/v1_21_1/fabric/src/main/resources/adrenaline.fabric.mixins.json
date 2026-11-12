@@ -5,6 +5,8 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "MixinChunkMap",
+    "MixinChunkStep",
+    "MixinChunkStatusTasks",
     "MixinNoiseBasedChunkGenerator",
     "MixinStructureCheck",
     "MixinStructureTemplatePalette"

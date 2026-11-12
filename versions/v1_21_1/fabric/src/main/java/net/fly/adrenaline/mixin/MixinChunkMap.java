@@ -2,9 +2,12 @@ package net.fly.adrenaline.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import java.util.concurrent.CompletableFuture;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
+import net.fly.adrenaline.util.WorldgenStageStats;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.GenerationChunkHolder;
@@ -27,6 +30,22 @@ public abstract class MixinChunkMap {
 
     @Shadow @Final private ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> worldgenMailbox;
     @Shadow @Final private ChunkGeneratorStructureState chunkGeneratorState;
+
+    @WrapMethod(method = "applyStep")
+    private CompletableFuture<ChunkAccess> adrenaline$measureScheduling(GenerationChunkHolder holder, ChunkStep step,
+            StaticCache2D<GenerationChunkHolder> cache, Operation<CompletableFuture<ChunkAccess>> original) {
+        if (!BuildConfig.DEBUG || step.targetStatus() == ChunkStatus.EMPTY
+                || !holder.getPersistedStatus().isBefore(step.targetStatus())) {
+            return original.call(holder, step, cache);
+        }
+        WorldgenStageStats.beginScheduling(holder.getPos(), step.targetStatus());
+        WorldgenStageStats.markDependenciesReady(holder.getPos(), step.targetStatus());
+        try {
+            return original.call(holder, step, cache);
+        } finally {
+            WorldgenStageStats.finishInitialScheduling(holder.getPos(), step.targetStatus());
+        }
+    }
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void adrenaline$prepareStructurePlacements(CallbackInfo ci) {

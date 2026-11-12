@@ -6,6 +6,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.WorldgenStageStats.WaitingReason;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -18,6 +20,8 @@ public final class ChunkJob extends GenerationJob {
 
     private ChunkPos waitingPos;
     private ChunkStatus waitingStatus;
+    private WaitingReason waitingReason;
+    private long waitingStartedNanos;
     private ServerLevel priorityLevel;
     private ChunkPos priorityPos;
     private long[] cachedPriorityFoci;
@@ -136,11 +140,31 @@ public final class ChunkJob extends GenerationJob {
     }
 
     @Override
-    protected void transitionWaiting(WaitReason reason) {
+    protected synchronized void transitionWaiting(WaitReason reason) {
+        if (this.waitingPos == null || this.waitingStatus == null || !WorldgenStageStats.isEnabled()) {
+            return;
+        }
+        long now = System.nanoTime();
+        if (this.waitingReason != null) {
+            WorldgenStageStats.addWaitingInterval(this.waitingPos, this.waitingStatus, this.waitingReason, this.waitingStartedNanos, now);
+        }
+        this.waitingReason = switch (reason) {
+            case FOOTPRINT_CONFLICT -> WaitingReason.FOOTPRINT_CONFLICT;
+            case CAPACITY -> WaitingReason.CAPACITY;
+            case EXECUTOR_QUEUE -> WaitingReason.EXECUTOR_QUEUE;
+        };
+        this.waitingStartedNanos = now;
     }
 
     @Override
-    protected void finishWaiting() {
+    protected synchronized void finishWaiting() {
+        if (this.waitingReason == null) {
+            return;
+        }
+        long now = System.nanoTime();
+        WorldgenStageStats.addWaitingInterval(this.waitingPos, this.waitingStatus, this.waitingReason, this.waitingStartedNanos, now);
+        this.waitingReason = null;
+        this.waitingStartedNanos = 0L;
     }
 
     private static Set<Long> buildFootprint(ChunkPos center, int radius) {

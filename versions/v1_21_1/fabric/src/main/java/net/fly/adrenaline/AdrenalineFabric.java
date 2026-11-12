@@ -7,6 +7,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.scheduler.ChunkJob;
+import net.fly.adrenaline.util.WorldgenStageStats;
 
 public final class AdrenalineFabric implements ModInitializer {
     public static final String MODID = "adrenaline";
@@ -14,6 +15,9 @@ public final class AdrenalineFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         AdrenalineCommon.init(FabricLoader.getInstance().getConfigDir());
+        if (BuildConfig.DEBUG) {
+            ServerLifecycleEvents.SERVER_STARTING.register(server -> WorldgenStageStats.reset());
+        }
         ServerTickEvents.START_SERVER_TICK.register(server -> {
             if (AdrenalineConfig.parallelWorldgenEnabled()) {
                 ChunkJob.updatePriorityFoci(server);
