@@ -1,6 +1,7 @@
 package net.fly.adrenaline;
 
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.loading.FMLPaths;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -10,7 +11,7 @@ public final class AdrenalineForge {
     private static final Logger LOGGER = LogManager.getLogger(MODID);
 
     public AdrenalineForge() {
-        AdrenalineCommon.init();
+        AdrenalineCommon.init(FMLPaths.CONFIGDIR.get());
         LOGGER.info("Adrenaline initialized on Forge");
     }
 }

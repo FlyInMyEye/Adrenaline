@@ -22,3 +22,10 @@ ordering="NONE"
 side="BOTH"
 [[mixins]]
 config = "${mod_id}.mixins.json"
+
+[[dependencies.${mod_id}]]
+modId="flysconfiglib"
+mandatory=true
+versionRange="[1.2.0,)"
+ordering="NONE"
+side="BOTH"

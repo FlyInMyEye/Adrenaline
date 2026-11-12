@@ -1,5 +1,7 @@
 package net.fly.adrenaline;
 
+import java.nio.file.Path;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
 
 public final class AdrenalineCommon {
@@ -9,9 +11,9 @@ public final class AdrenalineCommon {
     private AdrenalineCommon() {
     }
 
-    public static void init() {
+    public static void init(Path configDirectory) {
+        AdrenalineConfig.init(configDirectory);
         AdrenalineNatives.initialize();
-        GlobalCommon.workerPool();
-        System.out.println(MOD_ID + " initialized for " + TARGET_VERSION);
+        GlobalCommon.LOGGER.info("Adrenaline initialized for {}", TARGET_VERSION);
     }
 }
