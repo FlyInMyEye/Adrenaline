@@ -36,6 +36,18 @@
     "MixinNoiseChunkCells",
     "levelgen.AdrenalineMixinCacheAllInCellAccessor",
     "levelgen.AdrenalineMixinNoiseInterpolatorView",
+    "MixinDensityFunctionsConstant",
+    "MixinDensityFunctionsBeardifierMarker",
+    "MixinDensityFunctionsYClampedGradient",
+    "MixinDensityFunctionsShift",
+    "MixinDensityFunctionsShiftA",
+    "MixinDensityFunctionsShiftB",
+    "MixinDensityFunctionsShiftedNoise",
+    "MixinDensityFunctionsWeirdScaledSampler",
+    "MixinDensityFunctionsNoise",
+    "MixinNoiseChunkCacheAllInCell",
+    "MixinNoiseChunkCacheOnce",
+    "MixinNoiseChunkFlatCacheAllocation",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {

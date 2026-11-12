@@ -6,6 +6,7 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinCacheAllInCellAccessor;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
+import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
@@ -18,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
-public abstract class MixinNoiseChunkCells {
+public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
     @Shadow private int cellNoiseMinY;
     @Shadow private int cellWidth;
     @Shadow private int cellHeight;
@@ -34,6 +35,31 @@ public abstract class MixinNoiseChunkCells {
     @Shadow private boolean fillingCell;
     @Shadow private List<?> interpolators;
     @Shadow private List<?> cellCaches;
+
+    @Override
+    public int adrenaline$getCellStartBlockX() {
+        return this.cellStartBlockX;
+    }
+
+    @Override
+    public int adrenaline$getCellStartBlockY() {
+        return this.cellStartBlockY;
+    }
+
+    @Override
+    public int adrenaline$getCellStartBlockZ() {
+        return this.cellStartBlockZ;
+    }
+
+    @Override
+    public int adrenaline$getCellWidth() {
+        return this.cellWidth;
+    }
+
+    @Override
+    public int adrenaline$getCellHeight() {
+        return this.cellHeight;
+    }
 
     @Unique
     private AdrenalineMixinNoiseInterpolatorView[] adrenaline$interpolatorArray;
