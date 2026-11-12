@@ -1,5 +1,7 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -28,16 +30,17 @@ public class MixinNoiseInterpolator implements AdrenalineCompiledInterpolatorAcc
     @Shadow private double noise110;
     @Shadow private double noise111;
 
-    @Inject(method = "fillArray", at = @At("HEAD"))
-    private void adrenaline$beginNativePerlinBatch(double[] values, DensityFunction.ContextProvider contextProvider, CallbackInfo ci) {
-        if (AdrenalineConfig.nativePerlinBatchingEnabled() && !this.adrenaline$isFillingCell(contextProvider)) {
-            PerlinBatching.begin(values.length);
+    @WrapMethod(method = "fillArray")
+    @ControlsOptimization(Optimization.NATIVE_PERLIN)
+    private void adrenaline$withNativePerlinBatch(double[] values, DensityFunction.ContextProvider contextProvider, Operation<Void> original) {
+        if (!AdrenalineConfig.nativePerlinBatchingEnabled() || this.adrenaline$isFillingCell(contextProvider)) {
+            original.call(values, contextProvider);
+            return;
         }
-    }
-
-    @Inject(method = "fillArray", at = @At("RETURN"))
-    private void adrenaline$endNativePerlinBatch(double[] values, DensityFunction.ContextProvider contextProvider, CallbackInfo ci) {
-        if (!this.adrenaline$isFillingCell(contextProvider)) {
+        PerlinBatching.begin(values.length);
+        try {
+            original.call(values, contextProvider);
+        } finally {
             PerlinBatching.end();
         }
     }

@@ -22,6 +22,12 @@
     "MixinCubicSplineMultipoint",
     "MixinCubicSplineMultipointInvoker",
     "MixinNoiseChunkMapping",
+    "MixinNormalNoise",
+    "MixinPerlinNoise",
+    "MixinBlendedNoise",
+    "MixinNoiseInterpolator",
+    "MixinNoiseChunkAccessor",
+    "levelgen.AdrenalineMixinImprovedNoiseAccess",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
