@@ -53,7 +53,8 @@
     "MixinNoiseChunkOreVeinifier",
     "MixinMaterialRuleList",
     "MixinOreVeinifierInvoker",
-    "MixinHeightmapAccessor"
+    "MixinHeightmapAccessor",
+    "MixinLevelChunkSectionAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
