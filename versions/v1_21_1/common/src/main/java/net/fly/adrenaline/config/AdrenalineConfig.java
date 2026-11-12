@@ -620,7 +620,6 @@ public class AdrenalineConfig {
         public boolean materialRuleOptimizations = true;
         public boolean aquiferOptimizations = true;
         public boolean beardifierOptimizations = true;
-        @WorkInProgress
         public boolean oreVeinOptimizations = true;
         @WorkInProgress
         public boolean initialSpawnOptimization = true;

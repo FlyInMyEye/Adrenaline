@@ -49,7 +49,10 @@
     "MixinNoiseChunkCacheOnce",
     "MixinNoiseChunkFlatCacheAllocation",
     "MixinAquiferFluidStatus",
-    "MixinNoiseBasedAquifer"
+    "MixinNoiseBasedAquifer",
+    "MixinNoiseChunkOreVeinifier",
+    "MixinMaterialRuleList",
+    "MixinOreVeinifierInvoker"
   ],
   "injectors": {
     "defaultRequire": 1
