@@ -10,6 +10,11 @@ import net.fly.adrenaline.worldgen.AdrenalineCellGridAccess;
 import net.fly.adrenaline.worldgen.CellDensityCompiler;
 import net.fly.adrenaline.worldgen.CellDensityEvaluator;
 import net.fly.adrenaline.worldgen.NoiseInterpolationKernel;
+import net.fly.adrenaline.worldgen.NativeCellDensityEvaluator;
+import net.fly.adrenaline.worldgen.NativeSliceLattice;
+import net.fly.adrenaline.worldgen.PerlinBatching;
+import net.fly.adrenaline.worldgen.PerlinSectionCache;
+import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.NoiseChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -20,6 +25,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(NoiseChunk.class)
 public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
+    @Shadow private int cellCountXZ;
+    @Shadow private int cellCountY;
+    @Shadow private DensityFunction.ContextProvider sliceFillingContextProvider;
     @Shadow private int cellNoiseMinY;
     @Shadow private int cellWidth;
     @Shadow private int cellHeight;
@@ -70,6 +78,11 @@ public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
     @Unique
     private CellDensityEvaluator[] adrenaline$cellDensityEvaluators;
 
+    @Unique private CellDensityEvaluator[] adrenaline$sliceDensityEvaluators;
+    @Unique private PerlinSectionCache adrenaline$perlinSections;
+    @Unique private double[][] adrenaline$sliceLattices;
+    @Unique private int adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
+
     @Unique private double[] adrenaline$noise000;
     @Unique private double[] adrenaline$noise001;
     @Unique private double[] adrenaline$noise100;
@@ -118,6 +131,10 @@ public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
         this.adrenaline$valueZ0 = new double[size];
         this.adrenaline$valueZ1 = new double[size];
         this.adrenaline$values = new double[size];
+        this.adrenaline$sliceDensityEvaluators = null;
+        this.adrenaline$perlinSections = null;
+        this.adrenaline$sliceLattices = null;
+        this.adrenaline$perlinSectionBaseCellX = Integer.MIN_VALUE;
     }
 
     @Unique
@@ -145,6 +162,111 @@ public abstract class MixinNoiseChunkCells implements AdrenalineCellGridAccess {
             this.adrenaline$cellDensityEvaluators = cached;
         }
         return cached;
+    }
+
+    @Unique
+    private CellDensityEvaluator[] adrenaline$sliceDensityEvaluators(AdrenalineMixinNoiseInterpolatorView[] interpolators) {
+        CellDensityEvaluator[] cached = this.adrenaline$sliceDensityEvaluators;
+        if (cached == null || cached.length != interpolators.length) {
+            cached = new CellDensityEvaluator[interpolators.length];
+            for (int i = 0; i < interpolators.length; i++) {
+                cached[i] = CellDensityCompiler.compileSlice(interpolators[i].adrenaline$getNoiseFiller());
+            }
+            this.adrenaline$sliceDensityEvaluators = cached;
+        }
+        return cached;
+    }
+
+    @Unique
+    private void adrenaline$fillSlice(boolean useFirstSlice, int cellX) {
+        this.cellStartBlockX = cellX * this.cellWidth;
+        this.inCellX = 0;
+        AdrenalineMixinNoiseInterpolatorView[] interpolatorArray = this.adrenaline$interpolatorArray();
+        CellDensityEvaluator[] sliceEvaluators = this.adrenaline$sliceDensityEvaluators(interpolatorArray);
+        boolean nativePerlin = AdrenalineConfig.nativePerlinBatchingEnabled();
+        boolean nativeSection = nativePerlin || AdrenalineConfig.nativeBlendedNoiseEnabled();
+        if (nativeSection && this.adrenaline$perlinSectionBaseCellX == Integer.MIN_VALUE) {
+            this.adrenaline$perlinSectionBaseCellX = cellX;
+            this.adrenaline$perlinSections = new PerlinSectionCache(
+                cellX * this.cellWidth,
+                this.cellNoiseMinY * this.cellHeight,
+                this.firstCellZ * this.cellWidth,
+                this.cellWidth,
+                this.cellHeight,
+                this.cellCountXZ + 1,
+                this.cellCountY + 1,
+                this.cellCountXZ + 1
+            );
+        }
+        boolean nativeLattice = nativePerlin && AdrenalineConfig.nativeBlendedNoiseEnabled() && AdrenalineConfig.nativeDensityEvaluationEnabled();
+        if (nativeLattice && this.adrenaline$sliceLattices == null) {
+            this.adrenaline$sliceLattices = new double[interpolatorArray.length][];
+            for (int i = 0; i < sliceEvaluators.length; i++) {
+                if (sliceEvaluators[i] instanceof NativeCellDensityEvaluator evaluator) {
+                    this.adrenaline$sliceLattices[i] = NativeSliceLattice.evaluate(evaluator.program(), (NoiseChunk) (Object) this,
+                        this.adrenaline$perlinSections, this.cellStartBlockX, this.cellNoiseMinY * this.cellHeight, this.firstCellZ * this.cellWidth,
+                        this.cellCountXZ + 1, this.cellCountY + 1, this.cellWidth, this.cellHeight);
+                }
+            }
+        }
+        int perlinXIndex = cellX - this.adrenaline$perlinSectionBaseCellX;
+        for (int cellZ = 0; cellZ < this.cellCountXZ + 1; cellZ++) {
+            int currentCellZ = this.firstCellZ + cellZ;
+            this.cellStartBlockZ = currentCellZ * this.cellWidth;
+            this.inCellZ = 0;
+            this.arrayInterpolationCounter++;
+            for (int i = 0; i < interpolatorArray.length; i++) {
+                AdrenalineMixinNoiseInterpolatorView interpolator = interpolatorArray[i];
+                double[] slice = (useFirstSlice ? interpolator.adrenaline$getSlice0() : interpolator.adrenaline$getSlice1())[cellZ];
+                if (nativeLattice && perlinXIndex >= 0 && perlinXIndex <= this.cellCountXZ && this.adrenaline$sliceLattices[i] != null) {
+                    double[] lattice = this.adrenaline$sliceLattices[i];
+                    System.arraycopy(lattice, (perlinXIndex * (this.cellCountXZ + 1) + cellZ) * slice.length, slice, 0, slice.length);
+                    this.sliceFillingContextProvider.forIndex(slice.length - 1);
+                    continue;
+                }
+                if (nativeSection) {
+                    PerlinBatching.enterSection(this.adrenaline$perlinSections, perlinXIndex, cellZ, this.sliceFillingContextProvider);
+                }
+                try {
+                    CellDensityEvaluator evaluator = sliceEvaluators[i];
+                    if (evaluator == null) {
+                        interpolator.adrenaline$fillArray(slice, this.sliceFillingContextProvider);
+                    } else {
+                        if (evaluator instanceof NativeCellDensityEvaluator nativeEvaluator
+                            && nativeEvaluator.fillSlice(slice, this.sliceFillingContextProvider, this.cellStartBlockX,
+                                this.cellNoiseMinY * this.cellHeight, this.cellStartBlockZ, this.cellHeight)) {
+                            continue;
+                        }
+                        if (nativePerlin) {
+                            PerlinBatching.begin(slice.length);
+                        }
+                        try {
+                            evaluator.fill(slice, this.sliceFillingContextProvider);
+                        } finally {
+                            if (nativePerlin) {
+                                PerlinBatching.end();
+                            }
+                        }
+                    }
+                } finally {
+                    if (nativeSection) {
+                        PerlinBatching.exitSection();
+                    }
+                }
+            }
+        }
+        this.arrayInterpolationCounter++;
+    }
+
+    @Inject(method = "fillSlice", at = @At("HEAD"), cancellable = true)
+    @ControlsOptimization(Optimization.NOISE_SLICES)
+    private void adrenaline$fillSlice(boolean useFirstSlice, int cellX, CallbackInfo ci) {
+        if (!AdrenalineConfig.noiseSliceOptimizationsEnabled()) {
+            return;
+        }
+
+        this.adrenaline$fillSlice(useFirstSlice, cellX);
+        ci.cancel();
     }
 
     @Unique
