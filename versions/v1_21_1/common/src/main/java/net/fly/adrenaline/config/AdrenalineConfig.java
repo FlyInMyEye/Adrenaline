@@ -558,7 +558,6 @@ public class AdrenalineConfig {
 
     public static class Data {
         public Boolean worldgenOptimizations;
-        @WorkInProgress
         public boolean noiseSliceOptimizations = true;
         public boolean cellCacheOptimizations = true;
         public boolean cellInterpolationOptimizations = true;
@@ -577,7 +576,6 @@ public class AdrenalineConfig {
         public boolean surfaceBandNoiseOptimizations = true;
         @WorkInProgress
         public boolean aquiferStatusCacheOptimizations = true;
-        @WorkInProgress
         public boolean nativeBlendedNoise = true;
         @WorkInProgress
         public boolean nativeSurfaceNoise = true;
