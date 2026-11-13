@@ -46,7 +46,7 @@ comptime {
     if (!avx_only) {
         @export(&density_scalar_entry, .{ .name = "adrenaline_density_scalar" });
         @export(&@import("surface_rules.zig").column, .{ .name = "Java_net_fly_adrenaline_natives_NativeSurfaceSampler_columnAddress5" });
-        @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0, .{ .name = "Java_net_fly_adrenaline_natives_NativeSurfaceSampler_address0" });
+        @export(&Java_net_fly_adrenaline_natives_NativeSurfaceSampler_address0, .{ .name = "Java_net_fly_adrenaline_natives_NativeSurfaceSampler_address0" });
         @export(&JNI_OnLoad, .{ .name = "JNI_OnLoad" });
         @export(&Java_net_fly_adrenaline_natives_AdrenalineNatives_capabilities0, .{ .name = "Java_net_fly_adrenaline_natives_AdrenalineNatives_capabilities0" });
         @export(&Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0, .{ .name = "Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0" });
@@ -77,6 +77,10 @@ fn Java_net_fly_adrenaline_natives_AdrenalineNatives_capabilities0(_: ?*c.JNIEnv
         return 2;
     }
     return 0;
+}
+
+fn Java_net_fly_adrenaline_natives_NativeSurfaceSampler_address0(env: ?*c.JNIEnv, clazz: c.jclass, buffer: c.jobject) callconv(.c) c.jlong {
+    return Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0(env, clazz, buffer);
 }
 
 fn Java_net_fly_adrenaline_natives_PerlinNativeSampler_address0(env: ?*c.JNIEnv, _: c.jclass, buffer: c.jobject) callconv(.c) c.jlong {
