@@ -2,27 +2,26 @@ package net.fly.adrenaline.natives;
 
 import java.lang.ref.Reference;
 import java.nio.ByteBuffer;
+import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 import net.fly.adrenaline.worldgen.NativeSurfaceProgram;
 
 public final class NativeSurfaceSampler {
-
-    private static volatile boolean linked = true;
 
     private NativeSurfaceSampler() {
     }
 
     public static boolean available() {
-        return linked && AdrenalineNatives.isAvailable();
+        return AdrenalineNatives.isAvailable(Feature.SURFACE);
     }
 
     public static int column(NativeSurfaceProgram program, ByteBuffer input, long inputAddress, ByteBuffer output, long outputAddress, ByteBuffer cache, long cacheAddress, int count, int x, int z) {
-        if (!available()) {
+        if (!available() || program.address() == 0L || inputAddress == 0L || outputAddress == 0L || cacheAddress == 0L) {
             return -1;
         }
         try {
             return columnAddress5(program.address(), program.length(), inputAddress, outputAddress, cacheAddress, count, x, z);
-        } catch (UnsatisfiedLinkError exception) {
-            linked = false;
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.SURFACE, exception);
             return -1;
         } finally {
             Reference.reachabilityFence(input);
@@ -38,8 +37,8 @@ public final class NativeSurfaceSampler {
         }
         try {
             return address0(buffer);
-        } catch (UnsatisfiedLinkError exception) {
-            linked = false;
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.SURFACE, exception);
             return 0L;
         }
     }

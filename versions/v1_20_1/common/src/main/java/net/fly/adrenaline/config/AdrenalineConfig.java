@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Objects;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
+import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
 import net.fly.configlib.JsonConfigManager;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -278,11 +279,11 @@ public class AdrenalineConfig {
     }
 
     public static boolean nativeBlendedNoiseEnabled() {
-        return noiseSliceOptimizationsEnabled() && AdrenalineNatives.isAvailable() && get().nativeBlendedNoise && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_BLENDED_NOISE);
+        return noiseSliceOptimizationsEnabled() && AdrenalineNatives.isAvailable(Feature.BLENDED_NOISE) && get().nativeBlendedNoise && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_BLENDED_NOISE);
     }
 
     public static boolean nativeSurfaceNoiseEnabled() {
-        return AdrenalineNatives.isAvailable() && get().nativeSurfaceNoise;
+        return AdrenalineNatives.isAvailable(Feature.PERLIN) && get().nativeSurfaceNoise;
     }
 
     public static boolean inlineGenerationTasksEnabled() {
@@ -354,7 +355,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean nativePerlinBatchingEnabled() {
-        return AdrenalineNatives.isAvailable() && get().nativePerlinBatching && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_PERLIN);
+        return AdrenalineNatives.isAvailable(Feature.PERLIN) && get().nativePerlinBatching && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_PERLIN);
     }
 
     public static boolean approximateNativePerlinEnabled() {
@@ -362,11 +363,11 @@ public class AdrenalineConfig {
     }
 
     public static boolean nativeDensityEvaluationEnabled() {
-        return AdrenalineNatives.isAvailable() && get().nativeDensityEvaluation;
+        return AdrenalineNatives.isAvailable(Feature.DENSITY) && get().nativeDensityEvaluation;
     }
 
     public static boolean nativeAquiferBatchingEnabled() {
-        return aquiferOptimizationsEnabled() && AdrenalineNatives.isAvailable() && get().nativeAquiferBatching;
+        return aquiferOptimizationsEnabled() && AdrenalineNatives.isAvailable(Feature.AQUIFER) && get().nativeAquiferBatching;
     }
 
     public static boolean parallelChunkSerializationEnabled() {
@@ -402,7 +403,7 @@ public class AdrenalineConfig {
     }
 
     public static boolean nativeSurfaceRulesEnabled() {
-        return AdrenalineNatives.isAvailable() && get().nativeSurfaceRules && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_SURFACE_RULES);
+        return AdrenalineNatives.isAvailable(Feature.SURFACE) && get().nativeSurfaceRules && !OptimizationTakeoverRegistry.isControlled(Optimization.NATIVE_SURFACE_RULES);
     }
 
     public static boolean fastLegacyRandomEnabled() {

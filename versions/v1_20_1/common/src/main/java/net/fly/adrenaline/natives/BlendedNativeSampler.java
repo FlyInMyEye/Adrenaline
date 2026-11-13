@@ -1,6 +1,7 @@
 package net.fly.adrenaline.natives;
 
 import java.lang.ref.Reference;
+import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 
 public final class BlendedNativeSampler {
 
@@ -9,7 +10,7 @@ public final class BlendedNativeSampler {
 
     public static boolean sampleGrid(Data data, int x, int y, int z, int xStep, int yStep, int zStep,
                                      int xCount, int yCount, int zCount, double[] output) {
-        if (!AdrenalineNatives.isAvailable() || !data.available()) {
+        if (!AdrenalineNatives.isAvailable(Feature.BLENDED_NOISE) || !data.available()) {
             return false;
         }
         long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.PERLIN);
@@ -17,6 +18,9 @@ public final class BlendedNativeSampler {
             return sampleGrid0(data.min.address(), data.max.address(), data.main.address(), data.xzMultiplier,
                 data.yMultiplier, data.xzFactor, data.yFactor, data.smearScaleMultiplier,
                 x, y, z, xStep, yStep, zStep, xCount, yCount, zCount, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.BLENDED_NOISE, exception);
+            return false;
         } finally {
             Reference.reachabilityFence(data);
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.PERLIN, startedNanos);

@@ -12,7 +12,8 @@ public final class AdrenalineNatives {
     private static final int CAPABILITY_AVX2 = 1;
     private static final int CAPABILITY_NEON = 2;
     private static boolean initialized;
-    private static boolean available;
+    private static volatile boolean available;
+    private static volatile int failedFeatures;
     private static String backendDescription = "Unavailable";
 
     private AdrenalineNatives() {
@@ -54,13 +55,47 @@ public final class AdrenalineNatives {
                 backendDescription = library.platform();
             }
             GlobalCommon.LOGGER.info("Loaded Adrenaline native backend: {}", library.platform());
-        } catch (IOException | SecurityException | UnsatisfiedLinkError exception) {
+        } catch (IOException | RuntimeException | LinkageError exception) {
             GlobalCommon.LOGGER.warn("Unable to load Adrenaline native library for {}", library.platform(), exception);
         }
     }
 
     public static boolean isAvailable() {
         return available;
+    }
+
+    public static boolean isAvailable(Feature feature) {
+        int mask = 1 << feature.ordinal();
+        if (feature.requiresNoiseData) {
+            mask |= 1 << Feature.NOISE_DATA.ordinal();
+        }
+        return available && (failedFeatures & mask) == 0;
+    }
+
+    public static synchronized void disable(Feature feature, Throwable failure) {
+        int mask = 1 << feature.ordinal();
+        if ((failedFeatures & mask) != 0) {
+            return;
+        }
+        failedFeatures |= mask;
+        GlobalCommon.LOGGER.warn("Native {} failed; using Java fallbacks until restart. Saved settings are unchanged.", feature.description, failure);
+    }
+
+    public enum Feature {
+        NOISE_DATA("noise data packing", false),
+        PERLIN("Perlin sampling", true),
+        BLENDED_NOISE("blended noise sampling", true),
+        DENSITY("density evaluation", false),
+        AQUIFER("aquifer sampling", false),
+        SURFACE("surface rules", false);
+
+        private final String description;
+        private final boolean requiresNoiseData;
+
+        Feature(String description, boolean requiresNoiseData) {
+            this.description = description;
+            this.requiresNoiseData = requiresNoiseData;
+        }
     }
 
     public static String backendDescription() {
