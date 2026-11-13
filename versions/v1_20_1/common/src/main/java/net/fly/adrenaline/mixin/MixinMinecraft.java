@@ -1,9 +1,12 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.client.gui.screens.Overlay;
+import net.minecraft.client.gui.screens.Screen;
 import net.fly.adrenaline.client.BackgroundWorldSave;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.client.WorldCreationContextWaiter;
@@ -34,6 +37,11 @@ public class MixinMinecraft {
 
     @Shadow
     private Overlay overlay;
+
+    @WrapMethod(method = "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V")
+    private void adrenaline$finishPreparationBeforeDisconnect(Screen screen, Operation<Void> original) {
+        BackgroundWorldgenWarmup.runWorldTransition((Minecraft) (Object) this, () -> original.call(screen));
+    }
 
     @Inject(method = "setOverlay", at = @At("HEAD"), cancellable = true)
     private void adrenaline$keepBlockingWarmupOverlay(Overlay overlay, CallbackInfo ci) {

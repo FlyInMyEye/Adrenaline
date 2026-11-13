@@ -13,6 +13,7 @@ import net.minecraft.server.WorldLoader;
 public final class WorldCreationContextWaiter {
 
     private static CompletableFuture<WorldCreationContext> future;
+    private static CompletableFuture<Void> preparation = CompletableFuture.completedFuture(null);
     private static boolean worldLoadActive;
     private static boolean capturingPreload;
 
@@ -34,7 +35,7 @@ public final class WorldCreationContextWaiter {
     }
 
     public static boolean isPreloading() {
-        return future != null && !future.isDone();
+        return (future != null && !future.isDone()) || !preparation.isDone();
     }
 
     public static boolean canPreload() {
@@ -59,7 +60,7 @@ public final class WorldCreationContextWaiter {
         if (current == null) {
             return;
         }
-        current.whenCompleteAsync((context, failure) -> {
+        preparation = current.handleAsync((context, failure) -> {
             if (future == current) {
                 if (failure == null) {
                     prepare(context);
@@ -67,6 +68,7 @@ public final class WorldCreationContextWaiter {
                     GlobalCommon.LOGGER.warn("Failed to prepare world creation context", failure);
                 }
             }
+            return null;
         }, minecraft);
     }
 

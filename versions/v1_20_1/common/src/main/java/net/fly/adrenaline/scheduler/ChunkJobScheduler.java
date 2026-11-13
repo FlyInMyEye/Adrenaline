@@ -65,6 +65,10 @@ public final class ChunkJobScheduler {
         return this.runningCount < this.maxActive;
     }
 
+    public synchronized boolean isDrained() {
+        return this.activeJobs.isEmpty();
+    }
+
     public synchronized void setWorkerLimit(int workers) {
         this.refreshPoolIfNeeded();
         int previous = this.maxActive;

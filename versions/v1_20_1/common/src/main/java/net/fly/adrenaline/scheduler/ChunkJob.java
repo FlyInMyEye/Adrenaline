@@ -236,14 +236,12 @@ public final class ChunkJob implements Runnable {
     public void run() {
         Thread currentThread = Thread.currentThread();
         ClassLoader previousClassLoader = currentThread.getContextClassLoader();
-        boolean began = false;
         boolean handedOff = false;
         try {
             if (!ChunkJobScheduler.get().begin(this)) {
                 this.cancel();
                 return;
             }
-            began = true;
             ChunkJobScheduler.get().markCurrentWorkerActive();
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
@@ -260,7 +258,7 @@ public final class ChunkJob implements Runnable {
                 currentThread.setContextClassLoader(previousClassLoader);
             }
             ChunkJobScheduler.get().markCurrentWorkerIdle();
-            if (began && !handedOff) {
+            if (!handedOff) {
                 ChunkJobScheduler.get().onComplete(this);
             }
         }

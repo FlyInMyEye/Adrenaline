@@ -6,9 +6,11 @@ import java.util.regex.Pattern;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.MixinMinecraftFrameInvoker;
+import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
 import net.fly.adrenaline.util.WarmupResourceLoading;
 import net.fly.adrenaline.util.WarmupWorldDiscard;
+import net.fly.adrenaline.util.WorldgenPreparation;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
@@ -45,12 +47,13 @@ public final class BackgroundWorldgenWarmup {
     private static boolean started;
     private static boolean recoveryStarted;
     private static boolean running;
+    private static boolean worldTransition;
     private static volatile String levelId;
     private static volatile IntegratedServer server;
     private static CompletableFuture<WorldStem> loading;
 
     public void tick(Minecraft minecraft) {
-        if (!ClientResourceReloadState.isReady()) {
+        if (worldTransition || !ClientResourceReloadState.isReady()) {
             return;
         }
         Screen screen = minecraft.screen;
@@ -102,14 +105,24 @@ public final class BackgroundWorldgenWarmup {
     }
 
     public static void beforeContextLoad(Minecraft minecraft) {
+        boolean previous = worldTransition;
+        worldTransition = true;
+        try {
+            finishPreparation(minecraft);
+        } finally {
+            worldTransition = previous;
+        }
+    }
+
+    private static void finishPreparation(Minecraft minecraft) {
         stop(minecraft);
-        if (loading != null || WorldCreationContextWaiter.isPreloading()) {
+        if (loading != null || WorldCreationContextWaiter.isPreloading() || WorldgenPreparation.isPreparing()) {
             Screen previous = minecraft.screen;
             Screen waiting = new GenericDirtMessageScreen(Component.translatable("createWorld.preparing"));
             minecraft.setScreen(waiting);
             try {
                 minecraft.managedBlock(() -> {
-                    if (loading == null && !WorldCreationContextWaiter.isPreloading()) {
+                    if (loading == null && !WorldCreationContextWaiter.isPreloading() && !WorldgenPreparation.isPreparing()) {
                         return true;
                     }
                     ((MixinMinecraftFrameInvoker) minecraft).adrenaline$runTick(false);
@@ -122,6 +135,28 @@ public final class BackgroundWorldgenWarmup {
             }
         }
         BackgroundWorldSave.awaitCompletion();
+        if (minecraft.getSingleplayerServer() == null) {
+            minecraft.managedBlock(() -> {
+                if (ChunkJobScheduler.get().isDrained()) {
+                    return true;
+                }
+                ((MixinMinecraftFrameInvoker) minecraft).adrenaline$runTick(false);
+                return false;
+            });
+        }
+    }
+
+    public static void runWorldTransition(Minecraft minecraft, Runnable transition) {
+        boolean previous = worldTransition;
+        worldTransition = true;
+        try {
+            if (!previous) {
+                beforeContextLoad(minecraft);
+            }
+            transition.run();
+        } finally {
+            worldTransition = previous;
+        }
     }
 
     public static boolean isWarmupCall() {

@@ -15,6 +15,7 @@ public final class WorldgenPreparation {
     private static Prepared prepared;
     private static ChunkGenerator preparingGenerator;
     private static long preparingSeed;
+    private static CompletableFuture<Void> pending = CompletableFuture.completedFuture(null);
 
     private WorldgenPreparation() {
     }
@@ -28,7 +29,7 @@ public final class WorldgenPreparation {
         prepared = null;
         preparingGenerator = generator;
         preparingSeed = seed;
-        CompletableFuture.runAsync(() -> {
+        CompletableFuture<Void> current = CompletableFuture.runAsync(() -> {
             try {
                 NoiseGeneratorSettings settings = generator instanceof NoiseBasedChunkGenerator noiseGenerator
                     ? noiseGenerator.generatorSettings().value()
@@ -47,6 +48,11 @@ public final class WorldgenPreparation {
                 }
             }
         }, Util.backgroundExecutor());
+        pending = CompletableFuture.allOf(pending, current).handle((result, failure) -> null);
+    }
+
+    public static synchronized boolean isPreparing() {
+        return !pending.isDone();
     }
 
     public static synchronized RandomState take(ChunkGenerator generator, NoiseGeneratorSettings settings, long seed) {
