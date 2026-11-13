@@ -69,26 +69,31 @@ public final class BackgroundWorldgenWarmup {
         if (running && (warmupMode == AdrenalineConfig.WarmupMode.OFF || completed || screen instanceof ConnectScreen)) {
             stop(minecraft);
         }
-        if (!started && warmupMode != AdrenalineConfig.WarmupMode.OFF && screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning() && !WorldCreationContextWaiter.isPreloading()) {
+        boolean canLoadContext = minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning()
+            && ChunkJobScheduler.get().isDrained() && !WorldgenPreparation.isPreparing();
+        if (!started && warmupMode != AdrenalineConfig.WarmupMode.OFF && screen instanceof TitleScreen && canLoadContext && !WorldCreationContextWaiter.isPreloading()) {
             started = true;
             start(minecraft);
         }
-        if (!running && loading == null && AdrenalineConfig.prepareWorldCreationContext() && minecraft.getSingleplayerServer() == null && !BackgroundWorldSave.isRunning() && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
+        if (!running && loading == null && AdrenalineConfig.prepareWorldCreationContext() && canLoadContext && (screen instanceof TitleScreen || screen instanceof SelectWorldScreen) && WorldCreationContextWaiter.canPreload()) {
             WorldCreationContextWaiter.preload(minecraft);
         }
     }
 
     public static boolean isRunning() {
-        return running || loading != null || BackgroundWorldSave.isSaving(levelId) || WorldCreationContextWaiter.isPreloading();
+        return running || loading != null || BackgroundWorldSave.isSaving(levelId)
+            || WorldCreationContextWaiter.isPreloading() || WorldgenPreparation.isPreparing();
     }
 
     public static boolean isBlocking() {
-        return (running || loading != null || BackgroundWorldSave.isSaving(levelId)) && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON;
+        return isRunning() && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON;
     }
 
     public static boolean shouldKeepStartupOverlay(Minecraft minecraft) {
-        return isBlocking() || !started && AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON
-            && minecraft.screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null;
+        return isBlocking() || AdrenalineConfig.warmupMode() == AdrenalineConfig.WarmupMode.ON
+            && minecraft.screen instanceof TitleScreen && minecraft.getSingleplayerServer() == null
+            && (!started || AdrenalineConfig.prepareWorldCreationContext() && WorldCreationContextWaiter.canPreload()
+                || !ChunkJobScheduler.get().isDrained());
     }
 
     public static String branding() {
