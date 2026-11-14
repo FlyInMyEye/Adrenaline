@@ -594,7 +594,6 @@ public class AdrenalineConfig {
         public boolean biomeSearchOptimizations = true;
         @WorkInProgress
         public boolean biomeFiddleOptimizations = true;
-        @WorkInProgress
         public boolean biomeClimateOptimizations = true;
         public boolean densityMappingOptimizations = true;
         @WorkInProgress
