@@ -55,6 +55,7 @@
     "MixinOreVeinifierInvoker",
     "MixinHeightmapAccessor",
     "MixinLevelChunkSectionAccessor",
+    "MixinClimateParameterList",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
