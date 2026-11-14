@@ -15,6 +15,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.config.AdrenalineConfig.AdaptiveWorkerMode;
 import net.fly.adrenaline.config.AdrenalineConfig.Data;
 import net.fly.adrenaline.natives.AdrenalineNatives;
+import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
@@ -33,7 +34,7 @@ final class AdrenalineSettings {
         settings.add(choice("stagePriority", "stage_priority", Group.SCHEDULING, false, Impact.VARIABLE, List.of(AdrenalineConfig.StagePriority.HIGHEST, AdrenalineConfig.StagePriority.FIFO, AdrenalineConfig.StagePriority.NEAREST), Data::stagePriority, Data::setStagePriority).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
         settings.add(integer("featureSafetyRadius", "feature_safety_radius", Group.SCHEDULING, false, Impact.VARIABLE, 1, 8, d -> d.featureSafetyRadius == 0 ? switch (d.featureCompatibility) { case "increased" -> 3; case "max" -> 7; default -> 1; } : d.featureSafetyRadius, (d, v) -> d.featureSafetyRadius = v).requires(d -> d.parallelWorldgen && !OptimizationTakeoverRegistry.isControlled(Optimization.GENERATION_DISPATCH), "parallel_worldgen"));
         settings.add(toggle("terrainFillOptimizations", "terrain_fill_optimizations", Group.TERRAIN, false, Impact.HIGH, d -> d.terrainFillOptimizations, (d, v) -> d.terrainFillOptimizations = v).controlled(Optimization.TERRAIN_FILL));
-        settings.add(toggle("sectionTerrainOptimizations", "section_terrain_optimizations", Group.TERRAIN, false, Impact.HIGH, d -> d.sectionTerrainOptimizations, (d, v) -> d.sectionTerrainOptimizations = v).nativeBackend().controlled(Optimization.SECTION_TERRAIN)
+        settings.add(toggle("sectionTerrainOptimizations", "section_terrain_optimizations", Group.TERRAIN, false, Impact.HIGH, d -> d.sectionTerrainOptimizations, (d, v) -> d.sectionTerrainOptimizations = v).nativeBackend(Feature.AQUIFER).controlled(Optimization.SECTION_TERRAIN)
             .requires(d -> d.terrainFillOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.TERRAIN_FILL), "terrain_fill_optimizations")
             .requires(d -> d.noiseSliceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_SLICES), "noise_slice_optimizations")
             .requires(d -> d.cellCacheOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.CELL_CACHE), "cell_cache_optimizations")
@@ -57,11 +58,11 @@ final class AdrenalineSettings {
         settings.add(toggle("surfaceOptimizations", "surface_optimizations", Group.SURFACE_RULES, false, Impact.HIGH, d -> d.surfaceOptimizations, (d, v) -> d.surfaceOptimizations = v).controlled(Optimization.SURFACE_RULES));
         settings.add(toggle("surfaceNoiseOptimizations", "surface_noise_optimizations", Group.SURFACE_SAMPLING, false, Impact.MEDIUM, d -> d.surfaceNoiseOptimizations, (d, v) -> d.surfaceNoiseOptimizations = v).controlled(Optimization.SURFACE_DEPTH_NOISE));
         settings.add(toggle("surfaceColumnOptimizations", "surface_column_optimizations", Group.SURFACE_RULES, false, Impact.MEDIUM, d -> d.surfaceColumnOptimizations, (d, v) -> d.surfaceColumnOptimizations = v).controlled(Optimization.SURFACE_COLUMN));
-        settings.add(toggle("nativeSurfaceRules", "native_surface_rules", Group.SURFACE_RULES, false, Impact.HIGH, d -> d.nativeSurfaceRules, (d, v) -> d.nativeSurfaceRules = v).nativeBackend().controlled(Optimization.NATIVE_SURFACE_RULES));
-        settings.add(toggle("nativePerlinBatching", "native_perlin_batching", Group.NOISE, false, Impact.HIGH, d -> d.nativePerlinBatching, (d, v) -> d.nativePerlinBatching = v).nativeBackend().controlled(Optimization.NATIVE_PERLIN));
-        settings.add(toggle("nativeDensityEvaluation", "native_density_evaluation", Group.DENSITY, false, Impact.HIGH, d -> d.nativeDensityEvaluation, (d, v) -> d.nativeDensityEvaluation = v).nativeBackend());
-        settings.add(toggle("nativeAquiferBatching", "native_aquifer_batching", Group.AQUIFERS, false, Impact.MEDIUM, d -> d.nativeAquiferBatching, (d, v) -> d.nativeAquiferBatching = v).nativeBackend().requires(d -> d.aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER), "aquifer_optimizations").controlled(Optimization.AQUIFER));
-        settings.add(toggle("approximateNativePerlin", "approximate_native_perlin", Group.NOISE, false, Impact.HIGH, d -> d.approximateNativePerlin, (d, v) -> d.approximateNativePerlin = v).nativeBackend().requires(d -> d.nativePerlinBatching, "native_perlin_batching"));
+        settings.add(toggle("nativeSurfaceRules", "native_surface_rules", Group.SURFACE_RULES, false, Impact.HIGH, d -> d.nativeSurfaceRules, (d, v) -> d.nativeSurfaceRules = v).nativeBackend(Feature.SURFACE).controlled(Optimization.NATIVE_SURFACE_RULES));
+        settings.add(toggle("nativePerlinBatching", "native_perlin_batching", Group.NOISE, false, Impact.HIGH, d -> d.nativePerlinBatching, (d, v) -> d.nativePerlinBatching = v).nativeBackend(Feature.PERLIN).controlled(Optimization.NATIVE_PERLIN));
+        settings.add(toggle("nativeDensityEvaluation", "native_density_evaluation", Group.DENSITY, false, Impact.HIGH, d -> d.nativeDensityEvaluation, (d, v) -> d.nativeDensityEvaluation = v).nativeBackend(Feature.DENSITY));
+        settings.add(toggle("nativeAquiferBatching", "native_aquifer_batching", Group.AQUIFERS, false, Impact.MEDIUM, d -> d.nativeAquiferBatching, (d, v) -> d.nativeAquiferBatching = v).nativeBackend(Feature.AQUIFER).requires(d -> d.aquiferOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.AQUIFER), "aquifer_optimizations").controlled(Optimization.AQUIFER));
+        settings.add(toggle("approximateNativePerlin", "approximate_native_perlin", Group.NOISE, false, Impact.HIGH, d -> d.approximateNativePerlin, (d, v) -> d.approximateNativePerlin = v).nativeBackend(Feature.PERLIN).requires(d -> d.nativePerlinBatching, "native_perlin_batching"));
         settings.add(toggle("parallelChunkSerialization", "parallel_chunk_serialization", Group.SAVING, false, Impact.MEDIUM, d -> d.parallelChunkSerialization, (d, v) -> d.parallelChunkSerialization = v).controlled(Optimization.CHUNK_SERIALIZATION));
         settings.add(integer("serializationWorkerThreads", "serialization_threads", Group.SAVING, false, Impact.MEDIUM, 0, Runtime.getRuntime().availableProcessors(), d -> d.serializationWorkerThreads, (d, v) -> d.serializationWorkerThreads = v).requires(d -> d.parallelChunkSerialization, "parallel_chunk_serialization"));
         settings.add(toggle("regionScanOptimizations", "region_scan_optimizations", Group.SAVING, false, Impact.MEDIUM, d -> d.regionScanOptimizations, (d, v) -> d.regionScanOptimizations = v).controlled(Optimization.REGION_SCANS));
@@ -99,11 +100,11 @@ final class AdrenalineSettings {
         settings.add(toggle("surfaceSpanOptimizations", "surface_span_optimizations", Group.SURFACE_RULES, false, Impact.HIGH, d -> d.surfaceSpanOptimizations, (d, v) -> d.surfaceSpanOptimizations = v).controlled(Optimization.SURFACE_SPANS).requires(d -> d.surfaceColumnOptimizations, "surface_column_optimizations").requires(d -> d.surfaceOptimizations || d.nativeSurfaceRules, "surface_optimizations"));
         settings.add(toggle("surfaceBiomeOptimizations", "surface_biome_optimizations", Group.SURFACE_SAMPLING, false, Impact.MEDIUM, d -> d.surfaceBiomeOptimizations, (d, v) -> d.surfaceBiomeOptimizations = v).controlled(Optimization.SURFACE_BIOMES));
         settings.add(toggle("surfaceBandNoiseOptimizations", "surface_band_noise_optimizations", Group.SURFACE_SAMPLING, false, Impact.MEDIUM, d -> d.surfaceBandNoiseOptimizations, (d, v) -> d.surfaceBandNoiseOptimizations = v).controlled(Optimization.SURFACE_BAND_NOISE));
-        settings.add(toggle("aquiferStatusCacheOptimizations", "aquifer_status_cache_optimizations", Group.AQUIFERS, false, Impact.MEDIUM, d -> d.aquiferStatusCacheOptimizations, (d, v) -> d.aquiferStatusCacheOptimizations = v).controlled(Optimization.AQUIFER).nativeBackend().requires(d -> d.nativeAquiferBatching && d.aquiferOptimizations, "native_aquifer_batching"));
-        settings.add(toggle("nativeBlendedNoise", "native_blended_noise", Group.NOISE, false, Impact.HIGH, d -> d.nativeBlendedNoise, (d, v) -> d.nativeBlendedNoise = v).controlled(Optimization.NATIVE_BLENDED_NOISE).nativeBackend().requires(d -> d.noiseSliceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_SLICES), "noise_slice_optimizations"));
+        settings.add(toggle("aquiferStatusCacheOptimizations", "aquifer_status_cache_optimizations", Group.AQUIFERS, false, Impact.MEDIUM, d -> d.aquiferStatusCacheOptimizations, (d, v) -> d.aquiferStatusCacheOptimizations = v).controlled(Optimization.AQUIFER).nativeBackend(Feature.AQUIFER).requires(d -> d.nativeAquiferBatching && d.aquiferOptimizations, "native_aquifer_batching"));
+        settings.add(toggle("nativeBlendedNoise", "native_blended_noise", Group.NOISE, false, Impact.HIGH, d -> d.nativeBlendedNoise, (d, v) -> d.nativeBlendedNoise = v).controlled(Optimization.NATIVE_BLENDED_NOISE).nativeBackend(Feature.BLENDED_NOISE).requires(d -> d.noiseSliceOptimizations && !OptimizationTakeoverRegistry.isControlled(Optimization.NOISE_SLICES), "noise_slice_optimizations"));
+        settings.add(toggle("nativeSurfaceNoise", "native_surface_noise", Group.SURFACE_SAMPLING, false, Impact.MEDIUM, d -> d.nativeSurfaceNoise, (d, v) -> d.nativeSurfaceNoise = v).nativeBackend(Feature.PERLIN));
         settings.add(toggle("nativeGeodeFiltering", "native_geode_filtering", Group.FEATURES, false, Impact.HIGH, d -> d.nativeGeodeFiltering, (d, v) -> d.nativeGeodeFiltering = v).controlled(Optimization.GEODE_FILTER, Optimization.NATIVE_PERLIN).nativeBackend());
         settings.add(toggle("oreTargetOptimizations", "ore_target_optimizations", Group.FEATURES, false, Impact.LOW, d -> d.oreTargetOptimizations, (d, v) -> d.oreTargetOptimizations = v).controlled(Optimization.ORE_TARGETS));
-        settings.add(toggle("nativeSurfaceNoise", "native_surface_noise", Group.SURFACE_SAMPLING, false, Impact.MEDIUM, d -> d.nativeSurfaceNoise, (d, v) -> d.nativeSurfaceNoise = v).nativeBackend());
         settings.add(toggle("inlineGenerationTasks", "inline_generation_tasks", Group.SCHEDULING, false, Impact.MEDIUM, d -> d.inlineGenerationTasks, (d, v) -> d.inlineGenerationTasks = v).controlled(Optimization.INLINE_GENERATION_TASKS));
         if (BuildConfig.DEBUG) {
             settings.add(toggle("showThreadVisualizer", "show_thread_visualizer", Group.DIAGNOSTICS, false, Impact.LOW, d -> d.showThreadVisualizer, (d, v) -> d.showThreadVisualizer = v));
@@ -221,7 +222,7 @@ final class AdrenalineSettings {
         final int max;
         private final boolean workInProgress;
         private List<Optimization> controlled = List.of();
-        private boolean nativeBackend;
+        private List<Feature> nativeFeatures = List.of();
         private final List<Requirement> requirements = new ArrayList<>();
 
         private Setting(String id, String key, Group group, boolean main, Impact impact, Function<Data, Component> label,
@@ -248,8 +249,8 @@ final class AdrenalineSettings {
             return this;
         }
 
-        private Setting nativeBackend() {
-            this.nativeBackend = true;
+        private Setting nativeBackend(Feature... features) {
+            this.nativeFeatures = List.of(features);
             return this;
         }
 
@@ -294,15 +295,17 @@ final class AdrenalineSettings {
                     return Component.translatable("tooltip.adrenaline.config.optimization_controlled", controller);
                 }
             }
-            if (this.nativeBackend && !AdrenalineNatives.isAvailable()) {
-                return Component.translatable("gui.adrenaline.config.native_unavailable");
+            for (Feature feature : this.nativeFeatures) {
+                if (!AdrenalineNatives.isAvailable(feature)) {
+                    return Component.translatable("gui.adrenaline.config.native_unavailable");
+                }
             }
             for (Requirement required : this.requirements) {
                 if (!required.test.apply(draft)) {
                     return Component.translatable("gui.adrenaline.config.requires", Component.translatable("gui.adrenaline.config." + required.key));
                 }
             }
-            if (this.key.equals("surface_noise_optimizations") && draft.nativePerlinBatching && draft.approximateNativePerlin && AdrenalineNatives.isAvailable()) {
+            if (this.key.equals("surface_noise_optimizations") && draft.nativePerlinBatching && draft.approximateNativePerlin && AdrenalineNatives.isAvailable(Feature.PERLIN)) {
                 return Component.translatable("gui.adrenaline.config.requires_exact_noise");
             }
             return null;

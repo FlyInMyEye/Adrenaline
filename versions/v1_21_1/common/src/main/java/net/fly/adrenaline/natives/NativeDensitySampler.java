@@ -2,6 +2,7 @@ package net.fly.adrenaline.natives;
 
 import java.lang.ref.Reference;
 import java.nio.ByteBuffer;
+import net.fly.adrenaline.natives.AdrenalineNatives.Feature;
 import net.fly.adrenaline.worldgen.NativeDensityProgram;
 
 public final class NativeDensitySampler {
@@ -10,7 +11,7 @@ public final class NativeDensitySampler {
     }
 
     public static boolean evaluate(NativeDensityProgram program, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output) {
-        if (!AdrenalineNatives.isAvailable()) {
+        if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
             return false;
         }
         long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
@@ -19,6 +20,9 @@ public final class NativeDensitySampler {
                 return program.inputValues() != null && evaluateWithInputs0(program.bytecode(), program.length(), program.inputValues(), program.inputCount(), baseX, baseY, baseZ, cellWidth, cellHeight, output);
             }
             return evaluate0(program.bytecode(), program.length(), baseX, baseY, baseZ, cellWidth, cellHeight, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.DENSITY, exception);
+            return false;
         } finally {
             Reference.reachabilityFence(program);
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
@@ -26,12 +30,15 @@ public final class NativeDensitySampler {
     }
 
     public static int preliminarySurfaceLevel(NativeDensityProgram program, int x, int z, int minY, int maxY, int step) {
-        if (!AdrenalineNatives.isAvailable()) {
+        if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
             return Integer.MIN_VALUE;
         }
         long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
         try {
             return preliminarySurfaceLevel0(program.bytecode(), program.length(), program.inputValues(), program.inputCount(), program.columnCacheCount(), x, z, minY, maxY, step);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.DENSITY, exception);
+            return Integer.MIN_VALUE;
         } finally {
             Reference.reachabilityFence(program);
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
@@ -40,12 +47,15 @@ public final class NativeDensitySampler {
 
     public static boolean evaluateLattice(NativeDensityProgram program, ByteBuffer inputs, int x, int y, int z,
                                           int width, int height, int stepXz, int stepY, double[] output) {
-        if (!AdrenalineNatives.isAvailable()) {
+        if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
             return false;
         }
         long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
         try {
             return evaluateLattice0(program.bytecode(), program.length(), inputs, program.inputCount(), x, y, z, stepXz, stepY, width, height, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.DENSITY, exception);
+            return false;
         } finally {
             Reference.reachabilityFence(program);
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
@@ -53,12 +63,15 @@ public final class NativeDensitySampler {
     }
 
     public static boolean evaluateSlice(NativeDensityProgram program, int x, int y, int z, int step, double[] output) {
-        if (!AdrenalineNatives.isAvailable()) {
+        if (!AdrenalineNatives.isAvailable(Feature.DENSITY)) {
             return false;
         }
         long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.DENSITY);
         try {
             return evaluateSlice0(program.bytecode(), program.length(), program.inputValues(), program.inputCount(), x, y, z, step, output.length, output);
+        } catch (LinkageError | RuntimeException exception) {
+            AdrenalineNatives.disable(Feature.DENSITY, exception);
+            return false;
         } finally {
             Reference.reachabilityFence(program);
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
