@@ -590,7 +590,6 @@ public class AdrenalineConfig {
         public boolean sectionTerrainOptimizations = true;
         @WorkInProgress
         public boolean surfaceNoiseOptimizations = true;
-        @WorkInProgress
         public boolean biomeSearchOptimizations = true;
         @WorkInProgress
         public boolean biomeFiddleOptimizations = true;

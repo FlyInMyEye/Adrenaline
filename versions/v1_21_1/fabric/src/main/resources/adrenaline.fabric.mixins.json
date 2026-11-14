@@ -54,7 +54,8 @@
     "MixinMaterialRuleList",
     "MixinOreVeinifierInvoker",
     "MixinHeightmapAccessor",
-    "MixinLevelChunkSectionAccessor"
+    "MixinLevelChunkSectionAccessor",
+    "MixinClimateParameterList"
   ],
   "injectors": {
     "defaultRequire": 1
