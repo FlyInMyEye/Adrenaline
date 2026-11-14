@@ -36,6 +36,9 @@ public class MixinMinecraft {
     private IntegratedServer singleplayerServer;
 
     @Shadow
+    private boolean isLocalServer;
+
+    @Shadow
     private Overlay overlay;
 
     @WrapMethod(method = "clearLevel(Lnet/minecraft/client/gui/screens/Screen;)V")
@@ -123,10 +126,12 @@ public class MixinMinecraft {
         if (BuildConfig.DEBUG && WorldgenBenchmark.isBenchmarkCall()) {
             WorldgenBenchmark.detachWorldLoad(this.singleplayerServer);
             this.singleplayerServer = null;
+            this.isLocalServer = false;
             ci.cancel();
         } else if (BackgroundWorldgenWarmup.isWarmupCall()) {
             BackgroundWorldgenWarmup.detachWorldLoad(this.singleplayerServer);
             this.singleplayerServer = null;
+            this.isLocalServer = false;
             ci.cancel();
         }
     }
@@ -161,6 +166,7 @@ public class MixinMinecraft {
         String levelToDelete = WorldLoadCancellation.levelToDelete();
         IntegratedServer server = minecraft.getSingleplayerServer();
         this.singleplayerServer = null;
+        this.isLocalServer = false;
         if (server != null) {
             BackgroundWorldSave.detach(server);
         }
