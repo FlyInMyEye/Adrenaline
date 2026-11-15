@@ -50,6 +50,7 @@
     "MixinNoiseChunkCacheOnce",
     "MixinNoiseChunkFlatCacheAllocation",
     "MixinNoiseChunkBlenderAllocation",
+    "MixinGeodeFeature",
     "MixinAquiferFluidStatus",
     "MixinNoiseBasedAquifer",
     "MixinNoiseChunkOreVeinifier",
