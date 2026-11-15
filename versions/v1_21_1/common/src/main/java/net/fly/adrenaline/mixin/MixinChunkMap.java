@@ -7,11 +7,13 @@ import java.util.concurrent.CompletableFuture;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.WorldgenWarmup;
-import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkTaskPriorityQueueSorter;
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.util.StaticCache2D;
@@ -33,6 +35,14 @@ public abstract class MixinChunkMap {
 
     @Shadow @Final private ProcessorHandle<ChunkTaskPriorityQueueSorter.Message<Runnable>> worldgenMailbox;
     @Shadow @Final private ChunkGeneratorStructureState chunkGeneratorState;
+    @Shadow @Final private Long2ObjectLinkedOpenHashMap<ChunkHolder> pendingUnloads;
+
+    @Inject(method = "scheduleUnload", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$skipObsoleteUnload(long pos, ChunkHolder holder, CallbackInfo ci) {
+        if (this.pendingUnloads.get(pos) != holder) {
+            ci.cancel();
+        }
+    }
 
     @WrapMethod(method = "applyStep")
     private CompletableFuture<ChunkAccess> adrenaline$measureScheduling(GenerationChunkHolder holder, ChunkStep step,
