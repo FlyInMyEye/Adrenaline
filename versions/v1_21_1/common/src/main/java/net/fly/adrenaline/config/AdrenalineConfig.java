@@ -572,11 +572,9 @@ public class AdrenalineConfig {
         public boolean surfaceSpanOptimizations = true;
         @WorkInProgress
         public boolean surfaceBiomeOptimizations = true;
-        @WorkInProgress
         public boolean surfaceBandNoiseOptimizations = true;
         public boolean aquiferStatusCacheOptimizations = true;
         public boolean nativeBlendedNoise = true;
-        @WorkInProgress
         public boolean nativeSurfaceNoise = true;
         public boolean inlineGenerationTasks = true;
 
@@ -587,7 +585,6 @@ public class AdrenalineConfig {
         @WorkInProgress
         public boolean biomeCodecCache = true;
         public boolean sectionTerrainOptimizations = true;
-        @WorkInProgress
         public boolean surfaceNoiseOptimizations = true;
         public boolean biomeSearchOptimizations = true;
         @WorkInProgress
