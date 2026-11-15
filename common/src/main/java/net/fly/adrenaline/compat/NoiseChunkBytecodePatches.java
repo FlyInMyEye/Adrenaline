@@ -16,7 +16,7 @@ import org.objectweb.asm.tree.VarInsnNode;
 
 public final class NoiseChunkBytecodePatches {
     private static final String FLAT_CACHE_MIXIN = "net.fly.adrenaline.mixin.MixinNoiseChunkFlatCacheAllocation";
-    private static final String NOISE_CHUNK_MIXIN = "net.fly.adrenaline.mixin.MixinNoiseChunk";
+    private static final String BLENDER_ALLOCATION_MIXIN = "net.fly.adrenaline.mixin.MixinNoiseChunkBlenderAllocation";
     private static final String FLAT_CACHE_ARRAYS = "net/fly/adrenaline/worldgen/FlatCacheArrays";
 
     private NoiseChunkBytecodePatches() {
@@ -25,7 +25,7 @@ public final class NoiseChunkBytecodePatches {
     public static void apply(ClassNode targetClass, String mixinClassName) {
         if (FLAT_CACHE_MIXIN.equals(mixinClassName)) {
             rewriteFlatCacheAllocation(targetClass);
-        } else if (NOISE_CHUNK_MIXIN.equals(mixinClassName)) {
+        } else if (BLENDER_ALLOCATION_MIXIN.equals(mixinClassName)) {
             skipEmptyBlenderPopulation(targetClass);
         }
     }
