@@ -8,6 +8,7 @@ import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
+import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.minecraft.core.IdMap;
 import net.minecraft.util.BitStorage;
 import net.minecraft.util.Mth;
@@ -57,6 +58,40 @@ public final class SectionPaletteBuilder {
                     ids[index] = id;
                 }
             }
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    public static BlockState uniformState(PalettedContainer<BlockState> source) {
+        try {
+            Object data = ACCESS.data.get(source);
+            BitStorage storage = (BitStorage) ACCESS.storage.invoke(data);
+            @SuppressWarnings("unchecked")
+            Palette<BlockState> palette = (Palette<BlockState>) ACCESS.palette.invoke(data);
+            int bits = storage.getBits();
+            if (storage.getClass() == ZeroBitStorage.class && !SurfacePipelineCompatibility.hasForeignHooks(ZeroBitStorage.class)) {
+                return palette.valueFor(0);
+            }
+            if (storage.getClass() != SimpleBitStorage.class || bits < 1 || bits > 32
+                || SurfacePipelineCompatibility.hasForeignHooks(SimpleBitStorage.class)) {
+                return null;
+            }
+            int id = storage.get(0);
+            int values = 64 / bits;
+            long pattern = 0L;
+            for (int index = 0; index < values; index++) {
+                pattern |= (long) id << (index * bits);
+            }
+            long[] raw = storage.getRaw();
+            for (int index = 0; index < raw.length - 1; index++) {
+                if (raw[index] != pattern) {
+                    return null;
+                }
+            }
+            int remaining = 4096 - (raw.length - 1) * values;
+            long mask = -1L >>> (64 - remaining * bits);
+            return (raw[raw.length - 1] & mask) == (pattern & mask) ? palette.valueFor(id) : null;
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException(exception);
         }
