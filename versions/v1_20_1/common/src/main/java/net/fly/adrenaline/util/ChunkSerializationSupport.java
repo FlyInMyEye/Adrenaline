@@ -15,8 +15,7 @@ import net.minecraft.world.level.biome.Biome;
 
 public final class ChunkSerializationSupport {
 
-    private static volatile Codec<PalettedContainerRO<Holder<Biome>>> cachedBiomeCodec;
-    private static volatile Registry<Biome> cachedBiomeRegistry;
+    private static volatile BiomeCodecCache cachedBiomeCodec;
     private static volatile ForkJoinPool serializationPool;
     private static volatile int serializationPoolThreads = -1;
 
@@ -27,18 +26,21 @@ public final class ChunkSerializationSupport {
         if (!AdrenalineConfig.biomeCodecCacheEnabled()) {
             return codecFactory.create(biomeRegistry);
         }
-        Codec<PalettedContainerRO<Holder<Biome>>> codec = cachedBiomeCodec;
-        if (cachedBiomeRegistry == biomeRegistry && codec != null) {
-            return codec;
+        BiomeCodecCache cached = cachedBiomeCodec;
+        if (cached != null && cached.registry == biomeRegistry) {
+            return cached.codec;
         }
 
         synchronized (ChunkSerializationSupport.class) {
-            if (cachedBiomeRegistry != biomeRegistry || cachedBiomeCodec == null) {
-                cachedBiomeCodec = codecFactory.create(biomeRegistry);
-                cachedBiomeRegistry = biomeRegistry;
+            cached = cachedBiomeCodec;
+            if (cached == null || cached.registry != biomeRegistry) {
+                cachedBiomeCodec = cached = new BiomeCodecCache(biomeRegistry, codecFactory.create(biomeRegistry));
             }
-            return cachedBiomeCodec;
+            return cached.codec;
         }
+    }
+
+    private record BiomeCodecCache(Registry<Biome> registry, Codec<PalettedContainerRO<Holder<Biome>>> codec) {
     }
 
     public static ForkJoinPool serializationPool() {
