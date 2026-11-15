@@ -59,6 +59,22 @@
     "MixinClimateParameterList",
     "MixinSurfaceSystem",
     "MixinSurfaceBandNoise",
+    "MixinBiomeManager",
+    "levelgen.AdrenalineMixinBiomeTemperatureAccess",
+    "levelgen.AdrenalineMixinLegacyPositionalFactoryAccess",
+    "levelgen.AdrenalineMixinPerlinSimplexNoiseAccess",
+    "levelgen.AdrenalineMixinSimplexNoiseAccess",
+    "levelgen.AdrenalineMixinSurfaceBiomeCondition",
+    "levelgen.AdrenalineMixinSurfaceBiomeConditionSource",
+    "levelgen.AdrenalineMixinSurfaceConditions",
+    "levelgen.AdrenalineMixinSurfaceHolders",
+    "levelgen.AdrenalineMixinSurfacePositionAccess",
+    "levelgen.AdrenalineMixinSurfaceRulesContext",
+    "levelgen.AdrenalineMixinSurfaceRulesContextApi",
+    "levelgen.AdrenalineMixinSurfaceRulesContextMutable",
+    "levelgen.AdrenalineMixinSurfaceSystemAccess",
+    "levelgen.AdrenalineMixinSurfaceVectorAccess",
+    "levelgen.AdrenalineMixinXoroshiroPositionalFactoryAccess",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
@@ -70,5 +86,6 @@
     "MixinGuiStats",
     "MixinDebugScreenOverlay",
     "MixinMinecraftClientLifecycle"
-  ]
+  ],
+  "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin"
 }

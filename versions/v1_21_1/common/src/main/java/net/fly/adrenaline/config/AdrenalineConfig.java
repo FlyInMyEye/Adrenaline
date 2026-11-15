@@ -566,11 +566,8 @@ public class AdrenalineConfig {
         @WorkInProgress
         public boolean densityWrapperOptimizations = true;
         public boolean densitySplineOptimizations = true;
-        @WorkInProgress
         public boolean surfaceContextOptimizations = true;
-        @WorkInProgress
         public boolean surfaceSpanOptimizations = true;
-        @WorkInProgress
         public boolean surfaceBiomeOptimizations = true;
         public boolean surfaceBandNoiseOptimizations = true;
         public boolean aquiferStatusCacheOptimizations = true;
@@ -587,7 +584,6 @@ public class AdrenalineConfig {
         public boolean sectionTerrainOptimizations = true;
         public boolean surfaceNoiseOptimizations = true;
         public boolean biomeSearchOptimizations = true;
-        @WorkInProgress
         public boolean biomeFiddleOptimizations = true;
         public boolean biomeClimateOptimizations = true;
         public boolean densityMappingOptimizations = true;
@@ -601,12 +597,9 @@ public class AdrenalineConfig {
         public boolean palettePackingOptimizations = true;
         @WorkInProgress
         public boolean shapeCacheOptimizations = true;
-        @WorkInProgress
         public boolean nativeSurfaceRules = true;
-        @WorkInProgress
         public boolean surfaceColumnOptimizations = true;
         public boolean terrainFillOptimizations = true;
-        @WorkInProgress
         public boolean surfaceOptimizations = true;
         public boolean noiseChunkOptimizations = true;
         public boolean materialRuleOptimizations = true;
