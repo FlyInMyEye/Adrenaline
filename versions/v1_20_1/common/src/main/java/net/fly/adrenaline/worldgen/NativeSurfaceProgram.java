@@ -1,5 +1,7 @@
 package net.fly.adrenaline.worldgen;
 
+import net.fly.adrenaline.util.LambdaClasses;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -435,7 +437,7 @@ public final class NativeSurfaceProgram {
                 } else {
                     result = this.result(FALLBACK);
                 }
-            } else if (source == SurfaceRules.bandlands() && runtime.getClass().getName().startsWith(type.getName() + "$$Lambda$")) {
+            } else if (source == SurfaceRules.bandlands() && LambdaClasses.isFrom(runtime.getClass(), type)) {
                 SurfaceSystem system = (SurfaceSystem) captured(runtime, SurfaceSystem.class);
                 String signature = "adrenaline$getBand(III)" + org.objectweb.asm.Type.getDescriptor(BlockState.class);
                 if (system == null || SurfaceRuleHooks.hooked(system.getClass(), signature)) {
@@ -583,7 +585,7 @@ public final class NativeSurfaceProgram {
                 Object condition = component(runtime, 0);
                 result = this.runtimeCondition(condition, biome, unresolved,
                     () -> this.runtimeRule(component(runtime, 1), biome, unresolved, fail, depth + 1), () -> fail, depth + 1);
-            } else if (type.getName().startsWith(SurfaceRules.bandlands().getClass().getName() + "$$Lambda$")) {
+            } else if (LambdaClasses.isFrom(type, SurfaceRules.bandlands().getClass())) {
                 result = this.rule(SurfaceRules.bandlands(), runtime, biome, unresolved, fail, depth + 1);
             } else {
                 result = this.result(FALLBACK);
@@ -630,7 +632,7 @@ public final class NativeSurfaceProgram {
                     return this.result(BIOME);
                 }
                 var predicate = ((AdrenalineMixinSurfaceBiomeConditionSource) source).adrenaline$biomeNameTest();
-                if (!predicate.getClass().getName().startsWith(type.getName() + "$$Lambda$")) {
+                if (!LambdaClasses.isFrom(predicate.getClass(), type)) {
                     this.contextReusable = false;
                     return this.result(FALLBACK);
                 }

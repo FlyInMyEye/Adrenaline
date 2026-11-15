@@ -1,5 +1,7 @@
 package net.fly.adrenaline.worldgen;
 
+import net.fly.adrenaline.util.LambdaClasses;
+
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -63,7 +65,7 @@ final class SurfaceRuleDelegates {
     }
 
     static Field grid(Class<?> source, Object runtime, Class<?> rule) {
-        if (!SHAPES.get(source).grid || !runtime.getClass().getName().startsWith(source.getName() + "$$Lambda$")) return null;
+        if (!SHAPES.get(source).grid || !LambdaClasses.isFrom(runtime.getClass(), source)) return null;
         Field result = null;
         for (Field field : runtime.getClass().getDeclaredFields()) {
             Class<?> type = field.getType();
