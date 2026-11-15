@@ -562,7 +562,6 @@ public class AdrenalineConfig {
         public boolean noiseSliceOptimizations = true;
         public boolean cellCacheOptimizations = true;
         public boolean cellInterpolationOptimizations = true;
-        @WorkInProgress
         public boolean preliminarySurfaceOptimizations = true;
         @WorkInProgress
         public boolean densityWrapperOptimizations = true;
