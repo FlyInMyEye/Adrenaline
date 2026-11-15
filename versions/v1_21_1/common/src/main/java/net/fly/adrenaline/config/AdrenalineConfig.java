@@ -587,7 +587,6 @@ public class AdrenalineConfig {
         public boolean densityMappingOptimizations = true;
         @WorkInProgress
         public boolean blendingOptimizations = true;
-        @WorkInProgress
         public boolean heightmapOptimizations = true;
         @WorkInProgress
         public boolean parallelChunkSerialization = true;
