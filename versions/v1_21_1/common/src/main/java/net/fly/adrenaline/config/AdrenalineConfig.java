@@ -575,7 +575,6 @@ public class AdrenalineConfig {
         public boolean inlineGenerationTasks = true;
 
         public boolean flatCacheOptimizations = true;
-        @WorkInProgress
         public boolean regionScanOptimizations = true;
         public boolean biomeCodecCache = true;
         public boolean sectionTerrainOptimizations = true;
