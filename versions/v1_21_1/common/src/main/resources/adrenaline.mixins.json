@@ -55,6 +55,7 @@
     "MixinOreConfiguration",
     "MixinHolderReferenceAccessor",
     "MixinPalettedContainerData",
+    "MixinPalettedContainerPacking",
     "MixinAquiferFluidStatus",
     "MixinNoiseBasedAquifer",
     "MixinNoiseChunkOreVeinifier",
