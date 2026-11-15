@@ -6,6 +6,7 @@
   "mixins": [
     "MixinChunkMap",
     "MixinBeardifier",
+    "MixinBlock",
     "MixinMinecraftServer",
     "MixinChunkStep",
     "MixinChunkStatusTasks",

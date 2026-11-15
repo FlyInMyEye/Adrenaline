@@ -592,7 +592,6 @@ public class AdrenalineConfig {
         @WorkInProgress
         public boolean parallelChunkSerialization = true;
         public boolean palettePackingOptimizations = true;
-        @WorkInProgress
         public boolean shapeCacheOptimizations = true;
         public boolean nativeSurfaceRules = true;
         public boolean surfaceColumnOptimizations = true;
