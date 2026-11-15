@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
+import net.fly.adrenaline.util.PalettePacking;
 import net.minecraft.core.IdMap;
 import net.minecraft.util.BitStorage;
 import net.minecraft.util.Mth;
@@ -18,6 +19,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.Palette;
 import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.PalettedContainerRO;
 
 public final class SectionPaletteBuilder {
 
@@ -29,6 +31,24 @@ public final class SectionPaletteBuilder {
 
     public static boolean available() {
         return ACCESS != null;
+    }
+
+    public static <T> PalettedContainerRO.PackedData<T> pack(PalettedContainer<T> source, IdMap<T> registry, PalettedContainer.Strategy strategy) {
+        if (ACCESS == null || (strategy != PalettedContainer.Strategy.SECTION_STATES && strategy != PalettedContainer.Strategy.SECTION_BIOMES)) {
+            return null;
+        }
+        source.acquire();
+        try {
+            Object data = ACCESS.data.get(source);
+            BitStorage storage = (BitStorage) ACCESS.storage.invoke(data);
+            @SuppressWarnings("unchecked")
+            Palette<T> palette = (Palette<T>) ACCESS.palette.invoke(data);
+            return PalettePacking.pack(source, storage, palette, registry, strategy);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
+        } finally {
+            source.release();
+        }
     }
 
     public static void unpack(PalettedContainer<BlockState> source, int[] ids, List<BlockState> states) {
