@@ -646,7 +646,6 @@ public class AdrenalineConfig {
         public boolean nativeDensityEvaluation = true;
         public boolean nativeGeodeFiltering = true;
         public boolean paletteResizeOptimizations = true;
-        @WorkInProgress
         public boolean oreTargetOptimizations = true;
         public boolean nativeAquiferBatching = true;
         public int nativeSettingsVersion = 1;
