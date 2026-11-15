@@ -18,6 +18,7 @@ public final class NonAtomicLegacyRandomSource extends LegacyRandomSource {
 
     @Override
     public void setSeed(long seed) {
+        super.setSeed(seed);
         this.plainSeed = (seed ^ 25214903917L) & 281474976710655L;
     }
 
