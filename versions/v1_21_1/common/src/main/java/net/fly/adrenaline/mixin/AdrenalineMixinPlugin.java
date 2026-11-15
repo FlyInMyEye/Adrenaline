@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Set;
 import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
 import net.fly.adrenaline.compat.MixinPlatform;
+import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -35,6 +36,7 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+        NoiseChunkBytecodePatches.apply(targetClass, mixinClassName);
     }
 
     @Override

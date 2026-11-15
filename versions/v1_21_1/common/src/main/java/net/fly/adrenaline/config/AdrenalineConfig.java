@@ -563,7 +563,6 @@ public class AdrenalineConfig {
         public boolean cellCacheOptimizations = true;
         public boolean cellInterpolationOptimizations = true;
         public boolean preliminarySurfaceOptimizations = true;
-        @WorkInProgress
         public boolean densityWrapperOptimizations = true;
         public boolean densitySplineOptimizations = true;
         public boolean surfaceContextOptimizations = true;
@@ -575,7 +574,6 @@ public class AdrenalineConfig {
         public boolean nativeSurfaceNoise = true;
         public boolean inlineGenerationTasks = true;
 
-        @WorkInProgress
         public boolean flatCacheOptimizations = true;
         @WorkInProgress
         public boolean regionScanOptimizations = true;

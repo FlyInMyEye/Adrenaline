@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import java.util.List;
+import java.util.function.Function;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -22,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(NoiseChunk.class)
 public abstract class MixinNoiseChunkMapping {
     @Unique private DensityMapCache adrenaline$densityMapCache;
+    @Unique private final Function<DensityFunction, DensityFunction> adrenaline$wrapNewFunction = this::adrenaline$wrapNew;
 
     @Shadow
     protected abstract DensityFunction wrap(DensityFunction function);
@@ -36,6 +38,17 @@ public abstract class MixinNoiseChunkMapping {
     @ControlsOptimization(value = Optimization.DENSITY_MAPPING, local = true)
     private DensityFunction.Visitor adrenaline$cacheDensityMapping(DensityFunction.Visitor visitor) {
         return this.adrenaline$mappingVisitor(visitor);
+    }
+
+    @ControlsOptimization(Optimization.DENSITY_WRAPPERS)
+    @ModifyArg(method = "wrap", at = @At(value = "INVOKE", target = "Ljava/util/Map;computeIfAbsent(Ljava/lang/Object;Ljava/util/function/Function;)Ljava/lang/Object;"), index = 1, require = 0)
+    private Function<DensityFunction, DensityFunction> adrenaline$reuseWrapperFunction(Function<DensityFunction, DensityFunction> original) {
+        return AdrenalineConfig.densityWrapperOptimizationsEnabled() ? this.adrenaline$wrapNewFunction : original;
+    }
+
+    @Unique
+    private DensityFunction adrenaline$wrapNew(DensityFunction densityFunction) {
+        return ((MixinNoiseChunkWrapNewInvoker) this).adrenaline$invokeWrapNew(densityFunction);
     }
 
     @Unique
