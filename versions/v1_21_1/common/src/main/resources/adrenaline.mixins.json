@@ -57,6 +57,8 @@
     "MixinHeightmapAccessor",
     "MixinLevelChunkSectionAccessor",
     "MixinClimateParameterList",
+    "MixinSurfaceSystem",
+    "MixinSurfaceBandNoise",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
