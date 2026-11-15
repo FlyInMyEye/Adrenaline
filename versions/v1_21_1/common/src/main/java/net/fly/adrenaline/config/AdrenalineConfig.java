@@ -645,7 +645,6 @@ public class AdrenalineConfig {
         public boolean approximateNativePerlin = false;
         public boolean nativeDensityEvaluation = true;
         public boolean nativeGeodeFiltering = true;
-        @WorkInProgress
         public boolean paletteResizeOptimizations = true;
         @WorkInProgress
         public boolean oreTargetOptimizations = true;
