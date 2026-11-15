@@ -577,7 +577,6 @@ public class AdrenalineConfig {
         public boolean flatCacheOptimizations = true;
         @WorkInProgress
         public boolean regionScanOptimizations = true;
-        @WorkInProgress
         public boolean biomeCodecCache = true;
         public boolean sectionTerrainOptimizations = true;
         public boolean surfaceNoiseOptimizations = true;
@@ -588,7 +587,6 @@ public class AdrenalineConfig {
         @WorkInProgress
         public boolean blendingOptimizations = true;
         public boolean heightmapOptimizations = true;
-        @WorkInProgress
         public boolean parallelChunkSerialization = true;
         public boolean palettePackingOptimizations = true;
         public boolean shapeCacheOptimizations = true;
@@ -606,7 +604,6 @@ public class AdrenalineConfig {
         public int generationWorkerThreads = 0;
         public Boolean adaptiveGenerationWorkers;
         public AdaptiveWorkerMode adaptiveWorkerMode = AdaptiveWorkerMode.QUARTER;
-        @WorkInProgress
         public int serializationWorkerThreads = 0;
         @WorkInProgress
         public boolean saveChunksAfterWorldCreation = true;
