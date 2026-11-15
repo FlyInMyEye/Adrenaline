@@ -6,6 +6,7 @@
   "mixins": [
     "MixinChunkMap",
     "MixinIOWorker",
+    "MixinChunkStorageAccessor",
     "MixinIOWorkerPendingStoreAccessor",
     "MixinRegionFileStorageInvoker",
     "MixinWorldGenRegion",
