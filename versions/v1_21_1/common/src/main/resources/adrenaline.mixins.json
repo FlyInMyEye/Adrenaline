@@ -75,6 +75,7 @@
     "levelgen.AdrenalineMixinSurfaceSystemAccess",
     "levelgen.AdrenalineMixinSurfaceVectorAccess",
     "levelgen.AdrenalineMixinXoroshiroPositionalFactoryAccess",
+    "MixinSurfaceNoiseOptimizationTakeoverDetector",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
