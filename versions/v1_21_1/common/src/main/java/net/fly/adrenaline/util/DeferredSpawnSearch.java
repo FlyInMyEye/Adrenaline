@@ -1,0 +1,151 @@
+package net.fly.adrenaline.util;
+
+import java.util.Comparator;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.data.worldgen.features.MiscOverworldFeatures;
+import net.minecraft.server.level.PlayerRespawnLogic;
+import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.server.level.progress.ChunkProgressListener;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.storage.ServerLevelData;
+
+public final class DeferredSpawnSearch {
+
+    private static final TicketType<ChunkPos> SEARCH_TICKET = TicketType.create("adrenaline_spawn_search", Comparator.comparingLong(ChunkPos::toLong));
+    private State state;
+
+    public DeferredSpawnSearch() {
+    }
+
+    public synchronized void reset() {
+        if (state != null) {
+            state.releaseTicket(state.level.getChunkSource());
+        }
+        state = null;
+    }
+
+    public synchronized void begin(ServerLevel level, ServerLevelData levelData, ChunkPos candidate, boolean generateBonusChest) {
+        reset();
+        state = new State(level, levelData, candidate, generateBonusChest);
+    }
+
+    public synchronized boolean isPending() {
+        return state != null;
+    }
+
+    public synchronized void advance(ChunkProgressListener progressListener, SpawnPreparation preparation) {
+        State current = state;
+        if (current == null) {
+            return;
+        }
+        ServerChunkCache chunkSource = current.level.getChunkSource();
+        while (true) {
+            ChunkPos searchPos = current.searchPos();
+            LevelChunk chunk = chunkSource.getChunkNow(searchPos.x, searchPos.z);
+            if (chunk == null) {
+                current.requestChunk(chunkSource, searchPos);
+                return;
+            }
+            current.resolveFallback(chunkSource);
+            BlockPos spawnPos = PlayerRespawnLogic.getSpawnPosInChunk(current.level, searchPos);
+            current.releaseTicket(chunkSource);
+            if (spawnPos != null) {
+                current.finish(spawnPos, progressListener, preparation);
+                state = null;
+                return;
+            }
+            if (!current.moveNext()) {
+                current.finish(current.levelData.getSpawnPos(), progressListener, preparation);
+                state = null;
+                return;
+            }
+        }
+    }
+
+    private static final class State {
+
+        private final ServerLevel level;
+        private final ServerLevelData levelData;
+        private final ChunkPos candidate;
+        private final boolean generateBonusChest;
+        private int offsetX;
+        private int offsetZ;
+        private int directionX;
+        private int directionZ = -1;
+        private int attempts;
+        private boolean fallbackResolved;
+        private ChunkPos requestedChunk;
+
+        private State(ServerLevel level, ServerLevelData levelData, ChunkPos candidate, boolean generateBonusChest) {
+            this.level = level;
+            this.levelData = levelData;
+            this.candidate = candidate;
+            this.generateBonusChest = generateBonusChest;
+        }
+
+        private ChunkPos searchPos() {
+            return new ChunkPos(this.candidate.x + this.offsetX, this.candidate.z + this.offsetZ);
+        }
+
+        private void requestChunk(ServerChunkCache chunkSource, ChunkPos pos) {
+            if (!pos.equals(this.requestedChunk)) {
+                this.releaseTicket(chunkSource);
+                chunkSource.addRegionTicket(SEARCH_TICKET, pos, 0, pos);
+                this.requestedChunk = pos;
+            }
+        }
+
+        private void releaseTicket(ServerChunkCache chunkSource) {
+            if (this.requestedChunk != null) {
+                chunkSource.removeRegionTicket(SEARCH_TICKET, this.requestedChunk, 0, this.requestedChunk);
+                this.requestedChunk = null;
+            }
+        }
+
+        private boolean moveNext() {
+            this.attempts++;
+            if (this.attempts >= 121) {
+                return false;
+            }
+            if (this.offsetX == this.offsetZ || this.offsetX < 0 && this.offsetX == -this.offsetZ || this.offsetX > 0 && this.offsetX == 1 - this.offsetZ) {
+                int oldDirectionX = this.directionX;
+                this.directionX = -this.directionZ;
+                this.directionZ = oldDirectionX;
+            }
+            this.offsetX += this.directionX;
+            this.offsetZ += this.directionZ;
+            return true;
+        }
+
+        private void resolveFallback(ServerChunkCache chunkSource) {
+            if (this.fallbackResolved) {
+                return;
+            }
+            int y = chunkSource.getGenerator().getSpawnHeight(this.level);
+            if (y < this.level.getMinBuildHeight()) {
+                BlockPos origin = this.candidate.getWorldPosition();
+                y = this.level.getHeight(Heightmap.Types.WORLD_SURFACE, origin.getX() + 8, origin.getZ() + 8);
+            }
+            this.levelData.setSpawn(this.candidate.getWorldPosition().offset(8, y, 8), 0.0F);
+            this.fallbackResolved = true;
+        }
+
+        private void finish(BlockPos spawnPos, ChunkProgressListener progressListener, SpawnPreparation preparation) {
+            this.level.setDefaultSpawnPos(spawnPos, 0.0F);
+            progressListener.updateSpawnPos(new ChunkPos(spawnPos));
+            preparation.moveTo(new ChunkPos(spawnPos));
+            if (this.generateBonusChest) {
+                this.level.registryAccess().registry(Registries.CONFIGURED_FEATURE).flatMap(registry -> registry.getHolder(MiscOverworldFeatures.BONUS_CHEST)).ifPresent(feature -> feature.value().place(this.level, this.level.getChunkSource().getGenerator(), this.level.random, spawnPos));
+            }
+        }
+    }
+
+    public interface Access {
+        DeferredSpawnSearch adrenaline$getSpawnSearch();
+    }
+}

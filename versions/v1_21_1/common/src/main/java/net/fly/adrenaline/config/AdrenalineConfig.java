@@ -597,7 +597,6 @@ public class AdrenalineConfig {
         public boolean aquiferOptimizations = true;
         public boolean beardifierOptimizations = true;
         public boolean oreVeinOptimizations = true;
-        @WorkInProgress
         public boolean initialSpawnOptimization = true;
         public int generationWorkerThreads = 0;
         public Boolean adaptiveGenerationWorkers;

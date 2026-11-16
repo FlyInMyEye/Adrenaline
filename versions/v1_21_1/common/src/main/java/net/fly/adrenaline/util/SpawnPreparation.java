@@ -11,7 +11,7 @@ public final class SpawnPreparation implements AutoCloseable {
     private static final TicketType<ChunkPos> PREPARATION_TICKET = TicketType.create("adrenaline_spawn_preparation", Comparator.comparingLong(ChunkPos::toLong));
 
     private final ServerLevel level;
-    private final ChunkPos center;
+    private ChunkPos center;
     private final int radius;
 
     public SpawnPreparation(ServerLevel level, int radius) {
@@ -25,6 +25,17 @@ public final class SpawnPreparation implements AutoCloseable {
 
     public int progressRadius() {
         return this.radius - 1;
+    }
+
+    public void moveTo(ChunkPos center) {
+        if (this.center.equals(center)) {
+            return;
+        }
+        this.close();
+        this.center = center;
+        if (this.radius > AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
+            this.level.getChunkSource().addRegionTicket(PREPARATION_TICKET, this.center, this.radius, this.center);
+        }
     }
 
     @Override

@@ -10,10 +10,16 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
+import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.SpawnPreparation;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.progress.ChunkProgressListener;
 import net.minecraft.server.level.progress.ChunkProgressListenerFactory;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.storage.ServerLevelData;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,10 +27,33 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
-public abstract class MixinMinecraftServer {
+public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access {
+
+    @Unique
+    private final DeferredSpawnSearch adrenaline$spawnSearch = new DeferredSpawnSearch();
 
     @Unique
     private SpawnPreparation adrenaline$spawnPreparation;
+
+    @Override
+    public DeferredSpawnSearch adrenaline$getSpawnSearch() {
+        return this.adrenaline$spawnSearch;
+    }
+
+    @Inject(method = "setInitialSpawn", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;randomState()Lnet/minecraft/world/level/levelgen/RandomState;"), cancellable = true)
+    @ControlsOptimization(Optimization.INITIAL_SPAWN)
+    private static void adrenaline$deferInitialSpawnSearch(ServerLevel level, ServerLevelData levelData, boolean generateBonusChest, boolean debugWorld, CallbackInfo ci) {
+        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS)
+            || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
+            return;
+        }
+        ServerChunkCache chunkSource = level.getChunkSource();
+        ChunkPos candidate = new ChunkPos(chunkSource.randomState().sampler().findSpawnPosition());
+        int y = Math.max(level.getMinBuildHeight(), chunkSource.getGenerator().getSpawnHeight(level));
+        levelData.setSpawn(candidate.getWorldPosition().offset(8, y, 8), 0.0F);
+        ((DeferredSpawnSearch.Access) level.getServer()).adrenaline$getSpawnSearch().begin(level, levelData, candidate, generateBonusChest);
+        ci.cancel();
+    }
 
     @WrapOperation(method = "loadLevel", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/progress/ChunkProgressListenerFactory;create(I)Lnet/minecraft/server/level/progress/ChunkProgressListener;"))
     @ControlsOptimization(Optimization.SPAWN_RADIUS)
@@ -46,6 +75,7 @@ public abstract class MixinMinecraftServer {
             this.adrenaline$spawnPreparation = preparation;
             original.call(listener);
         } finally {
+            this.adrenaline$spawnSearch.reset();
             this.adrenaline$spawnPreparation = null;
         }
     }
@@ -56,13 +86,32 @@ public abstract class MixinMinecraftServer {
         return this.adrenaline$spawnPreparation == null ? radius : this.adrenaline$spawnPreparation.progressRadius();
     }
 
+    @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getTickingGenerated()I"))
+    @ControlsOptimization(Optimization.SPAWN_WAIT)
+    private int adrenaline$waitForResolvedSpawn(int generated) {
+        return this.adrenaline$spawnSearch.isPending() ? -1 : generated;
+    }
+
+    @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V"), cancellable = true)
+    private void adrenaline$advanceSpawnSearch(ChunkProgressListener listener, CallbackInfo ci) {
+        if (!((MinecraftServer) (Object) this).isRunning()) {
+            this.adrenaline$spawnSearch.reset();
+            listener.stop();
+            ci.cancel();
+            return;
+        }
+        this.adrenaline$spawnSearch.advance(listener, this.adrenaline$spawnPreparation);
+    }
+
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$startAdaptiveWorkers(CallbackInfo ci) {
+        this.adrenaline$spawnSearch.reset();
         AdaptiveWorldgenWorkers.start((MinecraftServer) (Object) this);
     }
 
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void adrenaline$stopAdaptiveWorkers(CallbackInfo ci) {
+        this.adrenaline$spawnSearch.reset();
         AdaptiveWorldgenWorkers.stop((MinecraftServer) (Object) this);
     }
 
