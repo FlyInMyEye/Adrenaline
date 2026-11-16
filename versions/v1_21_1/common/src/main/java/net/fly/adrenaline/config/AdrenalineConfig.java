@@ -609,7 +609,7 @@ public class AdrenalineConfig {
         public int incrementalSaveInterval = 128;
         @WorkInProgress
         public boolean skipSavingScreenAfterExit = true;
-        @WorkInProgress
+        // TODO: Add a separate slider for the ticking spawn radius.
         public int spawnZoneRadius = DEFAULT_SPAWN_ZONE_RADIUS;
         public boolean parallelWorldgen = true;
         public Boolean prioritizeHigherStages;
