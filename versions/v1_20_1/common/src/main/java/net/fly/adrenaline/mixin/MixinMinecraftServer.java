@@ -108,7 +108,8 @@ public abstract class MixinMinecraftServer implements InitialWorldCreationAccess
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization(Optimization.INITIAL_SPAWN)
     private static void adrenaline$deferInitialSpawnSearch(ServerLevel level, ServerLevelData levelData, boolean generateBonusChest, boolean debugWorld, CallbackInfo ci) {
-        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT) || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
+        if (!AdrenalineConfig.initialSpawnOptimizationEnabled() || OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS)
+            || debugWorld || AdrenalineConfig.internalSpawnPreparationRadius() == AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS) {
             return;
         }
         if (AdrenalinePlatform.onCreateWorldSpawn(level, levelData)) {
