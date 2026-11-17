@@ -1,6 +1,7 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.client.WorldDeletion;
+import net.fly.adrenaline.client.BackgroundWorldSave;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.EarlyWorldEntry;
@@ -28,6 +29,7 @@ public class MixinMinecraft {
     @Inject(method = "doWorldLoad", at = @At("HEAD"))
     private void adrenaline$resetWorldLoadCancellation(LevelStorageSource.LevelStorageAccess storageAccess, PackRepository packRepository,
             WorldStem worldStem, boolean newWorld, CallbackInfo ci) {
+        BackgroundWorldSave.awaitCompletion();
         if (newWorld && AdrenalineConfig.showChunkPreview()) {
             WorldgenChunkPreview.begin();
         } else {
@@ -40,6 +42,7 @@ public class MixinMinecraft {
 
     @Inject(method = "destroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;close()V"))
     private void adrenaline$finishWorldCleanupBeforeShutdown(CallbackInfo ci) {
+        BackgroundWorldSave.awaitCompletion();
         WorldDeletion.awaitCompletion();
     }
 
@@ -68,7 +71,7 @@ public class MixinMinecraft {
         this.singleplayerServer = null;
         this.isLocalServer = false;
         if (server != null) {
-            server.execute(() -> server.halt(false));
+            BackgroundWorldSave.detach(server);
         }
         minecraft.disconnect(new TitleScreen());
         if (levelToDelete != null) {
