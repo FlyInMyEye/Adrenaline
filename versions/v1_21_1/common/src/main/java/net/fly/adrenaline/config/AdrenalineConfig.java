@@ -638,11 +638,8 @@ public class AdrenalineConfig {
         public boolean nativeAquiferBatching = true;
         public int nativeSettingsVersion = 1;
         public int settingsVersion;
-        @WorkInProgress
         public boolean showCancelButton = true;
-        @WorkInProgress
         public boolean showChunkPreview = true;
-        @WorkInProgress
         public boolean showThreadVisualizer;
         @WorkInProgress
         public boolean warmupOnStartup = true;
@@ -652,10 +649,8 @@ public class AdrenalineConfig {
         public boolean prepareWorldCreationContext = true;
         public boolean fastTerrainLoading = true;
         public FastTerrainLoadingMode fastTerrainLoadingMode;
-        @WorkInProgress
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
         public boolean debugLogging = false;
-        @WorkInProgress
         public boolean forceEasterEgg = false;
         public List<String> dismissedBlacklistedMods = List.of();
 

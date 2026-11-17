@@ -56,7 +56,7 @@ public final class ChunkJobScheduler extends GenerationScheduler {
                 }
             }
             return result;
-        }, () -> result.completeExceptionally(new CancellationException("Generation step cancelled")),
+        }, () -> result.completeExceptionally(new CancelledStepException()),
             Thread.currentThread().getContextClassLoader());
         job.trackWaiting(chunk.getPos(), step.targetStatus());
         if (level != null) {
@@ -64,6 +64,12 @@ public final class ChunkJobScheduler extends GenerationScheduler {
         }
         this.submit(job);
         return result;
+    }
+
+    public static final class CancelledStepException extends CancellationException {
+        public CancelledStepException() {
+            super("Generation step cancelled");
+        }
     }
 
     private static void completeStep(Supplier<CompletableFuture<ChunkAccess>> work, CompletableFuture<ChunkAccess> result) {

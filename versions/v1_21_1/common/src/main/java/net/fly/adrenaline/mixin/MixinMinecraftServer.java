@@ -12,6 +12,7 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
+import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.SpawnPreparation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
@@ -107,7 +108,10 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
     @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;getTickingGenerated()I"))
     @ControlsOptimization(Optimization.SPAWN_WAIT)
     private int adrenaline$waitForResolvedSpawn(int generated) {
-        return this.adrenaline$spawnSearch.isPending() ? -1 : generated;
+        if (this.adrenaline$spawnSearch.isPending()) {
+            return -1;
+        }
+        return AdrenalineConfig.startBeforehandMode() != AdrenalineConfig.StartBeforehandMode.OFF && EarlyWorldEntry.canEnter() ? Integer.MAX_VALUE : generated;
     }
 
     @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V"), cancellable = true)
