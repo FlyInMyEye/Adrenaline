@@ -28,6 +28,36 @@ public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAcc
     @Shadow private static double getBeardContribution(int x, int y, int z, int dy) { return 0.0D; }
 
     @Unique
+    private static final double[] adrenaline$beardContributions = adrenaline$createBeardContributions();
+
+    @Unique
+    private static double[] adrenaline$createBeardContributions() {
+        double[] values = new double[24 * 24 * 24];
+        for (int z = 0; z < 24; z++) {
+            for (int x = 0; x < 24; x++) {
+                for (int y = 0; y < 24; y++) {
+                    values[z * 24 * 24 + x * 24 + y] = getBeardContribution(x - 12, y - 12, z - 12, y - 12);
+                }
+            }
+        }
+        return values;
+    }
+
+    @Unique
+    private static double adrenaline$beardContribution(int x, int y, int z, int dy) {
+        if (dy != y) {
+            return getBeardContribution(x, y, z, dy);
+        }
+        int kernelX = x + 12;
+        int kernelY = y + 12;
+        int kernelZ = z + 12;
+        if (kernelX < 0 || kernelX >= 24 || kernelY < 0 || kernelY >= 24 || kernelZ < 0 || kernelZ >= 24) {
+            return 0.0D;
+        }
+        return adrenaline$beardContributions[kernelZ * 24 * 24 + kernelX * 24 + kernelY];
+    }
+
+    @Unique
     private Beardifier.Rigid[] adrenaline$pieces;
 
     @Unique
@@ -93,7 +123,7 @@ public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAcc
             value += switch (terrainAdjustment) {
                 case NONE -> 0.0D;
                 case BURY -> getBuryContribution(xDistance, adjustmentDistance / 2.0D, zDistance);
-                case BEARD_THIN, BEARD_BOX -> getBeardContribution(xDistance, adjustmentDistance, zDistance, yDistance) * 0.8D;
+                case BEARD_THIN, BEARD_BOX -> adrenaline$beardContribution(xDistance, adjustmentDistance, zDistance, yDistance) * 0.8D;
                 case ENCAPSULATE -> getBuryContribution(xDistance / 2.0D, adjustmentDistance / 2.0D, zDistance / 2.0D) * 0.8D;
                 default -> throw new IncompatibleClassChangeError();
             };
@@ -105,7 +135,7 @@ public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAcc
             int xDistance = blockX - junction.getSourceX();
             int yDistance = blockY - junction.getSourceGroundY();
             int zDistance = blockZ - junction.getSourceZ();
-            value += getBeardContribution(xDistance, yDistance, zDistance, yDistance) * 0.4D;
+            value += adrenaline$beardContribution(xDistance, yDistance, zDistance, yDistance) * 0.4D;
         }
 
         return value;
