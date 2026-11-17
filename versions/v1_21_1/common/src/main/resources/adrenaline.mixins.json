@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "MixinChunkMap",
+    "MixinGenerationChunkHolder",
     "MixinIOWorker",
     "MixinChunkStorageAccessor",
     "MixinIOWorkerPendingStoreAccessor",
@@ -15,6 +16,7 @@
     "MixinBeardifier",
     "MixinBlock",
     "MixinMinecraftServer",
+    "MixinStoringChunkProgressListenerAccessor",
     "MixinChunkStep",
     "MixinChunkStatusTasks",
     "MixinNoiseBasedChunkGenerator",
@@ -102,6 +104,9 @@
     "defaultRequire": 1
   },
   "client": [
+    "MixinMinecraft",
+    "MixinScreen",
+    "MixinLevelLoadingScreen",
     "MixinReceivingLevelScreen",
     "MixinLevelLoadStatusManager",
     "MixinOptionsScreen",
