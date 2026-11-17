@@ -121,7 +121,9 @@
     "MixinTectonicInvert",
     "levelgen.AdrenalineMixinFrozenTemperatureAccess",
     "MixinChunkTaskPriorityQueueSorter",
-    "MixinMessageAccessor"
+    "MixinMessageAccessor",
+    "MixinServerChunkCacheDebug",
+    "MixinNoiseBasedChunkGeneratorDebug"
   ],
   "injectors": {
     "defaultRequire": 1

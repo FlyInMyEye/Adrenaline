@@ -1,6 +1,8 @@
 package net.fly.adrenaline.client;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import java.util.function.Function;
 import java.util.function.Consumer;
@@ -31,6 +33,9 @@ public final class WorldgenStatsOverlay {
     public static <S> void registerCommands(CommandDispatcher<S> dispatcher,
             Function<S, Consumer<Component>> feedback) {
         dispatcher.register(LiteralArgumentBuilder.<S>literal("adrenaline")
+            .then(LiteralArgumentBuilder.<S>literal("stick"))
+            .then(LiteralArgumentBuilder.<S>literal("chunk")
+                .then(RequiredArgumentBuilder.<S, String>argument("arguments", StringArgumentType.greedyString())))
             .then(LiteralArgumentBuilder.<S>literal("stats")
                 .executes(context -> setEnabled(feedback.apply(context.getSource()), !WorldgenStageStats.isHudVisible()))
                 .then(LiteralArgumentBuilder.<S>literal("on").executes(context -> setEnabled(feedback.apply(context.getSource()), true)))
