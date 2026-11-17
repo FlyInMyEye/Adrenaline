@@ -447,14 +447,19 @@ public class AdrenalineConfigScreen extends Screen {
 
         private BenchmarkRow() {
             this.button = Button.builder(Component.translatable("gui.adrenaline.config.worldgen_benchmark"), pressed -> {
+                AdrenalineConfigScreen.this.save();
+                if (WorldgenBenchmark.start(AdrenalineConfigScreen.this.minecraft, AdrenalineConfigScreen.this.session.draft)) {
+                    AdrenalineConfigScreen.this.minecraft.setScreen(new WorldgenBenchmarkScreen(AdrenalineConfigScreen.this));
+                }
             }).bounds(0, 0, 200, 20).build();
             this.widgets.add(this.button);
         }
 
         @Override
         void update() {
-            this.button.active = false;
-            this.button.setTooltip(Tooltip.create(Component.translatable("gui.adrenaline.config.work_in_progress")));
+            this.button.active = AdrenalineConfigScreen.this.minecraft.level == null
+                && AdrenalineConfigScreen.this.minecraft.getSingleplayerServer() == null
+                && !WorldgenBenchmark.isRunning() && !BackgroundWorldgenWarmup.isRunning() && !BackgroundWorldSave.isRunning();
         }
 
         @Override

@@ -19,6 +19,7 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
+import net.fly.adrenaline.util.WarmupWorldDiscard;
 import net.fly.adrenaline.util.WorldgenDifferenceState;
 import net.fly.adrenaline.util.WorldgenBenchmarkHooks;
 import net.minecraft.client.Minecraft;
@@ -328,7 +329,8 @@ public final class WorldgenBenchmark {
         IntegratedServer completedServer = server;
         String completedLevelId = levelId;
         if (completedServer != null) {
-            completedServer.halt(false);
+            WarmupWorldDiscard.mark(completedServer);
+            completedServer.execute(() -> completedServer.halt(false));
         }
 
         Thread cleanup = new Thread(() -> {

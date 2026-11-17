@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import net.fly.adrenaline.BuildConfig;
 import java.util.List;
 import java.util.Set;
 import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
@@ -12,6 +13,13 @@ import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 
 public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
+    private static final Set<String> DEBUG_MIXINS = Set.of(
+        MixinPlatform.DEBUG_MIXIN,
+        "net.fly.adrenaline.mixin.MixinLoggerChunkProgressListener",
+        "net.fly.adrenaline.mixin.MixinMinecraftServerWorldgenDebug",
+        "net.fly.adrenaline.mixin.MixinPlayerList",
+        "net.fly.adrenaline.mixin.MixinWorldgenDifferenceInput"
+    );
     @Override
     public void onLoad(String mixinPackage) {
         if (MixinPlatform.isModLoaded("lightload")) {
@@ -26,7 +34,7 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        return true;
+        return BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName);
     }
 
     @Override

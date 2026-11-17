@@ -1,7 +1,9 @@
 package net.fly.adrenaline.mixin;
 
 import java.util.List;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
+import net.fly.adrenaline.client.WorldgenBenchmark;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,6 +18,7 @@ public class MixinLevelStorageSource {
         LevelStorageSource.LevelCandidates candidates = cir.getReturnValue();
         List<LevelStorageSource.LevelDirectory> visible = candidates.levels().stream()
             .filter(directory -> !BackgroundWorldgenWarmup.isWarmupLevel(directory.directoryName()))
+            .filter(directory -> !BuildConfig.DEBUG || !WorldgenBenchmark.isBenchmarkLevel(directory.directoryName()))
             .toList();
         if (visible.size() != candidates.levels().size()) {
             cir.setReturnValue(new LevelStorageSource.LevelCandidates(visible));

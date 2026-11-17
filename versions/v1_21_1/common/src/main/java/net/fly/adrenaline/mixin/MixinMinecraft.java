@@ -4,6 +4,8 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
 import net.fly.adrenaline.client.WorldCreationContextWaiter;
+import net.fly.adrenaline.client.WorldgenBenchmark;
+import net.fly.adrenaline.BuildConfig;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.client.gui.screens.Overlay;
 import net.minecraft.client.gui.screens.Screen;
@@ -53,7 +55,10 @@ public class MixinMinecraft {
         String levelId = storageAccess.getLevelId();
         BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
         BackgroundWorldSave.awaitCompletion();
-        boolean internalWorld = BackgroundWorldgenWarmup.isWarmupLevel(levelId);
+        if (BuildConfig.DEBUG) {
+            WorldgenBenchmark.beforeWorldLoad(levelId);
+        }
+        boolean internalWorld = BackgroundWorldgenWarmup.isWarmupLevel(levelId) || BuildConfig.DEBUG && WorldgenBenchmark.isBenchmarkLevel(levelId);
         if (AdrenalineConfig.prepareWorldCreationContext() && !internalWorld && newWorld) {
             WorldCreationContextWaiter.beginWorldLoad();
             WorldCreationContextWaiter.consume();
@@ -87,14 +92,19 @@ public class MixinMinecraft {
 
     @Redirect(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;disconnect()V"))
     private void adrenaline$preserveScreenDuringWarmup(Minecraft minecraft) {
-        if (!BackgroundWorldgenWarmup.isWarmupCall()) {
+        if (!BackgroundWorldgenWarmup.isWarmupCall() && (!BuildConfig.DEBUG || !WorldgenBenchmark.isBenchmarkCall())) {
             minecraft.disconnect();
         }
     }
 
     @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/atomic/AtomicReference;get()Ljava/lang/Object;", ordinal = 0), cancellable = true)
     private void adrenaline$detachWarmupServer(CallbackInfo ci) {
-        if (BackgroundWorldgenWarmup.isWarmupCall()) {
+        if (BuildConfig.DEBUG && WorldgenBenchmark.isBenchmarkCall()) {
+            WorldgenBenchmark.detachWorldLoad(this.singleplayerServer);
+            this.singleplayerServer = null;
+            this.isLocalServer = false;
+            ci.cancel();
+        } else if (BackgroundWorldgenWarmup.isWarmupCall()) {
             BackgroundWorldgenWarmup.detachWorldLoad(this.singleplayerServer);
             this.singleplayerServer = null;
             this.isLocalServer = false;
@@ -106,7 +116,10 @@ public class MixinMinecraft {
     private void adrenaline$exitWorldLoad(LevelStorageSource.LevelStorageAccess access, PackRepository packs, WorldStem stem, boolean newWorld, CallbackInfo ci) {
         String levelId = access.getLevelId();
         BackgroundWorldgenWarmup.exitWorldLoad(levelId);
-        if (!BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
+        if (BuildConfig.DEBUG) {
+            WorldgenBenchmark.exitWorldLoad(levelId);
+        }
+        if (!BackgroundWorldgenWarmup.isWarmupLevel(levelId) && (!BuildConfig.DEBUG || !WorldgenBenchmark.isBenchmarkLevel(levelId)) && newWorld) {
             WorldCreationContextWaiter.finishWorldLoad();
         }
     }

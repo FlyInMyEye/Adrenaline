@@ -1,6 +1,8 @@
 package net.fly.adrenaline.mixin;
 
 import net.fly.adrenaline.client.BuildWarningOverlay;
+import net.fly.adrenaline.client.WorldgenDifferenceHud;
+import net.fly.adrenaline.BuildConfig;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.GuiGraphics;
@@ -15,5 +17,8 @@ public class MixinGui {
     @Inject(method = "render", at = @At("TAIL"))
     private void adrenaline$renderBuildWarning(GuiGraphics graphics, DeltaTracker deltaTracker, CallbackInfo ci) {
         BuildWarningOverlay.renderGui(graphics);
+        if (BuildConfig.DEBUG) {
+            WorldgenDifferenceHud.render(graphics);
+        }
     }
 }
