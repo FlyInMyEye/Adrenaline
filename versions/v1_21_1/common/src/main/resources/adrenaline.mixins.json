@@ -118,7 +118,8 @@
     "MixinBiomeOptimizationTakeoverDetector",
     "MixinServerOptimizationTakeoverDetector",
     "MixinWorldLoader",
-    "MixinTectonicInvert"
+    "MixinTectonicInvert",
+    "levelgen.AdrenalineMixinFrozenTemperatureAccess"
   ],
   "injectors": {
     "defaultRequire": 1
