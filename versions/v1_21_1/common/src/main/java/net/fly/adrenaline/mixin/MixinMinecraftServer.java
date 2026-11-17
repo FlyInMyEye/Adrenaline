@@ -13,6 +13,7 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
+import net.fly.adrenaline.util.FeatureSafety;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.SpawnPreparation;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
@@ -59,7 +60,12 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
 
     @WrapMethod(method = "stopServer")
     private void adrenaline$discardWarmupWorldOnStop(Operation<Void> original) {
-        WarmupWorldDiscard.runShutdown((MinecraftServer) (Object) this, () -> original.call());
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        try {
+            WarmupWorldDiscard.runShutdown(server, () -> original.call());
+        } finally {
+            FeatureSafety.stop(server);
+        }
     }
 
     @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
@@ -103,7 +109,7 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
             return;
         }
         int radius = BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)
-            ? BackgroundWorldgenWarmupState.spawnZoneRadius()
+            ? BackgroundWorldgenWarmupState.spawnZoneRadius() + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1
             : this.adrenaline$skipSpawnPreparation() ? AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS : AdrenalineConfig.internalSpawnPreparationRadius();
         try (SpawnPreparation preparation = new SpawnPreparation(((MinecraftServer) (Object) this).overworld(), radius)) {
             this.adrenaline$spawnPreparation = preparation;
@@ -174,6 +180,7 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$startAdaptiveWorkers(CallbackInfo ci) {
         MinecraftServer server = (MinecraftServer) (Object) this;
+        FeatureSafety.start(server);
         this.adrenaline$initialWorldCreation = !server.getWorldData().overworldData().isInitialized();
         this.adrenaline$spawnSearch.reset();
         AdaptiveWorldgenWorkers.start(server);

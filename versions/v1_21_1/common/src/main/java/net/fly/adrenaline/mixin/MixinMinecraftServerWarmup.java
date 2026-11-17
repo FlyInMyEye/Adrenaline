@@ -2,6 +2,7 @@ package net.fly.adrenaline.mixin;
 
 import java.util.function.BooleanSupplier;
 import net.fly.adrenaline.util.WarmupWorldDiscard;
+import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
 import net.fly.adrenaline.util.SpawnPreparation;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
@@ -29,7 +30,7 @@ public abstract class MixinMinecraftServerWarmup {
             || !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS) && !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
             return;
         }
-        int radius = BackgroundWorldgenWarmupState.spawnZoneRadius();
+        int radius = BackgroundWorldgenWarmupState.spawnZoneRadius() + AdrenalineConfig.resolvedFeatureSafetyRadius() - 1;
         int diameter = radius * 2 - 1;
         try (SpawnPreparation preparation = new SpawnPreparation(server.overworld(), radius)) {
             while (server.isRunning() && BackgroundWorldgenWarmupState.isServer(server)

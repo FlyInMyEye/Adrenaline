@@ -1,5 +1,6 @@
 package net.fly.adrenaline.config;
 
+import net.fly.adrenaline.util.FeatureSafety;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import java.lang.reflect.Field;
@@ -212,6 +213,11 @@ public class AdrenalineConfig {
     }
 
     public static int resolvedFeatureSafetyRadius() {
+        int active = FeatureSafety.activeRadius();
+        return active == 0 ? configuredFeatureSafetyRadius() : active;
+    }
+
+    public static int configuredFeatureSafetyRadius() {
         if (!parallelWorldgenEnabled()) {
             return DEFAULT_FEATURE_SAFETY_RADIUS;
         }
@@ -610,9 +616,7 @@ public class AdrenalineConfig {
         public boolean parallelWorldgen = true;
         public Boolean prioritizeHigherStages;
         public StagePriority stagePriority;
-        @WorkInProgress
         public String featureCompatibility = "classic";
-        @WorkInProgress
         public int featureSafetyRadius;
         public boolean parallelizeStructureStarts = true;
         public boolean parallelizeStructureReferences = true;
