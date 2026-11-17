@@ -24,6 +24,9 @@ side="BOTH"
 [[mixins]]
 config = "adrenaline.mixins.json"
 
+[[mixins]]
+config = "adrenaline.neoforge.mixins.json"
+
 [[dependencies.${mod_id}]]
 modId="flysconfiglib"
 type="required"

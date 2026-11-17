@@ -6,6 +6,12 @@ public final class WorldLoadStatus {
     }
 
     public static String text() {
-        return BackgroundWorldSave.isRunning() ? "Adrenaline saving world..." : null;
+        if (BackgroundWorldgenWarmup.isRunning()) {
+            return BackgroundWorldgenWarmup.branding();
+        }
+        if (BackgroundWorldSave.isRunning()) {
+            return "Adrenaline saving world...";
+        }
+        return null;
     }
 }

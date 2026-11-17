@@ -640,11 +640,8 @@ public class AdrenalineConfig {
         public boolean showCancelButton = true;
         public boolean showChunkPreview = true;
         public boolean showThreadVisualizer;
-        @WorkInProgress
         public boolean warmupOnStartup = true;
-        @WorkInProgress
         public boolean blockingWarmupOnStartup = true;
-        @WorkInProgress
         public boolean prepareWorldCreationContext = true;
         public boolean fastTerrainLoading = true;
         public FastTerrainLoadingMode fastTerrainLoadingMode;

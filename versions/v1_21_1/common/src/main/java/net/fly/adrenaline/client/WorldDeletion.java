@@ -1,7 +1,11 @@
 package net.fly.adrenaline.client;
 
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 import net.fly.adrenaline.GlobalCommon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
@@ -16,6 +20,19 @@ public final class WorldDeletion {
 
     public static void deleteAsync(Minecraft minecraft, IntegratedServer server, String levelId) {
         runAsync(() -> delete(minecraft, server, levelId));
+    }
+
+    public static void recoverWarmupWorlds(Minecraft minecraft) {
+        runAsync(() -> {
+            try (Stream<Path> directories = Files.list(minecraft.getLevelSource().getBaseDir())) {
+                directories.filter(path -> Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
+                    .map(path -> path.getFileName().toString())
+                    .filter(BackgroundWorldgenWarmup::isStaleWarmupLevel)
+                    .forEach(levelId -> delete(minecraft, null, levelId));
+            } catch (Exception failure) {
+                GlobalCommon.LOGGER.warn("Failed to clean up leftover warmup worlds", failure);
+            }
+        });
     }
 
     private static void runAsync(Runnable action) {

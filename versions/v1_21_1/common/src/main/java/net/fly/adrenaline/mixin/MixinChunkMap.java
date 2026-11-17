@@ -11,6 +11,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import java.util.Queue;
 import java.util.function.BooleanSupplier;
 import net.fly.adrenaline.util.SaveBackpressure;
+import net.fly.adrenaline.util.WarmupWorldDiscard;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.WorldgenWarmup;
@@ -62,6 +63,9 @@ public abstract class MixinChunkMap {
 
     @WrapMethod(method = "saveAllChunks")
     private void adrenaline$flushSaveQueue(boolean flush, Operation<Void> original) {
+        if (WarmupWorldDiscard.isDiscarding()) {
+            return;
+        }
         if (flush) {
             this.adrenaline$saveFlushDepth++;
         }
@@ -104,6 +108,11 @@ public abstract class MixinChunkMap {
 
     @Inject(method = "save", at = @At("HEAD"), cancellable = true)
     private void adrenaline$boundFlushSerialization(ChunkAccess chunk, CallbackInfoReturnable<Boolean> cir) {
+        if (WarmupWorldDiscard.isDiscarding()) {
+            chunk.setUnsaved(false);
+            cir.setReturnValue(false);
+            return;
+        }
         if (this.adrenaline$saveFlushDepth > 0 && chunk.isUnsaved()) {
             this.adrenaline$saveBackpressure().adrenaline$awaitSaveCapacity().join();
         }
