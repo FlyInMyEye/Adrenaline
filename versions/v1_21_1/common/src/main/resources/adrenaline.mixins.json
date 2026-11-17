@@ -108,6 +108,9 @@
     "MixinChunkLevelAccessor",
     "MixinChunkTicketTracker",
     "MixinChunkTaskPriorityQueueAccessor",
+    "MixinLoggerChunkProgressListener",
+    "MixinMinecraftServerWorldgenDebug",
+    "MixinPlayerList",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
@@ -134,6 +137,7 @@
     "MixinWorldSelectionList",
     "MixinTitleScreen",
     "MixinGui",
+    "MixinWorldgenDifferenceInput",
     "MixinGuiStats",
     "MixinDebugScreenOverlay",
     "MixinMinecraftClientLifecycle",

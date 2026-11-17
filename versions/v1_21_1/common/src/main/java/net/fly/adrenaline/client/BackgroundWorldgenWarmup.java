@@ -4,6 +4,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
 import net.fly.adrenaline.GlobalCommon;
+import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.mixin.MixinMinecraftFrameInvoker;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
@@ -53,7 +54,7 @@ public final class BackgroundWorldgenWarmup {
     private static CompletableFuture<WorldStem> loading;
 
     public void tick(Minecraft minecraft) {
-        if (worldTransition || !ClientResourceReloadState.isReady()) {
+        if (worldTransition || !ClientResourceReloadState.isReady() || BuildConfig.DEBUG && WorldgenBenchmark.isRunning()) {
             return;
         }
         Screen screen = minecraft.screen;
