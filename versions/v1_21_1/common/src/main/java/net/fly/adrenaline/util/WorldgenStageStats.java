@@ -73,11 +73,15 @@ public final class WorldgenStageStats {
     }
 
     public static void beginScheduling(ChunkPos pos, ChunkStatus status) {
+        beginScheduling(pos, status, 0L);
+    }
+
+    public static void beginScheduling(ChunkPos pos, ChunkStatus status, long requestedNanos) {
         if (!BuildConfig.DEBUG) {
             return;
         }
         long now = System.nanoTime();
-        STAGE_SCHEDULING.put(new StageKey(pos.toLong(), status.getIndex()), new SchedulingState(EPOCH.get(), now));
+        STAGE_SCHEDULING.put(new StageKey(pos.toLong(), status.getIndex()), new SchedulingState(EPOCH.get(), requestedNanos > 0L && requestedNanos < now ? requestedNanos : now));
     }
 
     public static void finishInitialScheduling(ChunkPos pos, ChunkStatus status) {
