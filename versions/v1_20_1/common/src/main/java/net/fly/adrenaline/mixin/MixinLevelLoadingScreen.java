@@ -413,7 +413,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         ChunkJobScheduler.get().cancel(server);
         button.active = false;
         button.setMessage(Component.translatable("gui.adrenaline.loading.cancelling_world_creation"));
-        server.halt(false);
+        server.execute(() -> server.halt(false));
         String levelToDelete = WorldLoadCancellation.levelToDelete();
         WorldLoadCancellation.markClientHandled();
         minecraft.clearLevel(new TitleScreen());
