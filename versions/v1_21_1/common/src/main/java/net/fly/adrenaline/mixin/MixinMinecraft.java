@@ -1,5 +1,12 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import net.fly.adrenaline.client.BackgroundWorldgenWarmup;
+import net.fly.adrenaline.client.WorldCreationContextWaiter;
+import net.minecraft.client.gui.screens.LoadingOverlay;
+import net.minecraft.client.gui.screens.Overlay;
+import net.minecraft.client.gui.screens.Screen;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.client.BackgroundWorldSave;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -18,6 +25,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
@@ -25,12 +33,32 @@ public class MixinMinecraft {
 
     @Shadow private IntegratedServer singleplayerServer;
     @Shadow private boolean isLocalServer;
+    @Shadow private Overlay overlay;
+
+    @WrapMethod(method = "disconnect(Lnet/minecraft/client/gui/screens/Screen;Z)V")
+    private void adrenaline$finishPreparationBeforeDisconnect(Screen screen, boolean transferring, Operation<Void> original) {
+        BackgroundWorldgenWarmup.runWorldTransition((Minecraft) (Object) this, () -> original.call(screen, transferring));
+    }
+
+    @Inject(method = "setOverlay", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$keepBlockingWarmupOverlay(Overlay overlay, CallbackInfo ci) {
+        if (overlay == null && this.overlay instanceof LoadingOverlay && BackgroundWorldgenWarmup.shouldKeepStartupOverlay((Minecraft) (Object) this)) {
+            ci.cancel();
+        }
+    }
 
     @Inject(method = "doWorldLoad", at = @At("HEAD"))
     private void adrenaline$resetWorldLoadCancellation(LevelStorageSource.LevelStorageAccess storageAccess, PackRepository packRepository,
             WorldStem worldStem, boolean newWorld, CallbackInfo ci) {
+        String levelId = storageAccess.getLevelId();
+        BackgroundWorldgenWarmup.beforeWorldLoad((Minecraft) (Object) this, levelId);
         BackgroundWorldSave.awaitCompletion();
-        if (newWorld && AdrenalineConfig.showChunkPreview()) {
+        boolean internalWorld = BackgroundWorldgenWarmup.isWarmupLevel(levelId);
+        if (AdrenalineConfig.prepareWorldCreationContext() && !internalWorld && newWorld) {
+            WorldCreationContextWaiter.beginWorldLoad();
+            WorldCreationContextWaiter.consume();
+        }
+        if (newWorld && !internalWorld && AdrenalineConfig.showChunkPreview()) {
             WorldgenChunkPreview.begin();
         } else {
             WorldgenChunkPreview.end();
@@ -42,6 +70,7 @@ public class MixinMinecraft {
 
     @Inject(method = "destroy", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;close()V"))
     private void adrenaline$finishWorldCleanupBeforeShutdown(CallbackInfo ci) {
+        BackgroundWorldgenWarmup.stop((Minecraft) (Object) this);
         BackgroundWorldSave.awaitCompletion();
         WorldDeletion.awaitCompletion();
     }
@@ -54,6 +83,32 @@ public class MixinMinecraft {
     @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;getConnection()Lnet/minecraft/server/network/ServerConnectionListener;"), cancellable = true)
     private void adrenaline$cancelBeforeConnecting(CallbackInfo ci) {
         this.adrenaline$cancelWorldLoad(ci);
+    }
+
+    @Redirect(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;disconnect()V"))
+    private void adrenaline$preserveScreenDuringWarmup(Minecraft minecraft) {
+        if (!BackgroundWorldgenWarmup.isWarmupCall()) {
+            minecraft.disconnect();
+        }
+    }
+
+    @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Ljava/util/concurrent/atomic/AtomicReference;get()Ljava/lang/Object;", ordinal = 0), cancellable = true)
+    private void adrenaline$detachWarmupServer(CallbackInfo ci) {
+        if (BackgroundWorldgenWarmup.isWarmupCall()) {
+            BackgroundWorldgenWarmup.detachWorldLoad(this.singleplayerServer);
+            this.singleplayerServer = null;
+            this.isLocalServer = false;
+            ci.cancel();
+        }
+    }
+
+    @Inject(method = "doWorldLoad", at = @At("RETURN"))
+    private void adrenaline$exitWorldLoad(LevelStorageSource.LevelStorageAccess access, PackRepository packs, WorldStem stem, boolean newWorld, CallbackInfo ci) {
+        String levelId = access.getLevelId();
+        BackgroundWorldgenWarmup.exitWorldLoad(levelId);
+        if (!BackgroundWorldgenWarmup.isWarmupLevel(levelId) && newWorld) {
+            WorldCreationContextWaiter.finishWorldLoad();
+        }
     }
 
     @Unique

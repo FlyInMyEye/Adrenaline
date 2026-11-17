@@ -98,6 +98,12 @@
     "levelgen.AdrenalineMixinXoroshiroPositionalFactoryAccess",
     "MixinSurfaceNoiseOptimizationTakeoverDetector",
     "MixinNoiseChunkWrapNewInvoker",
+    "MixinPreparedRandomState",
+    "MixinWarmupReloadListener",
+    "MixinMinecraftServerWarmup",
+    "MixinServerLevelWarmup",
+    "MixinPersistentEntitySectionManagerWarmup",
+    "MixinSectionStorageWarmup",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {
@@ -118,9 +124,14 @@
     "MixinLevelLoadStatusManager",
     "MixinOptionsScreen",
     "MixinCreateWorldScreen",
+    "MixinCreateWorldScreenInvoker",
+    "MixinLoadingOverlay",
+    "MixinLevelStorageSource",
+    "MixinWorldSelectionList",
     "MixinGuiStats",
     "MixinDebugScreenOverlay",
-    "MixinMinecraftClientLifecycle"
+    "MixinMinecraftClientLifecycle",
+    "MixinMinecraftResourceReload"
   ],
   "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin"
 }

@@ -11,9 +11,12 @@ import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.scheduler.AdaptiveWorldgenWorkers;
+import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.DeferredSpawnSearch;
 import net.fly.adrenaline.util.EarlyWorldEntry;
 import net.fly.adrenaline.util.SpawnPreparation;
+import net.fly.adrenaline.util.BackgroundWorldgenWarmupState;
+import net.fly.adrenaline.util.WarmupWorldDiscard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerChunkCache;
@@ -27,6 +30,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
 public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access, InitialWorldCreationAccess {
@@ -53,6 +57,18 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
         return this.adrenaline$spawnSearch;
     }
 
+    @WrapMethod(method = "stopServer")
+    private void adrenaline$discardWarmupWorldOnStop(Operation<Void> original) {
+        WarmupWorldDiscard.runShutdown((MinecraftServer) (Object) this, () -> original.call());
+    }
+
+    @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)
+    private void adrenaline$skipDiscardedWarmupSave(boolean silent, boolean flush, boolean force, CallbackInfoReturnable<Boolean> cir) {
+        if (WarmupWorldDiscard.isDiscarding()) {
+            cir.setReturnValue(false);
+        }
+    }
+
     @Inject(method = "setInitialSpawn", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;randomState()Lnet/minecraft/world/level/levelgen/RandomState;"), cancellable = true)
     @ControlsOptimization(Optimization.INITIAL_SPAWN)
     private static void adrenaline$deferInitialSpawnSearch(ServerLevel level, ServerLevelData levelData, boolean generateBonusChest, boolean debugWorld, CallbackInfo ci) {
@@ -72,7 +88,9 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
     @ControlsOptimization(Optimization.SPAWN_RADIUS)
     private ChunkProgressListener adrenaline$useConfiguredSpawnProgress(ChunkProgressListenerFactory factory, int radius, Operation<ChunkProgressListener> original) {
         if (!OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS) && !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
-            radius = this.adrenaline$skipSpawnPreparation() ? 0 : AdrenalineConfig.resolvedSpawnZoneRadius() - 1;
+            radius = BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)
+                ? BackgroundWorldgenWarmupState.spawnZoneRadius() - 1
+                : this.adrenaline$skipSpawnPreparation() ? 0 : AdrenalineConfig.resolvedSpawnZoneRadius() - 1;
         }
         return original.call(factory, radius);
     }
@@ -84,7 +102,9 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
             original.call(listener);
             return;
         }
-        int radius = this.adrenaline$skipSpawnPreparation() ? AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS : AdrenalineConfig.internalSpawnPreparationRadius();
+        int radius = BackgroundWorldgenWarmupState.isServer((MinecraftServer) (Object) this)
+            ? BackgroundWorldgenWarmupState.spawnZoneRadius()
+            : this.adrenaline$skipSpawnPreparation() ? AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS : AdrenalineConfig.internalSpawnPreparationRadius();
         try (SpawnPreparation preparation = new SpawnPreparation(((MinecraftServer) (Object) this).overworld(), radius)) {
             this.adrenaline$spawnPreparation = preparation;
             original.call(listener);
@@ -132,6 +152,9 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
 
     @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V", ordinal = 0))
     private void adrenaline$saveGeneratedSpawnChunks(ChunkProgressListener listener, CallbackInfo ci) {
+        if (WarmupWorldDiscard.isServer((MinecraftServer) (Object) this)) {
+            return;
+        }
         ServerChunkCache chunkSource = ((MinecraftServer) (Object) this).overworld().getChunkSource();
         int generated = chunkSource.getTickingGenerated();
         int interval = AdrenalineConfig.incrementalSaveInterval();
@@ -143,7 +166,7 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
 
     @Inject(method = "prepareLevels", at = @At("RETURN"))
     private void adrenaline$finishIncrementalSpawnSaving(ChunkProgressListener listener, CallbackInfo ci) {
-        if (this.adrenaline$initialWorldCreation && AdrenalineConfig.saveChunksAfterWorldCreation()) {
+        if (this.adrenaline$initialWorldCreation && AdrenalineConfig.saveChunksAfterWorldCreation() && !WarmupWorldDiscard.isServer((MinecraftServer) (Object) this)) {
             ((MinecraftServer) (Object) this).overworld().getChunkSource().save(false);
         }
     }
@@ -159,6 +182,7 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void adrenaline$stopAdaptiveWorkers(CallbackInfo ci) {
         this.adrenaline$spawnSearch.reset();
+        ChunkJobScheduler.get().cancel((MinecraftServer) (Object) this);
         AdaptiveWorldgenWorkers.stop((MinecraftServer) (Object) this);
     }
 
@@ -169,7 +193,9 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
 
     @Inject(method = "tickServer", at = @At("RETURN"))
     private void adrenaline$finishAdaptiveWorkerTick(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
-        AdaptiveWorldgenWorkers.endTick((MinecraftServer) (Object) this);
+        if (!WarmupWorldDiscard.isServer((MinecraftServer) (Object) this)) {
+            AdaptiveWorldgenWorkers.endTick((MinecraftServer) (Object) this);
+        }
     }
 
     @Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickServer(Ljava/util/function/BooleanSupplier;)V"))
