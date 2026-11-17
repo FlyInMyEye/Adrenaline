@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "MixinChunkMap",
+    "MixinChunkMapMaintenanceInvoker",
     "MixinGenerationChunkHolder",
     "MixinIOWorker",
     "MixinChunkStorageAccessor",
@@ -125,6 +126,7 @@
     "MixinWorldListEntry",
     "MixinTitleScreenBranding",
     "MixinMinecraft",
+    "MixinIntegratedServerPausedChunkMaintenance",
     "MixinScreen",
     "MixinLevelLoadingScreen",
     "MixinReceivingLevelScreen",
