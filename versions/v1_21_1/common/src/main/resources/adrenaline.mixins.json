@@ -102,6 +102,8 @@
     "defaultRequire": 1
   },
   "client": [
+    "MixinReceivingLevelScreen",
+    "MixinLevelLoadStatusManager",
     "MixinOptionsScreen",
     "MixinCreateWorldScreen",
     "MixinGuiStats",

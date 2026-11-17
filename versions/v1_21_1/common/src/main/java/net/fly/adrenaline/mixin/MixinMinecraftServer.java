@@ -71,7 +71,7 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
     @ControlsOptimization(Optimization.SPAWN_RADIUS)
     private ChunkProgressListener adrenaline$useConfiguredSpawnProgress(ChunkProgressListenerFactory factory, int radius, Operation<ChunkProgressListener> original) {
         if (!OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_RADIUS) && !OptimizationTakeoverRegistry.isControlled(Optimization.SPAWN_WAIT)) {
-            radius = AdrenalineConfig.resolvedSpawnZoneRadius() - 1;
+            radius = this.adrenaline$skipSpawnPreparation() ? 0 : AdrenalineConfig.resolvedSpawnZoneRadius() - 1;
         }
         return original.call(factory, radius);
     }
@@ -83,13 +83,19 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
             original.call(listener);
             return;
         }
-        try (SpawnPreparation preparation = new SpawnPreparation(((MinecraftServer) (Object) this).overworld(), AdrenalineConfig.internalSpawnPreparationRadius())) {
+        int radius = this.adrenaline$skipSpawnPreparation() ? AdrenalineConfig.MIN_SPAWN_ZONE_RADIUS : AdrenalineConfig.internalSpawnPreparationRadius();
+        try (SpawnPreparation preparation = new SpawnPreparation(((MinecraftServer) (Object) this).overworld(), radius)) {
             this.adrenaline$spawnPreparation = preparation;
             original.call(listener);
         } finally {
             this.adrenaline$spawnSearch.reset();
             this.adrenaline$spawnPreparation = null;
         }
+    }
+
+    @Unique
+    private boolean adrenaline$skipSpawnPreparation() {
+        return !this.adrenaline$initialWorldCreation && AdrenalineConfig.fastTerrainLoadingMode() != AdrenalineConfig.FastTerrainLoadingMode.OFF;
     }
 
     @ModifyExpressionValue(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/GameRules;getInt(Lnet/minecraft/world/level/GameRules$Key;)I"))

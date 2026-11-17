@@ -650,9 +650,7 @@ public class AdrenalineConfig {
         public boolean blockingWarmupOnStartup = true;
         @WorkInProgress
         public boolean prepareWorldCreationContext = true;
-        @WorkInProgress
         public boolean fastTerrainLoading = true;
-        @WorkInProgress
         public FastTerrainLoadingMode fastTerrainLoadingMode;
         @WorkInProgress
         public StartBeforehandMode startBeforehand = StartBeforehandMode.OFF;
