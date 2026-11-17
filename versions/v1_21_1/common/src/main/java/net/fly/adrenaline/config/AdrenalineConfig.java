@@ -602,9 +602,7 @@ public class AdrenalineConfig {
         public Boolean adaptiveGenerationWorkers;
         public AdaptiveWorkerMode adaptiveWorkerMode = AdaptiveWorkerMode.QUARTER;
         public int serializationWorkerThreads = 0;
-        @WorkInProgress
         public boolean saveChunksAfterWorldCreation = true;
-        @WorkInProgress
         public int incrementalSaveInterval = 128;
         @WorkInProgress
         public boolean skipSavingScreenAfterExit = true;
