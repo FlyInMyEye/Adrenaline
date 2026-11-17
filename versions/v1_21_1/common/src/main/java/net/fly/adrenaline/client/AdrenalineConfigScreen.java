@@ -1,5 +1,7 @@
 package net.fly.adrenaline.client;
 
+import net.fly.adrenaline.compat.ModBlacklist;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -44,7 +46,7 @@ public class AdrenalineConfigScreen extends Screen {
     }
 
     public static Screen create(Screen parent) {
-        return new AdrenalineConfigScreen(parent);
+        return ModBlacklist.shouldWarn() ? new BlacklistedModsScreen(parent) : new AdrenalineConfigScreen(parent);
     }
 
     private AdrenalineConfigScreen(Screen parent, Session session, boolean advanced) {

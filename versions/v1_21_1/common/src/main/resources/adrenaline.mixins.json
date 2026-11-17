@@ -132,6 +132,8 @@
     "MixinLoadingOverlay",
     "MixinLevelStorageSource",
     "MixinWorldSelectionList",
+    "MixinTitleScreen",
+    "MixinGui",
     "MixinGuiStats",
     "MixinDebugScreenOverlay",
     "MixinMinecraftClientLifecycle",
