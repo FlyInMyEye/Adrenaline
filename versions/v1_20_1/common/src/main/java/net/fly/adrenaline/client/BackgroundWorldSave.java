@@ -20,7 +20,7 @@ public final class BackgroundWorldSave {
     public static void detach(IntegratedServer detachedServer) {
         server = detachedServer;
         worldPath = detachedServer.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-        detachedServer.halt(false);
+        detachedServer.execute(() -> detachedServer.halt(false));
     }
 
     public static boolean isRunning() {
