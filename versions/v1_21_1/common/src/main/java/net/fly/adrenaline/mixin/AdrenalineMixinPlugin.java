@@ -3,6 +3,7 @@ package net.fly.adrenaline.mixin;
 import java.util.List;
 import java.util.Set;
 import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
+import net.fly.adrenaline.compat.LightLoadCompat;
 import net.fly.adrenaline.compat.MixinPlatform;
 import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
@@ -13,6 +14,9 @@ import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
     @Override
     public void onLoad(String mixinPackage) {
+        if (MixinPlatform.isModLoaded("lightload")) {
+            LightLoadCompat.disable();
+        }
     }
 
     @Override
