@@ -271,6 +271,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         }
 
         int textureSize = diameter * WorldgenChunkPreview.SIZE;
+        guiGraphics.flush();
         guiGraphics.blit(
             this.adrenaline$chunkPreviewTextureLocation,
             centerX - textureSize / 2,
