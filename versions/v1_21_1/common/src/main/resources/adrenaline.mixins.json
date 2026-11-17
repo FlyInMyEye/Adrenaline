@@ -119,7 +119,9 @@
     "MixinServerOptimizationTakeoverDetector",
     "MixinWorldLoader",
     "MixinTectonicInvert",
-    "levelgen.AdrenalineMixinFrozenTemperatureAccess"
+    "levelgen.AdrenalineMixinFrozenTemperatureAccess",
+    "MixinChunkTaskPriorityQueueSorter",
+    "MixinMessageAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
