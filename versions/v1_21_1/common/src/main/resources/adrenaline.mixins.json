@@ -104,6 +104,10 @@
     "MixinServerLevelWarmup",
     "MixinPersistentEntitySectionManagerWarmup",
     "MixinSectionStorageWarmup",
+    "MixinChunkPyramidAccessor",
+    "MixinChunkLevelAccessor",
+    "MixinChunkTicketTracker",
+    "MixinChunkTaskPriorityQueueAccessor",
     "MixinMinecraftServerLifecycle"
   ],
   "injectors": {

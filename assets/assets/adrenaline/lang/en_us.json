@@ -175,6 +175,7 @@
   "tooltip.adrenaline.config.beardifier_optimizations": "Speeds up structure terrain blending calculations.",
   "tooltip.adrenaline.config.ore_vein_optimizations": "Speeds up ore vein sampling during generation.",
   "tooltip.adrenaline.config.initial_spawn_optimization": "Uses a faster search for a suitable starting position while retaining the normal spawn suitability checks.",
+  "gui.adrenaline.config.applies_next_world": "Changes apply when the next world is opened.",
   "tooltip.adrenaline.config.feature_safety_radius": "Reserves nearby chunks while placing features. Increase for mods whose features extend farther than adjacent chunks. Requires Parallel Worldgen.",
   "tooltip.adrenaline.config.stage_parallel": "Controls whether the %s stage is redirected to Adrenaline's parallel scheduler.",
   "tooltip.adrenaline.config.fast_legacy_random": "Replaces legacy random with a faster implementation.",

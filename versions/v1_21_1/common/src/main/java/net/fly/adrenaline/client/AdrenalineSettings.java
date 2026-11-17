@@ -282,6 +282,10 @@ final class AdrenalineSettings {
         }
 
         Component description() {
+            if (this.id.equals("featureSafetyRadius")) {
+                return Component.translatable("tooltip.adrenaline.config." + this.key)
+                    .append("\n").append(Component.translatable("gui.adrenaline.config.applies_next_world"));
+            }
             return Component.translatable("tooltip.adrenaline.config." + this.key);
         }
 
