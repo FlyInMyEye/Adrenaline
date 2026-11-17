@@ -112,7 +112,11 @@
     "MixinLoggerChunkProgressListener",
     "MixinMinecraftServerWorldgenDebug",
     "MixinPlayerList",
-    "MixinMinecraftServerLifecycle"
+    "MixinMinecraftServerLifecycle",
+    "MixinOptimizationTakeoverDetector",
+    "MixinAdditionalOptimizationTakeoverDetector",
+    "MixinBiomeOptimizationTakeoverDetector",
+    "MixinServerOptimizationTakeoverDetector"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -143,7 +147,8 @@
     "MixinGuiStats",
     "MixinDebugScreenOverlay",
     "MixinMinecraftClientLifecycle",
-    "MixinMinecraftResourceReload"
+    "MixinMinecraftResourceReload",
+    "MixinClientOptimizationTakeoverDetector"
   ],
   "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin"
 }
