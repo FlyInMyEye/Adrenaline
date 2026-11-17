@@ -16,6 +16,7 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.scheduler.ChunkJobScheduler;
 import net.fly.adrenaline.util.WorldgenWarmup;
 import net.fly.adrenaline.util.WorldgenStageStats;
+import net.fly.adrenaline.util.GenerationRequestTiming;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ServerLevel;
@@ -137,12 +138,13 @@ public abstract class MixinChunkMap {
                 || !holder.getPersistedStatus().isBefore(step.targetStatus())) {
             return original.call(holder, step, cache);
         }
-        WorldgenStageStats.beginScheduling(holder.getPos(), step.targetStatus());
+        WorldgenStageStats.beginScheduling(holder.getPos(), step.targetStatus(), GenerationRequestTiming.startedNanos());
         WorldgenStageStats.markDependenciesReady(holder.getPos(), step.targetStatus());
+        WorldgenStageStats.SchedulingWork work = WorldgenStageStats.beginSchedulingWork(holder.getPos(), step.targetStatus());
         try {
             return original.call(holder, step, cache);
         } finally {
-            WorldgenStageStats.finishInitialScheduling(holder.getPos(), step.targetStatus());
+            WorldgenStageStats.finishSchedulingWork(work);
         }
     }
 

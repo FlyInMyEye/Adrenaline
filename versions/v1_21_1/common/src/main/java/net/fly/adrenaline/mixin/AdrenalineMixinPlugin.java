@@ -21,7 +21,8 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
         "net.fly.adrenaline.mixin.MixinPlayerList",
         "net.fly.adrenaline.mixin.MixinWorldgenDifferenceInput",
         "net.fly.adrenaline.mixin.MixinServerChunkCacheDebug",
-        "net.fly.adrenaline.mixin.MixinNoiseBasedChunkGeneratorDebug"
+        "net.fly.adrenaline.mixin.MixinNoiseBasedChunkGeneratorDebug",
+        "net.fly.adrenaline.mixin.MixinChunkGenerationTaskTiming"
     );
     @Override
     public void onLoad(String mixinPackage) {
