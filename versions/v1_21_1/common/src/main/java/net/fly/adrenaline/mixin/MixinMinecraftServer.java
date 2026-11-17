@@ -5,6 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import java.util.function.BooleanSupplier;
+import net.fly.adrenaline.client.InitialWorldCreationAccess;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
@@ -27,13 +28,24 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = MinecraftServer.class, priority = 1100)
-public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access {
+public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access, InitialWorldCreationAccess {
 
     @Unique
     private final DeferredSpawnSearch adrenaline$spawnSearch = new DeferredSpawnSearch();
 
     @Unique
     private SpawnPreparation adrenaline$spawnPreparation;
+
+    @Unique
+    private int adrenaline$lastSpawnSaveCount;
+
+    @Unique
+    private boolean adrenaline$initialWorldCreation;
+
+    @Override
+    public boolean adrenaline$isInitialWorldCreation() {
+        return this.adrenaline$initialWorldCreation;
+    }
 
     @Override
     public DeferredSpawnSearch adrenaline$getSpawnSearch() {
@@ -103,10 +115,35 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
         this.adrenaline$spawnSearch.advance(listener, this.adrenaline$spawnPreparation);
     }
 
+    @Inject(method = "prepareLevels", at = @At("HEAD"))
+    private void adrenaline$beginIncrementalSpawnSaving(ChunkProgressListener listener, CallbackInfo ci) {
+        this.adrenaline$lastSpawnSaveCount = 0;
+    }
+
+    @Inject(method = "prepareLevels", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;waitUntilNextTick()V", ordinal = 0))
+    private void adrenaline$saveGeneratedSpawnChunks(ChunkProgressListener listener, CallbackInfo ci) {
+        ServerChunkCache chunkSource = ((MinecraftServer) (Object) this).overworld().getChunkSource();
+        int generated = chunkSource.getTickingGenerated();
+        int interval = AdrenalineConfig.incrementalSaveInterval();
+        if (interval > 0 && generated - this.adrenaline$lastSpawnSaveCount >= interval) {
+            chunkSource.save(false);
+            this.adrenaline$lastSpawnSaveCount = generated;
+        }
+    }
+
+    @Inject(method = "prepareLevels", at = @At("RETURN"))
+    private void adrenaline$finishIncrementalSpawnSaving(ChunkProgressListener listener, CallbackInfo ci) {
+        if (this.adrenaline$initialWorldCreation && AdrenalineConfig.saveChunksAfterWorldCreation()) {
+            ((MinecraftServer) (Object) this).overworld().getChunkSource().save(false);
+        }
+    }
+
     @Inject(method = "loadLevel", at = @At("HEAD"))
     private void adrenaline$startAdaptiveWorkers(CallbackInfo ci) {
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        this.adrenaline$initialWorldCreation = !server.getWorldData().overworldData().isInitialized();
         this.adrenaline$spawnSearch.reset();
-        AdaptiveWorldgenWorkers.start((MinecraftServer) (Object) this);
+        AdaptiveWorldgenWorkers.start(server);
     }
 
     @Inject(method = "stopServer", at = @At("HEAD"))
