@@ -104,6 +104,13 @@
     "defaultRequire": 1
   },
   "client": [
+    "MixinBackgroundWorldSave",
+    "MixinMinecraftFrameInvoker",
+    "MixinWorldOpenFlows",
+    "MixinDirectoryLock",
+    "MixinLevelSummary",
+    "MixinWorldListEntry",
+    "MixinTitleScreenBranding",
     "MixinMinecraft",
     "MixinScreen",
     "MixinLevelLoadingScreen",
