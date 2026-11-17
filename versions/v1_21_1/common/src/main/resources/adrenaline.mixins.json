@@ -117,7 +117,8 @@
     "MixinAdditionalOptimizationTakeoverDetector",
     "MixinBiomeOptimizationTakeoverDetector",
     "MixinServerOptimizationTakeoverDetector",
-    "MixinWorldLoader"
+    "MixinWorldLoader",
+    "MixinTectonicInvert"
   ],
   "injectors": {
     "defaultRequire": 1
