@@ -18,6 +18,8 @@
     "MixinIOWorkerPendingStoreAccessor",
     "MixinRegionFileStorageInvoker",
     "MixinClimateParameterList",
+    "MixinStreamsClimateSampler",
+    "MixinStreamsWorldGenRegion",
     "MixinBiomeManager",
     "MixinBiomeOptimizationTakeoverDetector",
     "MixinChunkTaskPriorityQueueSorter",

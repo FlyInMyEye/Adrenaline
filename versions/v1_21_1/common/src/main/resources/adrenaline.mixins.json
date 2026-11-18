@@ -79,6 +79,8 @@
     "MixinProtoChunkHeightmaps",
     "MixinLevelChunkSectionAccessor",
     "MixinClimateParameterList",
+    "MixinStreamsClimateSampler",
+    "MixinStreamsWorldGenRegion",
     "MixinSurfaceSystem",
     "MixinSurfaceBandNoise",
     "MixinBiomeManager",
