@@ -109,12 +109,14 @@ public abstract class GenerationJob implements Runnable, GenerationTaskQueue.Ent
         Thread currentThread = Thread.currentThread();
         ClassLoader previousClassLoader = currentThread.getContextClassLoader();
         boolean handedOff = false;
+        boolean workerActive = false;
         try {
             if (!this.execution().begin(this)) {
                 this.cancel();
                 return;
             }
             this.execution().markCurrentWorkerActive();
+            workerActive = true;
             if (this.contextClassLoader != null && this.contextClassLoader != previousClassLoader) {
                 currentThread.setContextClassLoader(this.contextClassLoader);
             }
@@ -129,7 +131,9 @@ public abstract class GenerationJob implements Runnable, GenerationTaskQueue.Ent
             if (currentThread.getContextClassLoader() != previousClassLoader) {
                 currentThread.setContextClassLoader(previousClassLoader);
             }
-            this.execution().markCurrentWorkerIdle();
+            if (workerActive) {
+                this.execution().markCurrentWorkerIdle();
+            }
             if (!handedOff) {
                 this.execution().onComplete(this);
             }
