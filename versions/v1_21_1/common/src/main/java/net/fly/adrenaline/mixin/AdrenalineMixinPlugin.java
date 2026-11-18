@@ -44,6 +44,10 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
         if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinTectonicInvert") && !MixinPlatform.isModLoaded("tectonic")) {
             return false;
         }
+        if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinStreamsClimateSampler")
+            || mixinClassName.equals("net.fly.adrenaline.mixin.MixinStreamsWorldGenRegion")) {
+            return MixinPlatform.isModLoaded("streamsreflowing");
+        }
         return BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName);
     }
 
