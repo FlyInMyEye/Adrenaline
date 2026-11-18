@@ -621,6 +621,7 @@ public class AdrenalineConfig {
         public boolean parallelizeInitializeLight = true;
         public boolean parallelizeLight = true;
         public boolean parallelizeSpawn = true;
+        @WorkInProgress
         public boolean parallelizeFull = true;
         public boolean fastLegacyRandom = true;
         public boolean nativePerlinBatching = true;
