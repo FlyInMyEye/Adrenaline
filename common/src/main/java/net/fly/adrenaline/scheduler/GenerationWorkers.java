@@ -1,9 +1,10 @@
 package net.fly.adrenaline.scheduler;
 
+import java.util.Arrays;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicIntegerArray;
 
 final class GenerationWorkers {
 
@@ -12,8 +13,7 @@ final class GenerationWorkers {
     static final int WAITING = 2;
 
     private final boolean debug;
-    private volatile AtomicIntegerArray states;
-    private volatile ForkJoinPool pool;
+    private volatile WorkerPool pool;
 
     GenerationWorkers(int threads, boolean debug) {
         this.debug = debug;
@@ -21,18 +21,18 @@ final class GenerationWorkers {
     }
 
     int parallelism() {
-        return this.pool.getParallelism();
+        return this.pool.executor.getParallelism();
     }
 
     ForkJoinPool executor() {
-        return this.pool;
+        return this.pool.executor;
     }
 
     void resize(int threads) {
-        ForkJoinPool current = this.pool;
-        ForkJoinPool replacement = this.createPool(threads);
+        WorkerPool current = this.pool;
+        WorkerPool replacement = this.createPool(threads);
         this.pool = replacement;
-        current.shutdown();
+        current.executor.shutdown();
     }
 
     int[] snapshot(boolean waitingWork) {
@@ -41,15 +41,17 @@ final class GenerationWorkers {
         }
         int processors = Runtime.getRuntime().availableProcessors();
         int[] snapshot = new int[processors];
-        AtomicIntegerArray currentStates = this.states;
-        int configuredWorkers = Math.min(this.pool.getParallelism(), processors);
-        for (int i = 0; i < configuredWorkers; i++) {
-            int state = i < currentStates.length() ? currentStates.get(i) : IDLE;
-            snapshot[i] = state == IDLE && waitingWork ? WAITING : state;
+        WorkerPool current = this.pool;
+        int configuredWorkers = Math.min(current.executor.getParallelism(), processors);
+        int active = 0;
+        for (GenerationWorkerThread worker : current.workers) {
+            if (worker.executionDepth > 0 && worker.getState() == Thread.State.RUNNABLE) {
+                active++;
+            }
         }
-        for (int i = configuredWorkers; i < processors; i++) {
-            snapshot[i] = -1;
-        }
+        Arrays.fill(snapshot, 0, configuredWorkers, waitingWork ? WAITING : IDLE);
+        Arrays.fill(snapshot, 0, Math.min(active, configuredWorkers), ACTIVE);
+        Arrays.fill(snapshot, configuredWorkers, processors, -1);
         return snapshot;
     }
 
@@ -63,30 +65,49 @@ final class GenerationWorkers {
         }
     }
 
-    private ForkJoinPool createPool(int threads) {
-        AtomicIntegerArray workerStates = this.debug ? new AtomicIntegerArray(threads) : null;
-        AtomicInteger nextWorker = new AtomicInteger();
-        this.states = workerStates;
-        return new ForkJoinPool(threads, pool -> {
-            int index = nextWorker.getAndIncrement();
-            return new GenerationWorkerThread(pool, workerStates, index);
-        }, null, false);
+    private WorkerPool createPool(int threads) {
+        Set<GenerationWorkerThread> workers = this.debug ? ConcurrentHashMap.newKeySet() : null;
+        ForkJoinPool executor = new ForkJoinPool(threads,
+            pool -> new GenerationWorkerThread(pool, workers), null, false);
+        return new WorkerPool(executor, workers);
+    }
+
+    private record WorkerPool(ForkJoinPool executor, Set<GenerationWorkerThread> workers) {
     }
 
     private static final class GenerationWorkerThread extends ForkJoinWorkerThread {
 
-        private final AtomicIntegerArray states;
-        private final int index;
+        private final Set<GenerationWorkerThread> workers;
+        private volatile int executionDepth;
 
-        private GenerationWorkerThread(ForkJoinPool pool, AtomicIntegerArray states, int index) {
+        private GenerationWorkerThread(ForkJoinPool pool, Set<GenerationWorkerThread> workers) {
             super(pool);
-            this.states = states;
-            this.index = index;
+            this.workers = workers;
+        }
+
+        @Override
+        protected void onStart() {
+            super.onStart();
+            if (this.workers != null) {
+                this.workers.add(this);
+            }
+        }
+
+        @Override
+        protected void onTermination(Throwable exception) {
+            if (this.workers != null) {
+                this.workers.remove(this);
+            }
+            super.onTermination(exception);
         }
 
         private void setState(int state) {
-            if (this.states != null && this.index < this.states.length()) {
-                this.states.set(this.index, state);
+            if (this.workers != null) {
+                if (state == ACTIVE) {
+                    this.executionDepth++;
+                } else if (this.executionDepth > 0) {
+                    this.executionDepth--;
+                }
             }
         }
     }
