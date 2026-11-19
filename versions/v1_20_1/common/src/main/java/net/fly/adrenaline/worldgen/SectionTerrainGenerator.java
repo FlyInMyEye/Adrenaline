@@ -83,7 +83,20 @@ public final class SectionTerrainGenerator {
             if (noiseProfile != null) {
                 noiseProfile.add(NoiseSubstage.SLICE_SAMPLING, System.nanoTime() - sampleStarted);
             }
+            long airBoundsStarted = noiseProfile == null ? 0L : System.nanoTime();
+            int[] firstAirCells = lattice.firstAirCells(
+                sectionNoise.adrenaline$sectionDensityProgram(), aquifer, baseX, baseZ, minCellY, cellCountY);
+            int cellLimit = 0;
+            for (int firstAirCell : firstAirCells) {
+                cellLimit = Math.max(cellLimit, firstAirCell);
+            }
+            if (noiseProfile != null) {
+                noiseProfile.add(NoiseSubstage.CELL_CACHE, System.nanoTime() - airBoundsStarted);
+            }
             for (int sectionIndex = chunk.getSectionsCount() - 1; sectionIndex >= 0; sectionIndex--) {
+                if (reference == null && sectionIndex * 2 >= cellLimit) {
+                    continue;
+                }
                 int sectionY = chunk.getMinBuildHeight() + sectionIndex * 16;
                 SectionTerrainBuffer buffer = new SectionTerrainBuffer(defaultBlock);
                 for (int cellX = 0; cellX < 4; cellX++) {
@@ -91,6 +104,9 @@ public final class SectionTerrainGenerator {
                     sectionNoise.adrenaline$setSectionCellX(cellX);
                     for (int cellZ = 0; cellZ < 4; cellZ++) {
                         for (int half = 1; half >= 0; half--) {
+                            if (sectionIndex * 2 + half >= firstAirCells[cellX * 4 + cellZ]) {
+                                continue;
+                            }
                             long startedNanos = noiseProfile == null ? 0L : System.nanoTime();
                             noise.selectCellYZ(sectionIndex * 2 + half, cellZ);
                             double[] density = material.adrenaline$finalDensityValues();

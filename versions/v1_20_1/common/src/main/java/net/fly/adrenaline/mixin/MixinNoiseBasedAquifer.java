@@ -9,6 +9,7 @@ import net.fly.adrenaline.natives.NativeAquiferSampler;
 import net.fly.adrenaline.worldgen.AdrenalineFastAquiferAccess;
 import net.fly.adrenaline.worldgen.AdrenalineFluidStatusAccess;
 import net.fly.adrenaline.worldgen.AdrenalineNativeAquiferAccess;
+import net.fly.adrenaline.worldgen.AquiferAirBounds;
 import net.fly.adrenaline.worldgen.SharedAquiferFluidStatuses;
 import java.nio.ByteBuffer;
 import java.util.IdentityHashMap;
@@ -253,30 +254,23 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
     }
 
     @Override
+    public int adrenaline$firstDryCell(int x, int z, int minCellY, int cellCountY) {
+        if (!AdrenalineConfig.nativeAquiferBatchingEnabled() || !adrenaline$prepareNativeFluidTable() || !adrenaline$prepareNativeGlobalFluid()) {
+            return cellCountY;
+        }
+        return AquiferAirBounds.firstDryCell(adrenaline$nativeFluidLevels.length, adrenaline$nativeMaximumFluidLevel, adrenaline$nativeGlobalFluidLevel,
+            minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ, x, z, minCellY, cellCountY);
+    }
+
+    @Override
     public byte adrenaline$nativeMaterialAt(int index) {
         return adrenaline$nativeMaterials[index];
     }
 
     @Unique
     private boolean adrenaline$cellAboveFluidLevels(int baseX, int baseY, int baseZ, int cellWidth, int cellHeight) {
-        if (cellWidth <= 0 || cellWidth > 32 || cellHeight <= 0 || cellHeight > 1024
-            || (long) cellWidth * cellWidth * cellHeight > 1024L
-            || adrenaline$nativeFluidLevels.length == 0 || adrenaline$nativeFluidLevels.length > 1024
-            || gridSizeX <= 1 || gridSizeZ <= 1
-            || gridSizeX > adrenaline$nativeFluidLevels.length || gridSizeZ > adrenaline$nativeFluidLevels.length
-            || (long) baseY < (long) adrenaline$nativeGlobalFluidLevel + 5L
-            || (long) baseY < (long) adrenaline$nativeMaximumFluidLevel + 5L) {
-            return false;
-        }
-        long minX = Math.floorDiv((long) baseX - 5L, 16L) - minGridX;
-        long maxX = Math.floorDiv((long) baseX + cellWidth - 6L, 16L) - minGridX;
-        long minZ = Math.floorDiv((long) baseZ - 5L, 16L) - minGridZ;
-        long maxZ = Math.floorDiv((long) baseZ + cellWidth - 6L, 16L) - minGridZ;
-        long minY = Math.floorDiv((long) baseY + 1L, 12L) - minGridY;
-        long maxY = Math.floorDiv((long) baseY + cellHeight, 12L) - minGridY;
-        long lastIndex = ((maxY + 1L) * gridSizeZ + maxZ + 1L) * gridSizeX + maxX + 1L;
-        return minX >= 0L && maxX + 1L < gridSizeX && minZ >= 0L && maxZ + 1L < gridSizeZ
-            && minY >= 1L && lastIndex < adrenaline$nativeFluidLevels.length;
+        return AquiferAirBounds.above(adrenaline$nativeFluidLevels.length, adrenaline$nativeMaximumFluidLevel, adrenaline$nativeGlobalFluidLevel,
+            minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ, baseX, baseY, baseZ, cellWidth, cellHeight);
     }
 
     @Unique

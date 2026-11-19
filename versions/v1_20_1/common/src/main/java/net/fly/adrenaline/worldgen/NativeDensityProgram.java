@@ -79,6 +79,11 @@ public final class NativeDensityProgram {
         this.columnCacheCount = columnCacheCount;
     }
 
+    AdrenalineNativeInterpolatorAccess firstTerrainInterpolator() {
+        return this.length == 388 && this.inputs.length == 0 && this.interpolators.length > 0 && this.interpolators[0].offset == 1
+            ? this.interpolators[0].source : null;
+    }
+
     public ByteBuffer bytecode() {
         return this.bytecode;
     }
