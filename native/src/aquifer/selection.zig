@@ -48,6 +48,62 @@ pub const AquiferCandidates = struct {
     third_index: usize,
 };
 
+pub const ColumnRanks = struct {
+    grid_y: i32,
+    top: i32,
+    keys: [3][8]i32,
+    indices: [12]usize,
+
+    pub fn init(search: *const AquiferSearch) ColumnRanks {
+        const V = core_vectors.Vec8i;
+        const rows: V = .{ 0, 1, 2, 3, 4, 5, 6, 7 };
+        var first: V = @splat(std.math.maxInt(i32));
+        var second = first;
+        var third = first;
+        inline for (0..12) |site| {
+            const intercept: V = @splat(search.distances[site] * 16 + @as(i32, 11 - site));
+            const slope: V = @splat(search.delta_y[site] * 32);
+            const key = intercept + slope * rows;
+            const after_first = @max(first, key);
+            third = @min(third, @max(second, after_first));
+            second = @min(second, after_first);
+            first = @min(first, key);
+        }
+        return .{
+            .grid_y = search.grid_y,
+            .top = search.y,
+            .indices = search.indices,
+            .keys = .{ @bitCast(first), @bitCast(second), @bitCast(third) },
+        };
+    }
+
+    pub fn contains(self: *const ColumnRanks, grid_y: i32, y: i32) bool {
+        return grid_y == self.grid_y and @as(u32, @bitCast(self.top -% y)) < 8;
+    }
+
+    pub fn nearest_two_distances(self: *const ColumnRanks, y: i32) [2]i32 {
+        const dy = self.top - y;
+        const row: usize = @intCast(dy);
+        return .{ (self.keys[0][row] >> 4) + dy * dy, (self.keys[1][row] >> 4) + dy * dy };
+    }
+
+    pub fn candidates(self: *const ColumnRanks, y: i32) AquiferCandidates {
+        const dy = self.top - y;
+        const row: usize = @intCast(dy);
+        const first = self.keys[0][row];
+        const second = self.keys[1][row];
+        const third = self.keys[2][row];
+        return .{
+            .nearest_distance = (first >> 4) + dy * dy,
+            .second_distance = (second >> 4) + dy * dy,
+            .third_distance = (third >> 4) + dy * dy,
+            .nearest_index = self.indices[@intCast(11 - (first & 15))],
+            .second_index = self.indices[@intCast(11 - (second & 15))],
+            .third_index = self.indices[@intCast(11 - (third & 15))],
+        };
+    }
+};
+
 pub const AquiferSearch = struct {
     grid_z: i32,
     grid_y: i32,
@@ -372,4 +428,33 @@ pub fn aquifer_search_cached(cache: *[16]AquiferCenters, valid: *u16, packed_loc
         result.delta_y[order] = dy;
     }
     return result;
+}
+
+test "column ranks preserve scalar distances, indices and ties across heights" {
+    var rng = std.Random.DefaultPrng.init(11845);
+    const random = rng.random();
+    for (0..1000) |trial| {
+        var search: AquiferSearch = undefined;
+        search.grid_y = -7;
+        search.y = -80;
+        for (0..12) |site| {
+            const dx: i32 = if (trial == 0) 0 else random.intRangeAtMost(i32, -32, 270);
+            const dz: i32 = if (trial == 0) 0 else random.intRangeAtMost(i32, -32, 32);
+            const dy: i32 = if (trial == 0) 0 else random.intRangeAtMost(i32, -24, 28);
+            search.distances[site] = dx * dx + dy * dy + dz * dz;
+            search.indices[site] = 4095 - site;
+            search.delta_y[site] = dy;
+        }
+        const ranks = ColumnRanks.init(&search);
+        for (0..8) |i| {
+            const y = ranks.top - @as(i32, @intCast(i));
+            if (i > 0) try std.testing.expect(search.advanceYDown(y));
+            try std.testing.expect(ranks.contains(-7, y));
+            const expected = search.candidates_impl(false);
+            try std.testing.expectEqualDeep(expected, ranks.candidates(y));
+            try std.testing.expectEqual([2]i32{ expected.nearest_distance, expected.second_distance }, ranks.nearest_two_distances(y));
+        }
+        try std.testing.expect(!ranks.contains(-6, ranks.top));
+        try std.testing.expect(!ranks.contains(-7, ranks.top - 8));
+    }
 }

@@ -132,7 +132,6 @@ fn aquifer_context_search(entry: *const AquiferContextEntry, gx: i32, gy: i32, g
 
 pub fn prepare_aquifer_context(ctx: *const AquiferContext, density: []const f64, candidate_values: []i64, global_fluid_level: i32, global_fluid_type: i8, base_x: i32, base_y: i32, base_z: i32, width: usize, height: usize, deferred_indices: []i32, materials: []i8) ?usize {
     const avx2 = true;
-    const neon = false;
     const fluid_levels = ctx.levels[0..ctx.count];
     const fluid_types = ctx.types[0..ctx.count];
     const min_grid_x = ctx.min_x;
@@ -287,7 +286,7 @@ pub fn prepare_aquifer_context(ctx: *const AquiferContext, density: []const f64,
             const column_index = x_index * width + z_index;
             const cell_grid_x = @divFloor(x - 5, 16);
             const cell_grid_z = @divFloor(z - 5, 16);
-            var search: ?aquifer_selection.AquiferSearch = null;
+            var ranks: ?aquifer_selection.ColumnRanks = null;
             var current_entry: *const AquiferContextEntry = undefined;
             var fluid_bound_grid_y: i32 = std.math.minInt(i32);
             var maximum_fluid_level: i32 = std.math.minInt(i32);
@@ -329,21 +328,18 @@ pub fn prepare_aquifer_context(ctx: *const AquiferContext, density: []const f64,
                     continue;
                 }
 
-                if (search) |*cached| {
-                    if (cached.grid_y != grid_y or !aquifer_selection.advance_y_down(avx2, neon, cached, y)) {
-                        search = aquifer_context_search(current_entry, cell_grid_x, grid_y, cell_grid_z, x, y, z);
-                    }
-                } else {
-                    search = aquifer_context_search(current_entry, cell_grid_x, grid_y, cell_grid_z, x, y, z);
+                if (ranks == null or !ranks.?.contains(grid_y, y)) {
+                    const top = aquifer_context_search(current_entry, cell_grid_x, grid_y, cell_grid_z, x, y, z);
+                    ranks = aquifer_selection.ColumnRanks.init(&top);
                 }
                 if (uniform_fluid_type == 2 or uniform_fluid_type == 3) {
-                    const distances = search.?.nearest_two_distances(avx2);
+                    const distances = ranks.?.nearest_two_distances(y);
                     const similarity = aquifer_material.aquifer_similarity(distances[0], distances[1]);
                     const fluid: u8 = if (y >= maximum_fluid_level) 1 else @intCast(uniform_fluid_type);
                     materials[index] = @intCast(fluid | if (similarity >= -0.76) @as(u8, 4) else @as(u8, 0));
                     continue;
                 }
-                const candidates = search.?.candidates();
+                const candidates = ranks.?.candidates(y);
                 const nearest_type = aquifer_material.aquifer_type_at(fluid_levels[candidates.nearest_index], fluid_types[candidates.nearest_index], y) orelse return null;
                 const second_type = aquifer_material.aquifer_type_at(fluid_levels[candidates.second_index], fluid_types[candidates.second_index], y) orelse return null;
                 const third_type = aquifer_material.aquifer_type_at(fluid_levels[candidates.third_index], fluid_types[candidates.third_index], y) orelse return null;
