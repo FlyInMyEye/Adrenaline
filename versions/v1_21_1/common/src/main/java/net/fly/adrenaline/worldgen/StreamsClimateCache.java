@@ -2,7 +2,11 @@ package net.fly.adrenaline.worldgen;
 
 import java.lang.ref.WeakReference;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
+import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.natives.AdrenalineNatives;
+import net.fly.adrenaline.natives.NativeClimateSampler;
 import net.minecraft.core.QuartPos;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.DensityFunction;
@@ -25,6 +29,8 @@ public final class StreamsClimateCache {
     private int cacheable;
     private boolean active;
     private boolean sampling;
+    private boolean nativePlanInitialized;
+    private NativeClimateSampler nativePlan;
 
     public static StreamsClimateCache forQuery() {
         StreamsClimateCache cache = CACHES.get();
@@ -53,12 +59,15 @@ public final class StreamsClimateCache {
         if (this.sampler.get() != sampler) {
             this.sampler = new WeakReference<>(sampler);
             Arrays.fill(this.valid, false);
-            this.cacheable = (cacheable(sampler.temperature()) ? 1 : 0)
-                | (cacheable(sampler.humidity()) ? 2 : 0)
-                | (cacheable(sampler.continentalness()) ? 4 : 0)
-                | (cacheable(sampler.erosion()) ? 8 : 0)
-                | (cacheable(sampler.depth()) ? 16 : 0)
-                | (cacheable(sampler.weirdness()) ? 32 : 0);
+            this.nativePlanInitialized = false;
+            this.nativePlan = null;
+            var known = new IdentityHashMap<DensityFunction, Boolean>();
+            this.cacheable = (cacheable(sampler.temperature(), known, 0) ? 1 : 0)
+                | (cacheable(sampler.humidity(), known, 0) ? 2 : 0)
+                | (cacheable(sampler.continentalness(), known, 0) ? 4 : 0)
+                | (cacheable(sampler.erosion(), known, 0) ? 8 : 0)
+                | (cacheable(sampler.depth(), known, 0) ? 16 : 0)
+                | (cacheable(sampler.weirdness(), known, 0) ? 32 : 0);
         }
         if (this.cacheable == 0) {
             return null;
@@ -72,12 +81,13 @@ public final class StreamsClimateCache {
         var point = new DensityFunction.SinglePointContext(QuartPos.toBlock(x), QuartPos.toBlock(y), QuartPos.toBlock(z));
         this.sampling = true;
         try {
-            float temperature = this.value(sampler.temperature(), point, base, 1, hit);
-            float humidity = this.value(sampler.humidity(), point, base + 1, 2, hit);
-            float continentalness = this.value(sampler.continentalness(), point, base + 2, 4, hit);
-            float erosion = this.value(sampler.erosion(), point, base + 3, 8, hit);
-            float depth = this.value(sampler.depth(), point, base + 4, 16, hit);
-            float weirdness = this.value(sampler.weirdness(), point, base + 5, 32, hit);
+            int ready = hit ? this.cacheable : this.sampleNative(sampler, point.blockX(), point.blockZ(), base);
+            float temperature = this.value(sampler.temperature(), point, base, 1, ready);
+            float humidity = this.value(sampler.humidity(), point, base + 1, 2, ready);
+            float continentalness = this.value(sampler.continentalness(), point, base + 2, 4, ready);
+            float erosion = this.value(sampler.erosion(), point, base + 3, 8, ready);
+            float depth = this.value(sampler.depth(), point, base + 4, 16, ready);
+            float weirdness = this.value(sampler.weirdness(), point, base + 5, 32, ready);
             this.keys[slot] = key;
             this.valid[slot] = true;
             return Climate.target(temperature, humidity, continentalness, erosion, depth, weirdness);
@@ -86,11 +96,23 @@ public final class StreamsClimateCache {
         }
     }
 
-    private float value(DensityFunction function, DensityFunction.FunctionContext point, int index, int flag, boolean hit) {
+    private int sampleNative(Climate.Sampler sampler, int x, int z, int base) {
+        if (!AdrenalineConfig.nativePerlinBatchingEnabled()
+            || !AdrenalineNatives.isAvailable(AdrenalineNatives.Feature.CLIMATE)) {
+            return 0;
+        }
+        if (!this.nativePlanInitialized) {
+            this.nativePlan = NativeClimateSampler.create(sampler, this.cacheable);
+            this.nativePlanInitialized = true;
+        }
+        return this.nativePlan == null ? 0 : this.nativePlan.sample(x, z, this.samples, base);
+    }
+
+    private float value(DensityFunction function, DensityFunction.FunctionContext point, int index, int flag, int ready) {
         if ((this.cacheable & flag) == 0) {
             return (float) function.compute(point);
         }
-        if (hit) {
+        if ((ready & flag) != 0) {
             return this.samples[index];
         }
         float value = (float) function.compute(point);
@@ -98,9 +120,38 @@ public final class StreamsClimateCache {
         return value;
     }
 
-    private static boolean cacheable(DensityFunction function) {
-        if (SurfacePipelineCompatibility.hasForeignHooks(function.getClass())) {
+    private static boolean cacheable(DensityFunction function, IdentityHashMap<DensityFunction, Boolean> known, int depth) {
+        if (depth > 48 || known.size() > 512) {
             return false;
+        }
+        Boolean previous = known.putIfAbsent(function, false);
+        if (previous != null) {
+            return previous;
+        }
+        boolean result = !SurfacePipelineCompatibility.hasForeignHooks(function.getClass()) && inspect(function, known, depth + 1);
+        known.put(function, result);
+        return result;
+    }
+
+    private static boolean inspect(DensityFunction function, IdentityHashMap<DensityFunction, Boolean> known, int depth) {
+        if (function instanceof AdrenalineConstantFunctionAccess) {
+            return true;
+        }
+        if (function instanceof AdrenalineMulOrAddAccess transform) {
+            return cacheable(transform.adrenaline$transformInput(), known, depth);
+        }
+        if (function instanceof AdrenalineBinaryFunctionAccess binary) {
+            return cacheable(binary.adrenaline$firstArgument(), known, depth)
+                && cacheable(binary.adrenaline$secondArgument(), known, depth);
+        }
+        if (function instanceof AdrenalineMappedFunctionAccess mapped) {
+            return cacheable(mapped.adrenaline$mappedInput(), known, depth);
+        }
+        if (function instanceof AdrenalineClampFunctionAccess clamp) {
+            return cacheable(clamp.adrenaline$clampInput(), known, depth);
+        }
+        if (function.getClass() == MARKER) {
+            return cacheable(((DensityFunctions.MarkerOrMarked) function).wrapped(), known, depth);
         }
         if (function instanceof AdrenalineNoiseFunctionAccess noise) {
             return Double.doubleToRawLongBits(noise.adrenaline$getYScale()) == 0L && unmodifiedNoise();

@@ -12,6 +12,7 @@ public final class NativeRuntimeStats {
         new StageStats("Density"),
         new StageStats("Aquifer prepare"),
         new StageStats("Aquifer final"),
+        new StageStats("Climate"),
         new StageStats("Ore candidates")
     };
     private static final ThreadLocal<int[]> COUNTERS = ThreadLocal.withInitial(() -> new int[STAGES.length]);
@@ -69,6 +70,7 @@ public final class NativeRuntimeStats {
         DENSITY,
         AQUIFER_PREPARE,
         AQUIFER_FINAL,
+        CLIMATE,
         ORE_CANDIDATES
     }
 
