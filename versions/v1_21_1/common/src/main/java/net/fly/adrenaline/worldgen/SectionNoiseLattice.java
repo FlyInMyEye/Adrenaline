@@ -1,7 +1,9 @@
 package net.fly.adrenaline.worldgen;
 
+import java.util.Arrays;
 import java.util.List;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
+import net.fly.adrenaline.natives.NativeDensitySampler;
 
 public final class SectionNoiseLattice implements AutoCloseable {
 
@@ -50,6 +52,32 @@ public final class SectionNoiseLattice implements AutoCloseable {
             }
             this.slices[x][i] = copy;
         }
+    }
+
+    int[] firstAirCells(NativeDensityProgram program, AdrenalineNativeAquiferAccess aquifer, int baseX, int baseZ,
+                        int minCellY, int cellCountY) {
+        int[] firstAirCells = new int[16];
+        Arrays.fill(firstAirCells, cellCountY);
+        AdrenalineNativeInterpolatorAccess terrain = program == null ? null : program.firstTerrainInterpolator();
+        if (terrain == null) {
+            return firstAirCells;
+        }
+        for (int i = 0; i < this.interpolators.length; i++) {
+            if (this.interpolators[i] != terrain) {
+                continue;
+            }
+            for (int x = 0; x < 4; x++) {
+                double[][] left = this.slices[x][i];
+                double[][] right = this.slices[x + 1][i];
+                for (int z = 0; z < 4; z++) {
+                    int firstDryCell = aquifer.adrenaline$firstDryCell(baseX + x * 4, baseZ + z * 4, minCellY, cellCountY);
+                    firstAirCells[x * 4 + z] = NativeDensitySampler.firstAirCell(
+                        program, left[z], left[z + 1], right[z], right[z + 1], firstDryCell, cellCountY);
+                }
+            }
+            break;
+        }
+        return firstAirCells;
     }
 
     public void select(int cellX) {

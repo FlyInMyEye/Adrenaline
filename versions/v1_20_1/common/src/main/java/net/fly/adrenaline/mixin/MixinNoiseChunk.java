@@ -353,6 +353,22 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
     }
 
     @Override
+    public NativeDensityProgram adrenaline$sectionDensityProgram() {
+        AdrenalineMixinCacheAllInCellAccessor[] caches = this.adrenaline$cellCacheArray();
+        if (caches.length == 0
+            || caches[caches.length - 1].adrenaline$getValues() != ((AdrenalineNoiseChunkMaterialAccess) this).adrenaline$finalDensityValues()) {
+            return null;
+        }
+        CellDensityEvaluator[] evaluators = this.adrenaline$cellDensityEvaluators(caches);
+        for (CellDensityEvaluator evaluator : evaluators) {
+            if (!(evaluator instanceof NativeCellDensityEvaluator compiled) || compiled.program().inputCount() != 0) {
+                return null;
+            }
+        }
+        return ((NativeCellDensityEvaluator) evaluators[caches.length - 1]).program();
+    }
+
+    @Override
     public void adrenaline$setSectionCellX(int cellX) {
         this.cellStartBlockX = (this.firstCellX + cellX) * this.cellWidth;
     }

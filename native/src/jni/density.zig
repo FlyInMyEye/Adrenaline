@@ -7,6 +7,7 @@ const c = @import("../core/jni.zig").c;
 const backend_abi = @import("../backend/abi.zig");
 const backend_options = @import("../backend/options.zig");
 const core_limits = @import("../core/limits.zig");
+const density_air_column = @import("../density/air_column.zig");
 const density_height = @import("../density/height.zig");
 const density_program = @import("../density/program.zig");
 
@@ -149,7 +150,50 @@ pub fn density_scalar_entry(program: [*]const u8, program_length: usize, base_x:
     return if (density_program.evaluate_density_cell(program[0..program_length], base_x, base_y, base_z, width, height, output[0 .. width * width * height], &.{})) 1 else 0;
 }
 
+pub fn native_density_sampler_first_air_cell0(
+    env: ?*c.JNIEnv,
+    _: c.jclass,
+    bytecode: c.jobject,
+    length: c.jint,
+    left_near: c.jdoubleArray,
+    left_far: c.jdoubleArray,
+    right_near: c.jdoubleArray,
+    right_far: c.jdoubleArray,
+    first_dry: c.jint,
+    count: c.jint,
+) callconv(.c) c.jint {
+    if (length != 388 or bytecode == null or first_dry < 0 or first_dry >= count or count == std.math.maxInt(c.jint)) return count;
+    const functions = (env orelse return count).*.*;
+    const capacity = functions.GetDirectBufferCapacity orelse return count;
+    const address = functions.GetDirectBufferAddress orelse return count;
+    const array_len = functions.GetArrayLength orelse return count;
+    const pin = functions.GetPrimitiveArrayCritical orelse return count;
+    const release = functions.ReleasePrimitiveArrayCritical orelse return count;
+    if (capacity(env, bytecode) < length) return count;
+    const data: [*]const u8 = @ptrCast(address(env, bytecode) orelse return count);
+    if (!density_air_column.supports_terrain_bounds(data[0..@intCast(length)])) return count;
+
+    const arrays = [4]c.jdoubleArray{ left_near, left_far, right_near, right_far };
+    for (arrays) |array| {
+        if (array == null or array_len(env, array) <= count) return count;
+    }
+    const n: usize = @intCast(count);
+    var columns: [4][]const f64 = undefined;
+    var pinned: usize = 0;
+    defer while (pinned != 0) {
+        pinned -= 1;
+        release(env, arrays[pinned], @ptrCast(@constCast(columns[pinned].ptr)), c.JNI_ABORT);
+    };
+    for (arrays, 0..) |array, i| {
+        const ptr: [*]const f64 = @ptrCast(@alignCast(pin(env, array, null) orelse return count));
+        columns[i] = ptr[0 .. n + 1];
+        pinned += 1;
+    }
+    return @intCast(density_air_column.first_air_cell(columns, @intCast(first_dry), n));
+}
+
 pub fn register() void {
+    @export(&native_density_sampler_first_air_cell0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_firstAirCell0" });
     @export(&native_density_sampler_evaluate_lattice0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateLattice0" });
     @export(&native_density_sampler_evaluate_slice0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluateSlice0" });
     @export(&native_density_sampler_evaluate0, .{ .name = "Java_net_fly_adrenaline_natives_NativeDensitySampler_evaluate0" });

@@ -7,7 +7,24 @@ import net.fly.adrenaline.worldgen.NativeDensityProgram;
 
 public final class NativeDensitySampler {
 
+    private static volatile boolean airColumnAvailable = true;
+
     private NativeDensitySampler() {
+    }
+
+    public static int firstAirCell(NativeDensityProgram program, double[] leftNear, double[] leftFar,
+                                   double[] rightNear, double[] rightFar, int firstDryCell, int cellCountY) {
+        if (firstDryCell >= cellCountY || !airColumnAvailable || !AdrenalineNatives.isAvailable(Feature.DENSITY)) {
+            return cellCountY;
+        }
+        try {
+            return firstAirCell0(program.bytecode(), program.length(), leftNear, leftFar, rightNear, rightFar, firstDryCell, cellCountY);
+        } catch (UnsatisfiedLinkError missing) {
+            airColumnAvailable = false;
+            return cellCountY;
+        } finally {
+            Reference.reachabilityFence(program);
+        }
     }
 
     public static boolean evaluate(NativeDensityProgram program, int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, double[] output) {
@@ -77,6 +94,9 @@ public final class NativeDensitySampler {
             NativeRuntimeStats.end(NativeRuntimeStats.Stage.DENSITY, startedNanos);
         }
     }
+
+    private static native int firstAirCell0(ByteBuffer program, int length, double[] leftNear, double[] leftFar,
+                                            double[] rightNear, double[] rightFar, int firstDryCell, int cellCountY);
 
     private static native boolean evaluateLattice0(ByteBuffer program, int length, ByteBuffer inputs, int inputCount, int x, int y, int z, int stepXz, int stepY, int width, int height, double[] output);
 
