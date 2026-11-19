@@ -3,7 +3,9 @@ const c = @import("../core/jni.zig").c;
 const core_limits = @import("../core/limits.zig");
 const core_math = @import("../core/math.zig");
 const core_vectors = @import("../core/vectors.zig");
+const noise_column_tile = @import("column_tile.zig");
 const noise_gradients = @import("gradients.zig");
+const noise_grid = @import("grid.zig");
 const noise_sampling = @import("sampling.zig");
 const noise_types = @import("types.zig");
 
@@ -236,6 +238,33 @@ pub fn blended_octaves_kernel(comptime avx2: bool, comptime kind: BlendedStack, 
             integer_y[i] = iy;
             adjusted_y[i] = fy - offset;
             fade_y[i] = core_math.smoothstep(fy);
+        }
+        if (avx2 and (cached or kind == .all) and raw_y.len >= 8 and raw_x.len * raw_z.len >= 4 and
+            @abs((raw_y[1] - raw_y[0]) * input_factor) <= 0.25 and noise_grid.grid_fractions_safe(adjusted_y[0..raw_y.len], true))
+        {
+            var integer_x: [core_limits.max_grid_axis]i32 = undefined;
+            var fraction_x: [core_limits.max_grid_axis]f64 = undefined;
+            var fade_x: [core_limits.max_grid_axis]f64 = undefined;
+            for (raw_x, 0..) |x, i| {
+                const shifted = (if (comptime no_wrap) x * input_factor - 0.0 else core_math.wrap(x * input_factor)) + core_math.read_f64(data, origin);
+                integer_x[i] = core_math.floor_int(shifted);
+                fraction_x[i] = shifted - @as(f64, @floatFromInt(integer_x[i]));
+                fade_x[i] = core_math.smoothstep(fraction_x[i]);
+            }
+            if (noise_column_tile.interior(fraction_x[0..raw_x.len]) and noise_column_tile.interior(fraction_z[0..raw_z.len])) {
+                noise_column_tile.accumulate(
+                    cached,
+                    &active_masks,
+                    permutation,
+                    .{ .cells = integer_x[0..raw_x.len], .fractions = fraction_x[0..raw_x.len], .fades = fade_x[0..raw_x.len] },
+                    .{ .cells = integer_y[0..raw_y.len], .fractions = adjusted_y[0..raw_y.len], .fades = fade_y[0..raw_y.len] },
+                    .{ .cells = integer_z[0..raw_z.len], .fractions = fraction_z[0..raw_z.len], .fades = fade_z[0..raw_z.len] },
+                    1.0,
+                    output_factor,
+                    outputs,
+                );
+                continue;
+            }
         }
         for (raw_x, 0..) |x, ix| {
             const shifted_x = (if (comptime no_wrap) x * input_factor - 0.0 else core_math.wrap(x * input_factor)) + core_math.read_f64(data, origin);

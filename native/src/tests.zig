@@ -2,6 +2,7 @@ pub const native_backend: @import("backend/options.zig").Options = .{ .instructi
 test {
     _ = @import("noise/sampling.zig");
     _ = @import("noise/gradients.zig");
+    _ = @import("noise/column_tile.zig");
     _ = @import("aquifer/selection.zig");
     _ = @import("aquifer/locate_tests.zig");
     _ = @import("density/fused.zig");

@@ -3,6 +3,7 @@ const core_limits = @import("../core/limits.zig");
 const core_math = @import("../core/math.zig");
 const core_vectors = @import("../core/vectors.zig");
 const noise_batch = @import("batch.zig");
+const noise_column_tile = @import("column_tile.zig");
 const noise_gradients = @import("gradients.zig");
 const noise_sampling = @import("sampling.zig");
 
@@ -128,6 +129,24 @@ pub fn perlin_value_grid_impl(comptime avx2: bool, comptime packed_corners: bool
             prepare_grid_axis(x, x_step, x_count, coordinate_scale, input_factor, core_math.read_f64(data, origin), integer_x[0..x_count], fraction_x[0..x_count], smooth_x[0..x_count]);
             prepare_grid_axis(y, y_step, y_count, coordinate_scale, input_factor, core_math.read_f64(data, origin + 8), integer_y[0..y_count], fraction_y[0..y_count], smooth_y[0..y_count]);
             prepare_grid_axis(z, z_step, z_count, coordinate_scale, input_factor, core_math.read_f64(data, origin + 16), integer_z[0..z_count], fraction_z[0..z_count], smooth_z[0..z_count]);
+            if (avx2 and x_count * z_count >= 4 and y_count >= 8 and @abs(y_step * coordinate_scale * input_factor) <= 0.25 and
+                noise_column_tile.interior(fraction_x[0..x_count]) and grid_fractions_safe(fraction_y[0..y_count], true) and noise_column_tile.interior(fraction_z[0..z_count]))
+            {
+                noise_column_tile.accumulate(
+                    false,
+                    &.{},
+                    permutation,
+                    .{ .cells = integer_x[0..x_count], .fractions = fraction_x[0..x_count], .fades = smooth_x[0..x_count] },
+                    .{ .cells = integer_y[0..y_count], .fractions = fraction_y[0..y_count], .fades = smooth_y[0..y_count] },
+                    .{ .cells = integer_z[0..z_count], .fractions = fraction_z[0..z_count], .fades = smooth_z[0..z_count] },
+                    amplitude,
+                    value_factor,
+                    values,
+                );
+                input_factor *= 2.0;
+                value_factor /= 2.0;
+                continue;
+            }
             if (comptime avx2 and packed_corners) {
                 if (y_count >= 9 and y_count % 4 == 1 and z_count >= 3 and x_count * y_count * z_count >= 256 and
                     @abs(y_step * coordinate_scale * input_factor) >= 0.25 and
