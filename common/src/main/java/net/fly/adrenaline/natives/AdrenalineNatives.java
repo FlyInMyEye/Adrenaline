@@ -88,6 +88,7 @@ public final class AdrenalineNatives {
         DENSITY("density evaluation", false),
         AQUIFER("aquifer sampling", false),
         SURFACE("surface rules", false),
+        CLIMATE("climate sampling", true),
         ORE_CANDIDATES("ore candidate batching", false);
 
         private final String description;
