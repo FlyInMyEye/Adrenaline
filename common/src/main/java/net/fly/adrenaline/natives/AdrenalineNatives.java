@@ -87,7 +87,8 @@ public final class AdrenalineNatives {
         BLENDED_NOISE("blended noise sampling", true),
         DENSITY("density evaluation", false),
         AQUIFER("aquifer sampling", false),
-        SURFACE("surface rules", false);
+        SURFACE("surface rules", false),
+        ORE_CANDIDATES("ore candidate batching", false);
 
         private final String description;
         private final boolean requiresNoiseData;

@@ -107,6 +107,7 @@ final class AdrenalineSettings {
         settings.add(toggle("oreTargetOptimizations", "ore_target_optimizations", Group.FEATURES, false, Impact.LOW, d -> d.oreTargetOptimizations, (d, v) -> d.oreTargetOptimizations = v).controlled(Optimization.ORE_TARGETS));
         settings.add(toggle("inlineGenerationTasks", "inline_generation_tasks", Group.SCHEDULING, false, Impact.MEDIUM, d -> d.inlineGenerationTasks, (d, v) -> d.inlineGenerationTasks = v).controlled(Optimization.INLINE_GENERATION_TASKS));
         if (BuildConfig.DEBUG) {
+            settings.add(toggle("oreCandidateBatching", "ore_candidate_batching", Group.FEATURES, false, Impact.HIGH, d -> d.oreCandidateBatching, (d, v) -> d.oreCandidateBatching = v).nativeBackend(Feature.ORE_CANDIDATES));
             settings.add(toggle("showThreadVisualizer", "show_thread_visualizer", Group.DIAGNOSTICS, false, Impact.LOW, d -> d.showThreadVisualizer, (d, v) -> d.showThreadVisualizer = v));
             settings.add(toggle("debugLogging", "debug_logging", Group.DIAGNOSTICS, false, Impact.LOW, d -> d.debugLogging, (d, v) -> d.debugLogging = v));
             settings.add(toggle("forceEasterEgg", "force_easter_egg", Group.DIAGNOSTICS, false, Impact.NONE, d -> d.forceEasterEgg, (d, v) -> d.forceEasterEgg = v));

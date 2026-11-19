@@ -11,7 +11,8 @@ public final class NativeRuntimeStats {
         new StageStats("Perlin"),
         new StageStats("Density"),
         new StageStats("Aquifer prepare"),
-        new StageStats("Aquifer final")
+        new StageStats("Aquifer final"),
+        new StageStats("Ore candidates")
     };
     private static final ThreadLocal<int[]> COUNTERS = ThreadLocal.withInitial(() -> new int[STAGES.length]);
 
@@ -67,7 +68,8 @@ public final class NativeRuntimeStats {
         PERLIN,
         DENSITY,
         AQUIFER_PREPARE,
-        AQUIFER_FINAL
+        AQUIFER_FINAL,
+        ORE_CANDIDATES
     }
 
     private static boolean debugBuild() {

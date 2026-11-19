@@ -7,6 +7,7 @@ import net.fly.adrenaline.compat.LightLoadCompat;
 import net.fly.adrenaline.compat.MixinPlatform;
 import net.fly.adrenaline.compat.NoiseChunkBytecodePatches;
 import net.fly.adrenaline.compat.OptimizationTakeoverDetector;
+import net.fly.adrenaline.compat.OreCandidateBytecode;
 import net.fly.adrenaline.compatdata.ModernFixCompat;
 import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
 import org.objectweb.asm.tree.ClassNode;
@@ -66,6 +67,9 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
+        if (BuildConfig.DEBUG) {
+            OreCandidateBytecode.apply(targetClass, mixinClassName);
+        }
         SurfaceRuleHooks.capture(targetClass);
         OptimizationTakeoverDetector.captureClaims(targetClass, mixinInfo);
         OptimizationTakeoverDetector.detectTakeovers(targetClass, MixinPlatform::mixinOwnerName);

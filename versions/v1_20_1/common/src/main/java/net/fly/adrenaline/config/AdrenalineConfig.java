@@ -631,6 +631,7 @@ public class AdrenalineConfig {
         public boolean nativeGeodeFiltering = true;
         public boolean paletteResizeOptimizations = true;
         public boolean oreTargetOptimizations = true;
+        public boolean oreCandidateBatching = true;
         public boolean nativeAquiferBatching = true;
         public int nativeSettingsVersion = 1;
         public int settingsVersion;
@@ -722,6 +723,7 @@ public class AdrenalineConfig {
             this.nativeGeodeFiltering = other.nativeGeodeFiltering;
             this.paletteResizeOptimizations = other.paletteResizeOptimizations;
             this.oreTargetOptimizations = other.oreTargetOptimizations;
+            this.oreCandidateBatching = other.oreCandidateBatching;
             this.nativeAquiferBatching = other.nativeAquiferBatching;
             this.nativeSettingsVersion = other.nativeSettingsVersion;
             this.settingsVersion = other.settingsVersion;
@@ -784,6 +786,7 @@ public class AdrenalineConfig {
             this.nativeGeodeFiltering = false;
             this.paletteResizeOptimizations = false;
             this.oreTargetOptimizations = false;
+            this.oreCandidateBatching = false;
             this.nativeAquiferBatching = false;
             this.fastLegacyRandom = false;
         }
