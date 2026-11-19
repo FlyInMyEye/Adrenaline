@@ -332,6 +332,7 @@ pub fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, densi
             const local_grid_x = cell_grid_x - min_grid_x;
             const local_grid_z = cell_grid_z - min_grid_z;
             var search: ?aquifer_selection.AquiferSearch = null;
+            var ranks: ?aquifer_selection.ColumnRanks = null;
             var fluid_bound_grid_y: i32 = std.math.minInt(i32);
             var maximum_fluid_level: i32 = std.math.minInt(i32);
             var uniform_fluid_type: i8 = 0;
@@ -394,21 +395,28 @@ pub fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, densi
                     continue;
                 }
 
-                if (search) |*cached| {
-                    if (cached.grid_y != grid_y or !aquifer_selection.advance_y_down(avx2, neon, cached, y)) {
-                        search = aquifer_selection.aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
+                if (avx2) {
+                    if (ranks == null or !ranks.?.contains(grid_y, y)) {
+                        const top = aquifer_selection.aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
+                        ranks = aquifer_selection.ColumnRanks.init(&top);
                     }
                 } else {
-                    search = aquifer_selection.aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
+                    if (search) |*cached| {
+                        if (cached.grid_y != grid_y or !aquifer_selection.advance_y_down(avx2, neon, cached, y)) {
+                            search = aquifer_selection.aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
+                        }
+                    } else {
+                        search = aquifer_selection.aquifer_search_cached(&center_cache, &center_valid, packed_locations, min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, cell_grid_x, grid_y, cell_grid_z, x, y, z) orelse return null;
+                    }
                 }
                 if (uniform_fluid_type == 2 or uniform_fluid_type == 3) {
-                    const distances = search.?.nearest_two_distances(avx2);
+                    const distances = if (avx2) ranks.?.nearest_two_distances(y) else search.?.nearest_two_distances(false);
                     const similarity = aquifer_material.aquifer_similarity(distances[0], distances[1]);
                     const fluid: u8 = if (y >= maximum_fluid_level) 1 else @intCast(uniform_fluid_type);
                     materials[index] = @intCast(fluid | if (similarity >= -0.76) @as(u8, 4) else @as(u8, 0));
                     continue;
                 }
-                const candidates = search.?.candidates();
+                const candidates = if (avx2) ranks.?.candidates(y) else search.?.candidates();
                 const nearest_type = aquifer_material.aquifer_type_at(fluid_levels[candidates.nearest_index], fluid_types[candidates.nearest_index], y) orelse return null;
                 const second_type = aquifer_material.aquifer_type_at(fluid_levels[candidates.second_index], fluid_types[candidates.second_index], y) orelse return null;
                 const third_type = aquifer_material.aquifer_type_at(fluid_levels[candidates.third_index], fluid_types[candidates.third_index], y) orelse return null;
