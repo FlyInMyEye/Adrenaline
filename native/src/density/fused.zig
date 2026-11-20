@@ -152,6 +152,10 @@ pub fn evaluate_terrain_prefix(program: []const u8, height: usize, terrain: []c.
 }
 
 pub fn evaluate_terrain_impl(comptime prefix: bool, comptime fixed_height: bool, comptime constant_terrain: bool, comptime branch: density_bounds.TerrainChoice, program: []const u8, requested_height: usize, output: []c.jdouble, noodle_output: []c.jdouble) void {
+    evaluate_terrain_rows(prefix, fixed_height, constant_terrain, branch, program, requested_height, output, noodle_output, {});
+}
+
+pub fn evaluate_terrain_rows(comptime prefix: bool, comptime fixed_height: bool, comptime constant_terrain: bool, comptime branch: density_bounds.TerrainChoice, program: []const u8, requested_height: usize, output: []c.jdouble, noodle_output: []c.jdouble, overlay: anytype) void {
     @setFloatMode(.strict);
     const height = if (fixed_height) 8 else requested_height;
     const ridge_choice: u8 = if (backend_options.is_simd_backend and !prefix and branch != .inside and branch != .inside_high) density_bounds.terrain_ridge_dominant(program) else 0;
@@ -165,7 +169,7 @@ pub fn evaluate_terrain_impl(comptime prefix: bool, comptime fixed_height: bool,
     const ridge_scale: core_vectors.Vec4 = @splat(density_read.density_program_value(program, 349));
     const minimum: core_vectors.Vec4 = @splat(density_read.density_program_value(program, 360));
     const maximum: core_vectors.Vec4 = @splat(density_read.density_program_value(program, 368));
-    const offset: core_vectors.Vec4 = @splat(if (prefix) 0.0 else density_read.density_program_value(program, 378));
+    const offset: core_vectors.Vec4 = @splat(if (prefix or @TypeOf(overlay) != void) 0.0 else density_read.density_program_value(program, 378));
     const low: core_vectors.Vec4 = @splat(-1.0);
     const high: core_vectors.Vec4 = @splat(1.0);
     const fixed_squeezed: core_vectors.Vec4 = if (constant_terrain) block: {
@@ -213,6 +217,8 @@ pub fn evaluate_terrain_impl(comptime prefix: bool, comptime fixed_height: bool,
                     output[index] = squeezed[z];
                     noodle_output[index] = noodle[z];
                 }
+            } else if (@TypeOf(overlay) != void) {
+                overlay.write(branch == .inside_high, squeezed, noodle, y, x, ((height - 1 - y) * 4 + x) * 4, output);
             } else {
                 const result = (if (branch == .inside_high) squeezed else density_math.density_min4_finite(squeezed, noodle)) + offset;
                 const row = ((height - 1 - y) * 4 + x) * 4;

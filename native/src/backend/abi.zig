@@ -31,6 +31,8 @@ pub extern fn adrenaline_fused_terrain_avx2(program: [*]const u8, height: usize,
 
 pub extern fn adrenaline_fused_ridge_avx2(program: [*]const u8, height: usize, output: [*]c.jdouble) callconv(.c) void;
 
+pub extern fn adrenaline_terrain_overlay_avx2(program: [*]const u8, length: usize, y: i32, inputs: [*]const f64, input_length: usize, output: [*]f64) callconv(.c) c.jint;
+
 pub extern fn adrenaline_terrain_prefix_avx2(program: [*]const u8, height: usize, terrain: [*]c.jdouble, noodle: [*]c.jdouble) callconv(.c) void;
 
 pub extern fn adrenaline_preliminary_height_avx2(program: [*]const u8, program_length: usize, inputs: [*]const f64, input_length: usize, slots: usize, x: c.jint, z: c.jint, min_y: c.jint, max_y: c.jint, step: c.jint) callconv(.c) c.jint;

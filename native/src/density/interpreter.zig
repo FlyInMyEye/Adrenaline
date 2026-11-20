@@ -44,6 +44,7 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
     var interpolation_width: [@max(4, capacity)]f64 = undefined;
     var interpolation_height: [capacity]f64 = undefined;
     var interpolation_ready = false;
+    var cell_noise: if (fixed_cell) @import("cell_noise.zig").CellNoise else void = if (fixed_cell) .{} else {};
     var call_frames: [core_limits.max_density_stack]density_frames.DensityCallFrame = undefined;
     var call_count: usize = 0;
     var stack_size: usize = 0;
@@ -94,6 +95,7 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                 if (stack_size >= core_limits.max_density_stack) {
                     return false;
                 }
+                const operand_start = program_counter;
                 const first_address = density_read.read_program_u64(program, &program_counter) orelse return false;
                 const first_octaves = density_read.read_program_u32(program, &program_counter) orelse return false;
                 const second_address = density_read.read_program_u64(program, &program_counter) orelse return false;
@@ -106,11 +108,17 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                 }
                 const first: [*]const u8 = @ptrFromInt(@as(usize, @intCast(first_address)));
                 const second: [*]const u8 = @ptrFromInt(@as(usize, @intCast(second_address)));
+                const remember = fixed_cell and y_scale == 0.0;
+                if (remember and cell_noise.find(program[operand_start..program_counter], stack[stack_size][0..total])) {
+                    stack_size += 1;
+                    continue;
+                }
                 if (slice and width == 1) {
                     density_noise.density_normal_noise_slice(.{ .first = first, .first_octaves = first_octaves, .second = second, .second_octaves = second_octaves, .factor = value_factor }, base_x, base_y, base_z, step_y, xz_scale, y_scale, stack[stack_size][0..total]);
                 } else {
                     density_noise.density_normal_noise_grid(first, first_octaves, second, second_octaves, value_factor, @as(f64, @floatFromInt(base_x)) * xz_scale, @as(f64, @floatFromInt(base_y)) * y_scale, @as(f64, @floatFromInt(base_z)) * xz_scale, xz_scale * @as(f64, @floatFromInt(step_xz)), y_scale * @as(f64, @floatFromInt(step_y)), width, height, stack[stack_size][0..total]);
                 }
+                if (remember) cell_noise.remember(program[operand_start..program_counter], stack[stack_size][0..total]);
                 stack_size += 1;
             },
             2 => {
@@ -496,11 +504,17 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
             },
             23 => {
                 if (stack_size < 3) return false;
+                const operand_start = program_counter;
                 const height_independent = density_read.read_program_u8(program, &program_counter) orelse return false;
                 if (height_independent > 1) return false;
                 const noise = density_noise.DensityNoise.read(program, &program_counter) orelse return false;
                 const xz_scale = density_read.read_program_f64(program, &program_counter) orelse return false;
                 const y_scale = density_read.read_program_f64(program, &program_counter) orelse return false;
+                const remember = fixed_cell and height_independent == 1;
+                if (remember and cell_noise.findShifted(program[operand_start..program_counter], .{ &stack[stack_size - 3], &stack[stack_size - 2], &stack[stack_size - 1] }, &stack[stack_size - 3])) {
+                    stack_size -= 2;
+                    continue;
+                }
                 for (0..width) |x| {
                     for (0..width) |z| {
                         for (0..if (height_independent == 1) @as(usize, 1) else height) |y| {
@@ -516,6 +530,7 @@ fn evaluate_density_grid(comptime capacity: usize, comptime fixed_cell: bool, co
                         }
                     }
                 }
+                if (remember) cell_noise.rememberShifted(program[operand_start..program_counter], &stack[stack_size - 3]);
                 stack_size -= 2;
             },
             24 => {
