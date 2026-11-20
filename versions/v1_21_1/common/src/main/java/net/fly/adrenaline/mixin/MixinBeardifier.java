@@ -142,6 +142,29 @@ public abstract class MixinBeardifier implements AdrenalineCompiledBeardifierAcc
     }
 
     @Override
+    public long adrenaline$firstClearY() {
+        this.adrenaline$initCaches();
+        long firstClearY = Long.MIN_VALUE;
+        for (Beardifier.Rigid piece : this.adrenaline$pieces) {
+            BoundingBox box = piece.box();
+            long groundY = (long) box.minY() + piece.groundLevelDelta();
+            if (Math.abs(groundY) >= 0x10000000L || Math.abs((long) box.maxY()) >= 0x10000000L
+                || Math.abs((long) box.minY()) >= 0x10000000L) {
+                return Long.MAX_VALUE;
+            }
+            firstClearY = Math.max(firstClearY, Math.max(groundY, box.maxY()) + Beardifier.BEARD_KERNEL_RADIUS);
+        }
+        for (JigsawJunction junction : this.adrenaline$junctions) {
+            int groundY = junction.getSourceGroundY();
+            if (Math.abs((long) groundY) >= 0x10000000L) {
+                return Long.MAX_VALUE;
+            }
+            firstClearY = Math.max(firstClearY, (long) groundY + Beardifier.BEARD_KERNEL_RADIUS);
+        }
+        return firstClearY;
+    }
+
+    @Override
     public boolean adrenaline$isEmpty() {
         this.adrenaline$initCaches();
         return this.adrenaline$pieces.length == 0 && this.adrenaline$junctions.length == 0;

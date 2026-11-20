@@ -62,7 +62,7 @@ public final class NativeDensityProgramCompiler {
                 }
                 builder.code.put(NativeDensityProgram.COLUMN_RETURN);
             }
-            return new Result(new NativeDensityProgram(builder.code.finish(), builder.keepAlive.toArray(), builder.interpolators.toArray(NativeDensityProgram.InterpolatorBinding[]::new), builder.inputs.toArray(DensityFunction[]::new), builder.emptyBlender, builder.columnCaches.size()), null);
+            return new Result(new NativeDensityProgram(root, builder.code.finish(), builder.keepAlive.toArray(), builder.interpolators.toArray(NativeDensityProgram.InterpolatorBinding[]::new), builder.inputs.toArray(DensityFunction[]::new), builder.emptyBlender, builder.columnCaches.size()), null);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return new Result(null, builder.rejection == null ? root.getClass().getName() : builder.rejection);
         }

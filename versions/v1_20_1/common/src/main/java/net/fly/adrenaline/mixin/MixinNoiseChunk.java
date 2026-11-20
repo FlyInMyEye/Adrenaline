@@ -318,6 +318,9 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
         this.arrayInterpolationCounter++;
     }
 
+    @Unique private boolean adrenaline$checkSectionAir;
+    @Unique private boolean adrenaline$sectionAir;
+
     @Unique
     private void adrenaline$fillCellCaches() {
         this.arrayInterpolationCounter++;
@@ -329,6 +332,13 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             CellDensityEvaluator evaluator = evaluators[i];
             if (evaluator == null) {
                 cache.adrenaline$getNoiseFiller().fillArray(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
+            } else if (this.adrenaline$checkSectionAir && i == cellCacheArray.length - 1
+                && evaluator instanceof NativeCellDensityEvaluator compiled) {
+                if (compiled.fillSection(cache.adrenaline$getValues(), (NoiseChunk) (Object) this, true)) {
+                    this.adrenaline$sectionAir = true;
+                    this.arrayInterpolationCounter++;
+                    return;
+                }
             } else {
                 evaluator.fill(cache.adrenaline$getValues(), (NoiseChunk) (Object) this);
             }
@@ -360,12 +370,24 @@ public abstract class MixinNoiseChunk implements AdrenalineNoiseChunkCoordinateA
             return null;
         }
         CellDensityEvaluator[] evaluators = this.adrenaline$cellDensityEvaluators(caches);
-        for (CellDensityEvaluator evaluator : evaluators) {
-            if (!(evaluator instanceof NativeCellDensityEvaluator compiled) || compiled.program().inputCount() != 0) {
+        for (int i = 0; i < evaluators.length - 1; i++) {
+            if (!(evaluators[i] instanceof NativeCellDensityEvaluator compiled) || compiled.program().inputCount() != 0) {
                 return null;
             }
         }
-        return ((NativeCellDensityEvaluator) evaluators[caches.length - 1]).program();
+        return evaluators[caches.length - 1] instanceof NativeCellDensityEvaluator compiled ? compiled.program() : null;
+    }
+
+    @Override
+    public boolean adrenaline$selectSectionCell(int cellY, int cellZ) {
+        this.adrenaline$checkSectionAir = true;
+        try {
+            ((NoiseChunk) (Object) this).selectCellYZ(cellY, cellZ);
+            return this.adrenaline$sectionAir;
+        } finally {
+            this.adrenaline$checkSectionAir = false;
+            this.adrenaline$sectionAir = false;
+        }
     }
 
     @Override

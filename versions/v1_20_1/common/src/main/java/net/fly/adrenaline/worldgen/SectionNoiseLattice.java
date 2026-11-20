@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinNoiseInterpolatorView;
 import net.fly.adrenaline.natives.NativeDensitySampler;
+import net.minecraft.world.level.levelgen.DensityFunction;
 
 public final class SectionNoiseLattice implements AutoCloseable {
 
@@ -54,13 +55,32 @@ public final class SectionNoiseLattice implements AutoCloseable {
         }
     }
 
-    int[] firstAirCells(NativeDensityProgram program, AdrenalineNativeAquiferAccess aquifer, int baseX, int baseZ,
+    AirCells airCells(NativeDensityProgram program, AdrenalineNativeAquiferAccess aquifer, int baseX, int baseZ,
                         int minCellY, int cellCountY) {
         int[] firstAirCells = new int[16];
         Arrays.fill(firstAirCells, cellCountY);
-        AdrenalineNativeInterpolatorAccess terrain = program == null ? null : program.firstTerrainInterpolator();
+        if (program == null) {
+            return new AirCells(firstAirCells, null);
+        }
+        AdrenalineNativeInterpolatorAccess terrain = program.firstTerrainInterpolator();
         if (terrain == null) {
-            return firstAirCells;
+            DensityFunction beforeInput = program.terrainBeforeInput();
+            boolean checkInput = beforeInput != null;
+            CellDensityBounds.Bound density = CellDensityBounds.compile(checkInput ? beforeInput : program.root(), this.interpolators);
+            if (density == null) {
+                return new AirCells(firstAirCells, null);
+            }
+            int[] firstCandidates = checkInput ? new int[16] : firstAirCells;
+            double ceiling = checkInput ? -2.0D * CellDensityBounds.INPUT_LIMIT : CellDensityBounds.AIR_LIMIT;
+            for (int x = 0; x < 4; x++) {
+                for (int z = 0; z < 4; z++) {
+                    int firstDry = aquifer.adrenaline$firstDryCell(baseX + x * 4, baseZ + z * 4, minCellY, cellCountY);
+                    firstCandidates[x * 4 + z] = firstDry < cellCountY
+                        ? CellDensityBounds.firstAirCell(density, this.slices, x, z, minCellY, firstDry, cellCountY, ceiling)
+                        : cellCountY;
+                }
+            }
+            return new AirCells(firstAirCells, checkInput ? firstCandidates : null);
         }
         for (int i = 0; i < this.interpolators.length; i++) {
             if (this.interpolators[i] != terrain) {
@@ -77,8 +97,10 @@ public final class SectionNoiseLattice implements AutoCloseable {
             }
             break;
         }
-        return firstAirCells;
+        return new AirCells(firstAirCells, null);
     }
+
+    record AirCells(int[] unconditional, int[] needsInput) { }
 
     public void select(int cellX) {
         for (int i = 0; i < this.interpolators.length; i++) {

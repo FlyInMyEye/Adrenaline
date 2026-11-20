@@ -6,5 +6,7 @@ public interface AdrenalineSectionNoiseAccess {
 
     NativeDensityProgram adrenaline$sectionDensityProgram();
 
+    boolean adrenaline$selectSectionCell(int cellY, int cellZ);
+
     void adrenaline$setSectionCellX(int cellX);
 }
