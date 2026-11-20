@@ -8,6 +8,8 @@ import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.natives.AdrenalineNatives;
 import net.fly.adrenaline.natives.NativeClimateSampler;
 import net.minecraft.core.QuartPos;
+import net.minecraft.util.CubicSpline;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.DensityFunctions;
@@ -27,6 +29,7 @@ public final class StreamsClimateCache {
     private final boolean[] valid = new boolean[SIZE];
     private final float[] samples = new float[SIZE * 6];
     private int cacheable;
+    private DepthSampler depthSampler;
     private boolean active;
     private boolean sampling;
     private boolean nativePlanInitialized;
@@ -68,8 +71,9 @@ public final class StreamsClimateCache {
                 | (cacheable(sampler.erosion(), known, 0) ? 8 : 0)
                 | (cacheable(sampler.depth(), known, 0) ? 16 : 0)
                 | (cacheable(sampler.weirdness(), known, 0) ? 32 : 0);
+            this.depthSampler = (this.cacheable & 16) == 0 ? depthSampler(sampler.depth(), known, new IdentityHashMap<>(), true, 0) : null;
         }
-        if (this.cacheable == 0) {
+        if (this.cacheable == 0 && this.depthSampler == null) {
             return null;
         }
 
@@ -86,7 +90,8 @@ public final class StreamsClimateCache {
             float humidity = this.value(sampler.humidity(), point, base + 1, 2, ready);
             float continentalness = this.value(sampler.continentalness(), point, base + 2, 4, ready);
             float erosion = this.value(sampler.erosion(), point, base + 3, 8, ready);
-            float depth = this.value(sampler.depth(), point, base + 4, 16, ready);
+            float depth = this.depthSampler == null ? this.value(sampler.depth(), point, base + 4, 16, ready)
+                : (float) this.depthSampler.sample(point, slot);
             float weirdness = this.value(sampler.weirdness(), point, base + 5, 32, ready);
             this.keys[slot] = key;
             this.valid[slot] = true;
@@ -120,6 +125,89 @@ public final class StreamsClimateCache {
         return value;
     }
 
+    private static @Nullable DepthSampler depthSampler(
+        DensityFunction function, IdentityHashMap<DensityFunction, Boolean> known,
+        IdentityHashMap<DensityFunction, DepthSampler> offsets, boolean allowRange, int depth
+    ) {
+        if (depth > 24 || SurfacePipelineCompatibility.hasForeignHooks(function.getClass())) {
+            return null;
+        }
+        if (function.getClass() == MARKER) {
+            return depthSampler(((DensityFunctions.MarkerOrMarked) function).wrapped(), known, offsets, allowRange, depth + 1);
+        }
+        if (function instanceof DensityFunctions.HolderHolder holder) {
+            return depthSampler(holder.function().value(), known, offsets, allowRange, depth + 1);
+        }
+        if (function instanceof AdrenalineClampFunctionAccess clamp) {
+            DepthSampler input = depthSampler(clamp.adrenaline$clampInput(), known, offsets, allowRange, depth + 1);
+            double min = clamp.adrenaline$clampMin();
+            double max = clamp.adrenaline$clampMax();
+            return input == null ? null : (point, slot) -> Mth.clamp(input.sample(point, slot), min, max);
+        }
+        if (allowRange && function instanceof AdrenalineRangeChoiceAccess range
+            && range.adrenaline$rangeInput() instanceof AdrenalineYGradientAccess
+            && !SurfacePipelineCompatibility.hasForeignHooks(range.adrenaline$rangeInput().getClass())) {
+            DepthSampler in = depthSampler(range.adrenaline$whenInRange(), known, offsets, false, depth + 1);
+            DepthSampler out = depthSampler(range.adrenaline$whenOutOfRange(), known, offsets, false, depth + 1);
+            if (in == null || out == null) {
+                return null;
+            }
+            var input = range.adrenaline$rangeInput();
+            double min = range.adrenaline$minInclusive();
+            double max = range.adrenaline$maxExclusive();
+            return (point, slot) -> {
+                double value = input.compute(point);
+                return (value >= min && value < max ? in : out).sample(point, slot);
+            };
+        }
+        if (function instanceof AdrenalineMulOrAddAccess transform) {
+            try {
+                if (DensityFunctionOperation.ordinal(function) == 1) {
+                    DepthSampler input = depthSampler(transform.adrenaline$transformInput(), known, offsets, allowRange, depth + 1);
+                    double argument = transform.adrenaline$transformArgument();
+                    return input == null ? null : (point, slot) -> input.sample(point, slot) + argument;
+                }
+            } catch (IllegalAccessException | RuntimeException ignored) {
+                return null;
+            }
+        }
+        if (function instanceof AdrenalineBinaryFunctionAccess binary
+            && binary.adrenaline$firstArgument() instanceof AdrenalineYGradientAccess
+            && !SurfacePipelineCompatibility.hasForeignHooks(binary.adrenaline$firstArgument().getClass())
+            && cacheable(binary.adrenaline$secondArgument(), known, depth + 1)) {
+            try {
+                if (DensityFunctionOperation.ordinal(function) == 0) {
+                    var gradient = binary.adrenaline$firstArgument();
+                    DepthSampler offset = offsets.computeIfAbsent(binary.adrenaline$secondArgument(), StreamsClimateCache::columnSampler);
+                    return (point, slot) -> gradient.compute(point) + offset.sample(point, slot);
+                }
+            } catch (IllegalAccessException | RuntimeException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static DepthSampler columnSampler(DensityFunction function) {
+        var values = new double[SIZE];
+        var keys = new long[SIZE];
+        var valid = new boolean[SIZE];
+        return (point, slot) -> {
+            long key = ((long) point.blockX() << 32) | (point.blockZ() & 0xffffffffL);
+            if (!valid[slot] || keys[slot] != key) {
+                values[slot] = function.compute(point);
+                keys[slot] = key;
+                valid[slot] = true;
+            }
+            return values[slot];
+        };
+    }
+
+    @FunctionalInterface
+    private interface DepthSampler {
+        double sample(DensityFunction.FunctionContext point, int slot);
+    }
+
     private static boolean cacheable(DensityFunction function, IdentityHashMap<DensityFunction, Boolean> known, int depth) {
         if (depth > 48 || known.size() > 512) {
             return false;
@@ -134,7 +222,8 @@ public final class StreamsClimateCache {
     }
 
     private static boolean inspect(DensityFunction function, IdentityHashMap<DensityFunction, Boolean> known, int depth) {
-        if (function instanceof AdrenalineConstantFunctionAccess) {
+        if (function instanceof AdrenalineConstantFunctionAccess
+            || function == DensityFunctions.blendAlpha() || function == DensityFunctions.blendOffset()) {
             return true;
         }
         if (function instanceof AdrenalineMulOrAddAccess transform) {
@@ -153,6 +242,17 @@ public final class StreamsClimateCache {
         if (function.getClass() == MARKER) {
             return cacheable(((DensityFunctions.MarkerOrMarked) function).wrapped(), known, depth);
         }
+        if (function instanceof DensityFunctions.HolderHolder holder) {
+            return cacheable(holder.function().value(), known, depth);
+        }
+        if (function instanceof AdrenalineRangeChoiceAccess range) {
+            return cacheable(range.adrenaline$rangeInput(), known, depth)
+                && cacheable(range.adrenaline$whenInRange(), known, depth)
+                && cacheable(range.adrenaline$whenOutOfRange(), known, depth);
+        }
+        if (function instanceof DensityFunctions.Spline spline) {
+            return cacheableSpline(spline.spline(), known, depth);
+        }
         if (function instanceof AdrenalineNoiseFunctionAccess noise) {
             return Double.doubleToRawLongBits(noise.adrenaline$getYScale()) == 0L && unmodifiedNoise();
         }
@@ -161,19 +261,41 @@ public final class StreamsClimateCache {
             && noise.adrenaline$getShiftY() instanceof AdrenalineConstantFunctionAccess constant
             && Double.doubleToRawLongBits(constant.adrenaline$getConstantValue()) == 0L
             && !SurfacePipelineCompatibility.hasForeignHooks(constant.getClass())
-            && isShift(noise.adrenaline$getShiftX(), 1) && isShift(noise.adrenaline$getShiftZ(), 2)
+            && isColumnShift(noise.adrenaline$getShiftX(), 1) && isColumnShift(noise.adrenaline$getShiftZ(), 2)
             && unmodifiedNoise();
     }
 
-    private static boolean isShift(DensityFunction function, int kind) {
+    private static boolean cacheableSpline(CubicSpline<DensityFunctions.Spline.Point, DensityFunctions.Spline.Coordinate> spline,
+        IdentityHashMap<DensityFunction, Boolean> known, int depth) {
+        if (depth > 48 || SurfacePipelineCompatibility.hasForeignHooks(spline.getClass())) {
+            return false;
+        }
+        if (spline instanceof CubicSpline.Constant<?, ?>) {
+            return true;
+        }
+        if (!(spline instanceof CubicSpline.Multipoint<DensityFunctions.Spline.Point, DensityFunctions.Spline.Coordinate> multipoint)
+            || SurfacePipelineCompatibility.hasForeignHooks(multipoint.coordinate().getClass())
+            || !cacheable(multipoint.coordinate().function().value(), known, depth + 1)) {
+            return false;
+        }
+        for (var value : multipoint.values()) {
+            if (!cacheableSpline(value, known, depth + 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isColumnShift(DensityFunction function, int kind) {
         if (function.getClass() == MARKER) {
             if (SurfacePipelineCompatibility.hasForeignHooks(MARKER)) {
                 return false;
             }
             function = ((DensityFunctions.MarkerOrMarked) function).wrapped();
         }
-        return function instanceof AdrenalineShiftNoiseAccess noise && noise.adrenaline$getShiftKind() == kind
-            && !SurfacePipelineCompatibility.hasForeignHooks(function.getClass());
+        return !SurfacePipelineCompatibility.hasForeignHooks(function.getClass())
+            && (function instanceof AdrenalineConstantFunctionAccess
+                || function instanceof AdrenalineShiftNoiseAccess noise && noise.adrenaline$getShiftKind() == kind);
     }
 
     private static boolean unmodifiedNoise() {
