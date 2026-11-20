@@ -1,6 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8",
+  "mixinextras": { "minVersion": "0.5.0-beta.1" },
   "package": "net.fly.adrenaline.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
@@ -79,6 +80,8 @@
     "MixinProtoChunkHeightmaps",
     "MixinLevelChunkSectionAccessor",
     "MixinClimateParameterList",
+    "MixinClimateRTree",
+    "MixinClimatePositionalSearch",
     "MixinStreamsClimateSampler",
     "MixinStreamsWorldGenRegion",
     "MixinSurfaceSystem",
