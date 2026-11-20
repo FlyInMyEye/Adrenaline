@@ -18,12 +18,14 @@ public final class NativeSurfaceSampler {
         if (!available() || program.address() == 0L || inputAddress == 0L || outputAddress == 0L || cacheAddress == 0L) {
             return -1;
         }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.SURFACE);
         try {
             return columnAddress5(program.address(), program.length(), inputAddress, outputAddress, cacheAddress, count, x, z);
         } catch (LinkageError | RuntimeException exception) {
             AdrenalineNatives.disable(Feature.SURFACE, exception);
             return -1;
         } finally {
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.SURFACE, startedNanos);
             Reference.reachabilityFence(input);
             Reference.reachabilityFence(output);
             Reference.reachabilityFence(cache);

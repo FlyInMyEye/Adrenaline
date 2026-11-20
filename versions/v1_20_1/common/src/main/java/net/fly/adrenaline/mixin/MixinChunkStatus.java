@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -107,15 +108,15 @@ public class MixinChunkStatus {
         if ((Object) this == ChunkStatus.FEATURES && AdrenalineConfig.parallelWorldgenEnabled() && AdrenalineConfig.parallelChunkStatusEnabled(status)) {
             return scheduleFeature(original, status, executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks, centerChunk);
         }
-        long startedNanos = BuildConfig.DEBUG && status != ChunkStatus.FULL ? WorldgenStageStats.beginStage(centerChunk.getPos(), status) : 0L;
+        if (BuildConfig.DEBUG && status != ChunkStatus.FULL) {
+            return WorldgenStageStats.track(status, centerChunk.getPos(),
+                () -> original.call(executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks));
+        }
         CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = original.call(executor, level, generator, structureTemplateManager, lightEngine, fullChunkConverter, chunks);
         if (status == ChunkStatus.FULL && WorldgenChunkPreview.isActive()) {
             future.thenAccept(result ->
                 result.left().ifPresent(chunk -> WorldgenChunkPreview.capture(level, chunk))
             );
-        }
-        if (BuildConfig.DEBUG && status != ChunkStatus.FULL) {
-            return WorldgenStageStats.track(status, centerChunk.getPos(), startedNanos, future);
         }
         return future;
     }
@@ -153,8 +154,7 @@ public class MixinChunkStatus {
         String debugLabel = centerPos.x + "," + centerPos.z + " status=" + status + " footprint=" + summarizeFootprint(footprint);
 
         ChunkJob job = new ChunkJob(footprint, () -> {
-            long startedNanos = BuildConfig.DEBUG ? WorldgenStageStats.beginStage(centerPos, status) : 0L;
-            CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future = original.call(
+            Supplier<CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>>> task = () -> original.call(
                 executor,
                 level,
                 generator,
@@ -163,9 +163,8 @@ public class MixinChunkStatus {
                 fullChunkConverter,
                 chunks
             );
-            if (BuildConfig.DEBUG) {
-                WorldgenStageStats.track(status, centerPos, startedNanos, future);
-            }
+            CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future =
+                BuildConfig.DEBUG ? WorldgenStageStats.track(status, centerPos, task) : task.get();
             future.whenComplete((value, throwable) -> {
                 if (throwable != null) {
                     result.completeExceptionally(throwable);

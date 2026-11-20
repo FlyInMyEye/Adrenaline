@@ -1,6 +1,5 @@
 package net.fly.adrenaline.mixin;
 
-import java.util.Locale;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.StageTiming;
@@ -29,7 +28,7 @@ public abstract class MixinPauseScreen {
             output.append(' ')
                 .append(timing.name().trim())
                 .append('=')
-                .append(String.format(Locale.ROOT, "%.3fms", timing.averageNanos() / 1_000_000.0D));
+                .append(timing.formatDuration());
         }
         GlobalCommon.LOGGER.info("{}", output);
     }

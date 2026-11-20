@@ -3,7 +3,6 @@ package net.fly.adrenaline.client;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -91,16 +90,17 @@ public final class WorldgenStatsOverlay {
 
         List<String> lines = new ArrayList<>(timings.size());
         for (StageTiming timing : timings) {
-            double milliseconds = timing.averageNanos() / 1_000_000.0D;
             String name = displayName(timing.name());
+            String label = name + " ".repeat(Math.max(1, 21 - name.length()));
+            String duration = timing.formatDuration();
             if (isWaitingTiming(timing.name())) {
-                lines.add(String.format(Locale.ROOT, "%-20s %.3fms", name, milliseconds));
+                lines.add(label + duration);
                 continue;
             }
             int bars = timing.averageNanos() == 0L || maxNanos == 0L
                 ? 0
                 : Math.max(1, (int) Math.round((double) timing.averageNanos() * MAX_BARS / maxNanos));
-            lines.add(String.format(Locale.ROOT, "%-20s %s %.3fms", name, "|".repeat(bars), milliseconds));
+            lines.add(label + "|".repeat(bars) + " " + duration);
         }
         return lines;
     }

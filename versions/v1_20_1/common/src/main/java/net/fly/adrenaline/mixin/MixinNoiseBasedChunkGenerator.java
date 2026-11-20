@@ -10,6 +10,7 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.natives.NativeRuntimeStats;
 import net.fly.adrenaline.util.WorldgenStageStats;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseProfile;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseSubstage;
@@ -76,7 +77,8 @@ public class MixinNoiseBasedChunkGenerator {
         if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
-        return CompletableFuture.supplyAsync(ChunkJob.trackExecution(supplier), executor);
+        Supplier<T> tracked = BuildConfig.DEBUG ? NativeRuntimeStats.wrapStageTask(supplier) : supplier;
+        return CompletableFuture.supplyAsync(ChunkJob.trackExecution(tracked), executor);
     }
 
     @Redirect(
@@ -91,7 +93,8 @@ public class MixinNoiseBasedChunkGenerator {
         if (AdrenalineConfig.inlineTerrainFillTasks() && executor == Util.backgroundExecutor()) {
             return CompletableFuture.completedFuture(supplier.get());
         }
-        return CompletableFuture.supplyAsync(ChunkJob.trackExecution(supplier), executor);
+        Supplier<T> tracked = BuildConfig.DEBUG ? NativeRuntimeStats.wrapStageTask(supplier) : supplier;
+        return CompletableFuture.supplyAsync(ChunkJob.trackExecution(tracked), executor);
     }
 
     @Redirect(
