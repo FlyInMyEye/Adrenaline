@@ -79,13 +79,18 @@ public final class NativeAquiferSampler {
 
     public static boolean prepareContext(ByteBuffer context, double[] densityValues, long[] candidates, int globalFluidLevel, byte globalFluidType,
                                          int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, int[] deferredIndices, int[] deferredCount, byte[] output) {
-        if (!AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
+        if (deferredCount == null || deferredCount.length == 0 || !AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
             return false;
         }
         long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.AQUIFER_PREPARE);
         try {
-            return prepareContext0(context, densityValues, candidates, globalFluidLevel, globalFluidType,
-                baseX, baseY, baseZ, cellWidth, cellHeight, deferredIndices, deferredCount, output);
+            int count = prepareContextResult0(context, densityValues, candidates, globalFluidLevel, globalFluidType,
+                baseX, baseY, baseZ, cellWidth, cellHeight, deferredIndices, output);
+            if (count < 0) {
+                return false;
+            }
+            deferredCount[0] = count;
+            return true;
         } catch (LinkageError | RuntimeException exception) {
             AdrenalineNatives.disable(Feature.AQUIFER, exception);
             return false;
@@ -126,6 +131,6 @@ public final class NativeAquiferSampler {
     private static native boolean createContext0(ByteBuffer context, short[] packedLocations, int[] fluidLevels, byte[] fluidTypes,
                                                 int minGridX, int minGridY, int minGridZ, int gridSizeX, int gridSizeZ);
 
-    private static native boolean prepareContext0(ByteBuffer context, double[] densityValues, long[] candidates, int globalFluidLevel, byte globalFluidType,
-                                                 int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, int[] deferredIndices, int[] deferredCount, byte[] output);
+    private static native int prepareContextResult0(ByteBuffer context, double[] densityValues, long[] candidates, int globalFluidLevel, byte globalFluidType,
+                                                    int baseX, int baseY, int baseZ, int cellWidth, int cellHeight, int[] deferredIndices, byte[] output);
 }
