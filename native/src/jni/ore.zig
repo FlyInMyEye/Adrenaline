@@ -1,4 +1,5 @@
 const c = @import("../core/jni.zig").c;
+const feature_output = @import("feature_output.zig");
 const Vec = @Vector(4, f64);
 threadlocal var visited: [40 * 40]u64 = undefined;
 
@@ -8,14 +9,14 @@ fn collect0(env: ?*c.JNIEnv, _: c.jclass, balls_array: c.jdoubleArray, count: c.
     if (@abs(@as(i64, origin_x)) > 30_001_000 or @abs(@as(i64, origin_z)) > 30_001_000 or
         @abs(@as(i64, origin_y)) > 65_536 or min_y < -65_536 or max_y > 65_536 or max_y <= min_y) return -1;
     const f = env.?.*.*;
-    const capacity = f.GetArrayLength.?(env, output_array);
-    if (f.GetArrayLength.?(env, balls_array) < 4 * count or capacity <= 0) return -1;
-    const bp = f.GetPrimitiveArrayCritical.?(env, balls_array, null) orelse return -1;
-    defer f.ReleasePrimitiveArrayCritical.?(env, balls_array, bp, c.JNI_ABORT);
-    const op = f.GetPrimitiveArrayCritical.?(env, output_array, null) orelse return -1;
-    defer f.ReleasePrimitiveArrayCritical.?(env, output_array, op, 0);
-    const balls: [*]const f64 = @ptrCast(@alignCast(bp));
-    const output: [*]i32 = @ptrCast(@alignCast(op));
+    const get_length = f.GetArrayLength orelse return -1;
+    const get_region = f.GetDoubleArrayRegion orelse return -1;
+    const set_region = f.SetIntArrayRegion orelse return -1;
+    const capacity = get_length(env, output_array);
+    if (get_length(env, balls_array) < 4 * count or capacity <= 0) return -1;
+    var balls: [4 * 64]f64 = undefined;
+    get_region(env, balls_array, 0, 4 * count, &balls);
+    const output = feature_output.positions[0..@min(@as(usize, @intCast(capacity)), feature_output.positions.len)];
     @memset(visited[0..@intCast(width * height)], 0);
     var length: usize = 0;
     const lanes: Vec = .{ 0.0, 1.0, 2.0, 3.0 };
@@ -74,13 +75,14 @@ fn collect0(env: ?*c.JNIEnv, _: c.jclass, balls_array: c.jdoubleArray, count: c.
                 row.* |= eligible;
                 const xy_sphere = sphere | ((yy - origin_y) << 8) | (xx - origin_x);
                 while (fresh != 0) : (fresh &= fresh - 1) {
-                    if (length >= capacity) return -1;
+                    if (length >= output.len) return -1;
                     output[length] = xy_sphere | (@as(i32, @intCast(@ctz(fresh))) << 16);
                     length += 1;
                 }
             }
         }
     }
+    if (length != 0) set_region(env, output_array, 0, @intCast(length), output.ptr);
     return @intCast(length);
 }
 
