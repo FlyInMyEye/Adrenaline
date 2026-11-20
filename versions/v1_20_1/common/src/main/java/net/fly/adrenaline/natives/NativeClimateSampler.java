@@ -79,13 +79,17 @@ public final class NativeClimateSampler {
     }
 
     public int sample(int x, int z, float[] output, int base) {
-        long started = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.CLIMATE);
-        boolean sampled = false;
         try {
-            if (!sampleBatch0(this.plan, x, z, this.values)) {
+            boolean sampled;
+            long started = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.CLIMATE);
+            try {
+                sampled = sampleBatch0(this.plan, x, z, this.values);
+            } finally {
+                NativeRuntimeStats.end(NativeRuntimeStats.Stage.CLIMATE, started);
+            }
+            if (!sampled) {
                 return 0;
             }
-            sampled = true;
             for (int i = 0; i < this.channels.length; i++) {
                 Channel channel = this.channels[i];
                 output[base + channel.index] = (float) channel.apply(this.values[i]);
@@ -96,9 +100,6 @@ public final class NativeClimateSampler {
             return 0;
         } finally {
             Reference.reachabilityFence(this.noiseData);
-            if (sampled) {
-                NativeRuntimeStats.end(NativeRuntimeStats.Stage.CLIMATE, started);
-            }
         }
     }
 

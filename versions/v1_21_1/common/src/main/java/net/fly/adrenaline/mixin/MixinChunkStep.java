@@ -24,7 +24,6 @@ public abstract class MixinChunkStep {
                 || chunk.getPersistedStatus().isOrAfter(status)) {
             return original.call(context, cache, chunk);
         }
-        long started = WorldgenStageStats.beginStage(chunk.getPos(), status);
-        return WorldgenStageStats.track(status, chunk.getPos(), started, original.call(context, cache, chunk));
+        return WorldgenStageStats.track(status, chunk.getPos(), () -> original.call(context, cache, chunk));
     }
 }

@@ -31,12 +31,15 @@ public final class NativeAquiferSampler {
         if (!AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
             return false;
         }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.AQUIFER_LOCATE);
         try {
             return locate0(densityValues, globalMaterials, candidates, packedLocations,
                 minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ, baseX, baseY, baseZ, cellWidth, cellHeight);
         } catch (LinkageError | RuntimeException exception) {
             AdrenalineNatives.disable(Feature.AQUIFER, exception);
             return false;
+        } finally {
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.AQUIFER_LOCATE, startedNanos);
         }
     }
 
@@ -69,8 +72,13 @@ public final class NativeAquiferSampler {
                 return null;
             }
             ByteBuffer context = ByteBuffer.allocateDirect(bytes).order(ByteOrder.nativeOrder());
-            return createContext0(context, packedLocations, fluidLevels, fluidTypes, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ)
-                ? context : null;
+            long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.AQUIFER_CONTEXT);
+            try {
+                return createContext0(context, packedLocations, fluidLevels, fluidTypes, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ)
+                    ? context : null;
+            } finally {
+                NativeRuntimeStats.end(NativeRuntimeStats.Stage.AQUIFER_CONTEXT, startedNanos);
+            }
         } catch (LinkageError | RuntimeException exception) {
             AdrenalineNatives.disable(Feature.AQUIFER, exception);
             return null;
@@ -104,11 +112,14 @@ public final class NativeAquiferSampler {
         if (!AdrenalineNatives.isAvailable(Feature.AQUIFER)) {
             return false;
         }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.AQUIFER_CLASSIFY);
         try {
             return classify0(densityValues, globalMaterials, candidates, fluidLevels, fluidTypes, baseY, cellWidth, cellHeight, output);
         } catch (LinkageError | RuntimeException exception) {
             AdrenalineNatives.disable(Feature.AQUIFER, exception);
             return false;
+        } finally {
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.AQUIFER_CLASSIFY, startedNanos);
         }
     }
 

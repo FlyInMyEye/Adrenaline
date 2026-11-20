@@ -18,10 +18,12 @@ public final class NativeGeodeSampler {
         if (!first.available() || !second.available()) {
             return -1;
         }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.GEODE);
         try {
             return filter0(first.address(), first.octaves(), second.address(), second.octaves(), access.adrenaline$getNativeValueFactor(),
                 x, y, z, size, multiplier, threshold, points, output);
         } finally {
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.GEODE, startedNanos);
             Reference.reachabilityFence(first);
             Reference.reachabilityFence(second);
         }

@@ -9,6 +9,7 @@ import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.compat.ControlsOptimization;
 import net.fly.adrenaline.compat.OptimizationTakeoverRegistry.Optimization;
 import net.fly.adrenaline.config.AdrenalineConfig;
+import net.fly.adrenaline.natives.NativeRuntimeStats;
 import net.fly.adrenaline.scheduler.GenerationJob;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseProfile;
 import net.fly.adrenaline.util.WorldgenStageStats.NoiseSubstage;
@@ -94,7 +95,7 @@ public abstract class MixinNoiseBasedChunkGenerator {
                 return CompletableFuture.failedFuture(error);
             }
         }
-        return original.call(tracked, executor);
+        return original.call(BuildConfig.DEBUG ? NativeRuntimeStats.wrapStageTask(tracked) : tracked, executor);
     }
     @Inject(method = "doFill", at = @At("HEAD"), cancellable = true)
     @ControlsOptimization({Optimization.TERRAIN_FILL, Optimization.SECTION_TERRAIN})

@@ -17,12 +17,14 @@ public final class NativeDensitySampler {
         if (firstDryCell >= cellCountY || !airColumnAvailable || !AdrenalineNatives.isAvailable(Feature.DENSITY)) {
             return cellCountY;
         }
+        long startedNanos = NativeRuntimeStats.begin(NativeRuntimeStats.Stage.AIR_BOUNDS);
         try {
             return firstAirCell0(program.bytecode(), program.length(), leftNear, leftFar, rightNear, rightFar, firstDryCell, cellCountY);
         } catch (UnsatisfiedLinkError missing) {
             airColumnAvailable = false;
             return cellCountY;
         } finally {
+            NativeRuntimeStats.end(NativeRuntimeStats.Stage.AIR_BOUNDS, startedNanos);
             Reference.reachabilityFence(program);
         }
     }

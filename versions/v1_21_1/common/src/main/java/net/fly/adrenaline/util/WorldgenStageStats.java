@@ -12,7 +12,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import net.fly.adrenaline.BuildConfig;
+import net.fly.adrenaline.natives.NativeRuntimeStats.StageTimer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
@@ -20,6 +22,7 @@ public final class WorldgenStageStats {
 
     private static final List<ChunkStatus> STATUSES = ChunkStatus.getStatusList();
     private static final AtomicLongArray AVERAGE_NANOS = new AtomicLongArray(STATUSES.size());
+    private static final AtomicLongArray NATIVE_AVERAGE_NANOS = new AtomicLongArray(STATUSES.size());
     private static final NoiseSubstage[] NOISE_SUBSTAGES = NoiseSubstage.values();
     private static final AtomicLongArray NOISE_AVERAGE_NANOS = new AtomicLongArray(NOISE_SUBSTAGES.length);
     private static final ConcurrentHashMap<StageKey, SchedulingState> STAGE_SCHEDULING = new ConcurrentHashMap<>();
@@ -57,6 +60,7 @@ public final class WorldgenStageStats {
         EPOCH.incrementAndGet();
         for (int i = 0; i < STATUSES.size(); i++) {
             AVERAGE_NANOS.set(i, 0L);
+            NATIVE_AVERAGE_NANOS.set(i, 0L);
         }
         for (int i = 0; i < NOISE_SUBSTAGES.length; i++) {
             NOISE_AVERAGE_NANOS.set(i, 0L);
@@ -130,10 +134,8 @@ public final class WorldgenStageStats {
         }
     }
 
-    public static long beginStage(ChunkPos pos, ChunkStatus status) {
-        if (!BuildConfig.DEBUG) {
-            return 0L;
-        }
+    private static StageProfile beginStage(ChunkPos pos, ChunkStatus status) {
+        long epoch = EPOCH.get();
         long now = System.nanoTime();
         SchedulingState state = STAGE_SCHEDULING.remove(new StageKey(pos.toLong(), status.getIndex()));
         if (state != null && EPOCH.get() == state.epoch) {
@@ -172,14 +174,13 @@ public final class WorldgenStageStats {
             }
         }
         if (status == ChunkStatus.BIOMES) {
-            long epoch = EPOCH.get();
             long referenceNanos = WorldgenReference.measure();
             if (referenceNanos != 0L && EPOCH.get() == epoch) {
                 updateAverage(REFERENCE_AVERAGE_NANOS, referenceNanos);
             }
-            return System.nanoTime();
+            now = System.nanoTime();
         }
-        return now;
+        return new StageProfile(now, epoch, new StageTimer());
     }
 
     public static NoiseProfile beginNoiseProfile() {
@@ -195,13 +196,10 @@ public final class WorldgenStageStats {
         }
     }
 
-    public static <T> CompletableFuture<T> track(ChunkStatus status, ChunkPos pos, long startedNanos, CompletableFuture<T> future) {
-        if (!BuildConfig.DEBUG || startedNanos == 0L) {
-            return future;
-        }
-
-        long epoch = EPOCH.get();
-        future.whenComplete((value, throwable) -> finishStage(status, pos, startedNanos, epoch));
+    public static <T> CompletableFuture<T> track(ChunkStatus status, ChunkPos pos, Supplier<CompletableFuture<T>> task) {
+        StageProfile profile = beginStage(pos, status);
+        CompletableFuture<T> future = profile.nativeTimer().run(task);
+        future.whenComplete((value, throwable) -> finishStage(status, pos, profile));
         return future;
     }
 
@@ -216,11 +214,14 @@ public final class WorldgenStageStats {
         }
         long epoch = EPOCH.get();
         return operation.apply(value -> {
-            long startedNanos = EPOCH.get() == epoch ? beginStage(pos, ChunkStatus.FULL) : 0L;
-            try {
+            if (EPOCH.get() != epoch) {
                 return conversion.apply(value);
+            }
+            StageProfile profile = beginStage(pos, ChunkStatus.FULL);
+            try {
+                return profile.nativeTimer().run(() -> conversion.apply(value));
             } finally {
-                finishStage(ChunkStatus.FULL, pos, startedNanos, epoch);
+                finishStage(ChunkStatus.FULL, pos, profile);
             }
         }, task -> {
             long queuedNanos = System.nanoTime();
@@ -233,13 +234,18 @@ public final class WorldgenStageStats {
         });
     }
 
-    private static void finishStage(ChunkStatus status, ChunkPos pos, long startedNanos, long epoch) {
-        if (!BuildConfig.DEBUG || startedNanos == 0L || EPOCH.get() != epoch) {
+    private static void finishStage(ChunkStatus status, ChunkPos pos, StageProfile profile) {
+        if (EPOCH.get() != profile.epoch()) {
             return;
         }
         long finishedNanos = System.nanoTime();
         if (status != ChunkStatus.EMPTY) {
-            updateAverage(AVERAGE_NANOS, status.getIndex(), finishedNanos - startedNanos);
+            int index = status.getIndex();
+            long nativeNanos = profile.nativeTimer().estimatedNanos();
+            if (nativeNanos != 0L || NATIVE_AVERAGE_NANOS.get(index) != 0L) {
+                NATIVE_AVERAGE_NANOS.accumulateAndGet(index, nativeNanos, (current, sample) -> (current * 99L + sample) / 100L);
+            }
+            updateAverage(AVERAGE_NANOS, index, finishedNanos - profile.startedNanos());
         }
         LAST_STAGE_FINISH_NANOS.computeIfAbsent(pos.toLong(), ignored -> new AtomicLong()).accumulateAndGet(finishedNanos, Math::max);
         if (status == ChunkStatus.FULL) {
@@ -269,7 +275,7 @@ public final class WorldgenStageStats {
             int index = status.getIndex();
             String name = status.toString();
             int separator = name.indexOf(':');
-            timings.add(new StageTiming(name.substring(separator + 1).toUpperCase(Locale.ROOT), AVERAGE_NANOS.get(index)));
+            timings.add(new StageTiming(name.substring(separator + 1).toUpperCase(Locale.ROOT), AVERAGE_NANOS.get(index), NATIVE_AVERAGE_NANOS.get(index)));
         }
         Collections.reverse(timings);
         StageTiming scheduling = timings.remove(timings.size() - 1);
@@ -394,6 +400,22 @@ public final class WorldgenStageStats {
         }
     }
 
-    public record StageTiming(String name, long averageNanos) {
+    private record StageProfile(long startedNanos, long epoch, StageTimer nativeTimer) {
+    }
+
+    public record StageTiming(String name, long averageNanos, long nativeAverageNanos) {
+        public StageTiming(String name, long averageNanos) {
+            this(name, averageNanos, 0L);
+        }
+
+        public String formatDuration() {
+            double total = averageNanos / 1_000_000.0D;
+            long nativeNanos = Math.min(averageNanos, nativeAverageNanos);
+            if (nativeNanos == 0L) {
+                return String.format(Locale.ROOT, "%.3fms", total);
+            }
+            return String.format(Locale.ROOT, "%.3fms (%.1fms/%.1fms)", total,
+                nativeNanos / 1_000_000.0D, (averageNanos - nativeNanos) / 1_000_000.0D);
+        }
     }
 }
