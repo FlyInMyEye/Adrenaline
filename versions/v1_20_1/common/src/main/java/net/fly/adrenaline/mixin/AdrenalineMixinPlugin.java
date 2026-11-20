@@ -13,6 +13,7 @@ import net.fly.adrenaline.worldgen.SurfaceRuleHooks;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
+import org.spongepowered.asm.service.MixinService;
 
 public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
     private static final Set<String> DEBUG_MIXINS = Set.of(
@@ -48,7 +49,19 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
             || mixinClassName.equals("net.fly.adrenaline.mixin.MixinStreamsWorldGenRegion")) {
             return MixinPlatform.isModLoaded("streamsreflowing");
         }
+        if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinClimatePositionalSearch")) {
+            return supportsExpressionInjectors();
+        }
         return BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName);
+    }
+
+    private static boolean supportsExpressionInjectors() {
+        try {
+            MixinService.getService().getClassProvider().findClass("com.llamalad7.mixinextras.expression.Definition", false);
+            return true;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            return false;
+        }
     }
 
     @Override

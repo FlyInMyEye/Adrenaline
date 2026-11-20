@@ -7,9 +7,12 @@ import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import net.fly.adrenaline.compat.SurfacePipelineCompatibility;
 import net.minecraft.world.level.biome.Climate;
 
 public final class ClimateColumnIndex {
+
+    public static final Object FALLBACK = new Object();
 
     private static final long MAX_PARAMETER = 1_000_000L;
     private static final int COLUMN_COUNT = 16;
@@ -30,29 +33,29 @@ public final class ClimateColumnIndex {
         this.depthGroups = depthGroups(root, nodes);
     }
 
-    @SuppressWarnings("unchecked")
     public static ClimateColumnIndex create(Object parameterList) {
         if (parameterList.getClass() != Climate.ParameterList.class) {
             return null;
         }
         try {
-            Object tree = null;
             for (Field field : parameterList.getClass().getDeclaredFields()) {
                 if (!Modifier.isStatic(field.getModifiers()) && field.getType() != List.class) {
                     field.setAccessible(true);
-                    Object candidate = field.get(parameterList);
-                    if (candidate != null && threadLocalField(candidate.getClass()) != null) {
-                        tree = candidate;
-                        break;
+                    if (field.get(parameterList) instanceof Access tree) {
+                        return tree.adrenaline$columnIndex();
                     }
                 }
             }
-            if (tree == null) {
-                return null;
-            }
-            Field lastResultField = threadLocalField(tree.getClass());
-            lastResultField.setAccessible(true);
-            ThreadLocal<Object> lastResult = (ThreadLocal<Object>) lastResultField.get(tree);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        }
+        return null;
+    }
+
+    public static ClimateColumnIndex createTree(Object tree, ThreadLocal<Object> lastResult) {
+        if (SurfacePipelineCompatibility.hasForeignHooks(tree.getClass())) {
+            return null;
+        }
+        try {
             for (Field field : tree.getClass().getDeclaredFields()) {
                 if (Modifier.isStatic(field.getModifiers()) || field.getType() == ThreadLocal.class) {
                     continue;
@@ -77,7 +80,19 @@ public final class ClimateColumnIndex {
     }
 
     public Object search(Climate.TargetPoint target) {
-        Column column = this.columns.get().get(target, this.depthGroups == null ? this.nodes.length : 0);
+        return this.search(target, this.columns.get().find(target, this.depthGroups == null ? this.nodes.length : 0));
+    }
+
+    public Object searchPositional(Climate.TargetPoint target) {
+        if (this.depthGroups == null) {
+            return FALLBACK;
+        }
+        Columns columns = this.columns.get();
+        Column column = columns.find(target, 0);
+        return columns.recentReuse > 0 ? this.search(target, column) : FALLBACK;
+    }
+
+    private Object search(Climate.TargetPoint target, Column column) {
         long depth = target.depth();
         Node incumbent = this.leaves.get(this.lastResult.get());
         Node winner;
@@ -228,6 +243,9 @@ public final class ClimateColumnIndex {
     }
 
     private static Node build(Object original, List<Node> nodes, IdentityHashMap<Object, Node> leaves) throws ReflectiveOperationException {
+        if (SurfacePipelineCompatibility.hasForeignHooks(original.getClass())) {
+            throw new IllegalArgumentException("Climate tree has external hooks");
+        }
         Field parametersField = parameterField(original.getClass());
         parametersField.setAccessible(true);
         Climate.Parameter[] parameters = (Climate.Parameter[]) parametersField.get(original);
@@ -273,13 +291,9 @@ public final class ClimateColumnIndex {
         return null;
     }
 
-    private static Field threadLocalField(Class<?> type) {
-        for (Field field : type.getDeclaredFields()) {
-            if (!Modifier.isStatic(field.getModifiers()) && field.getType() == ThreadLocal.class) {
-                return field;
-            }
-        }
-        return null;
+    public interface Access {
+
+        ClimateColumnIndex adrenaline$columnIndex();
     }
 
     private static final class Node {
@@ -309,13 +323,18 @@ public final class ClimateColumnIndex {
     private static final class Columns {
         private final Column[] entries = new Column[COLUMN_COUNT];
         private int next;
+        private int recentReuse;
 
-        private Column get(Climate.TargetPoint target, int nodeCount) {
+        private Column find(Climate.TargetPoint target, int nodeCount) {
             for (Column column : this.entries) {
                 if (column != null && column.matches(target)) {
+                    this.recentReuse = COLUMN_COUNT * 2;
                     column.prepare(nodeCount);
                     return column;
                 }
+            }
+            if (this.recentReuse > 0) {
+                this.recentReuse--;
             }
             Column column = this.entries[this.next];
             if (column == null) {
