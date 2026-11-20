@@ -166,8 +166,7 @@ pub fn native_density_sampler_first_air_cell0(
     const capacity = functions.GetDirectBufferCapacity orelse return count;
     const address = functions.GetDirectBufferAddress orelse return count;
     const array_len = functions.GetArrayLength orelse return count;
-    const pin = functions.GetPrimitiveArrayCritical orelse return count;
-    const release = functions.ReleasePrimitiveArrayCritical orelse return count;
+    const get_region = functions.GetDoubleArrayRegion orelse return count;
     if (capacity(env, bytecode) < length) return count;
     const data: [*]const u8 = @ptrCast(address(env, bytecode) orelse return count);
     if (!density_air_column.supports_terrain_bounds(data[0..@intCast(length)])) return count;
@@ -176,19 +175,23 @@ pub fn native_density_sampler_first_air_cell0(
     for (arrays) |array| {
         if (array == null or array_len(env, array) <= count) return count;
     }
-    const n: usize = @intCast(count);
+    const window = 64;
+    var scratch: [4][window + 1]f64 = undefined;
     var columns: [4][]const f64 = undefined;
-    var pinned: usize = 0;
-    defer while (pinned != 0) {
-        pinned -= 1;
-        release(env, arrays[pinned], @ptrCast(@constCast(columns[pinned].ptr)), c.JNI_ABORT);
-    };
-    for (arrays, 0..) |array, i| {
-        const ptr: [*]const f64 = @ptrCast(@alignCast(pin(env, array, null) orelse return count));
-        columns[i] = ptr[0 .. n + 1];
-        pinned += 1;
+    var top = count;
+    while (top > first_dry) {
+        const start = @max(first_dry, top - window);
+        const length_with_overlap = top - start + 1;
+        const span: usize = @intCast(length_with_overlap);
+        for (arrays, 0..) |array, i| {
+            get_region(env, array, start, length_with_overlap, &scratch[i]);
+            columns[i] = scratch[i][0..span];
+        }
+        const first_air = density_air_column.first_air_cell(columns, 0, span - 1);
+        if (first_air != 0) return start + @as(c.jint, @intCast(first_air));
+        top = start;
     }
-    return @intCast(density_air_column.first_air_cell(columns, @intCast(first_dry), n));
+    return first_dry;
 }
 
 pub fn register() void {
