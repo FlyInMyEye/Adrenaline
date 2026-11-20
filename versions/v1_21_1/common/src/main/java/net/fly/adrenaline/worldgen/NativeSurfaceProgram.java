@@ -20,6 +20,7 @@ import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinSurfaceSystemAccess;
 import net.fly.adrenaline.natives.PerlinNativeSampler;
 import net.fly.adrenaline.mixin.levelgen.AdrenalineMixinXoroshiroPositionalFactoryAccess;
 import net.fly.adrenaline.natives.NativeSurfaceSampler;
+import net.fly.adrenaline.worldgen.NativeSurfaceGraph.Node;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
@@ -53,7 +54,6 @@ public final class NativeSurfaceProgram {
     private static final Class<?> XOROSHIRO_FACTORY = new XoroshiroRandomSource(0L).forkPositional().getClass();
     private static final Class<?> LEGACY_FACTORY = new LegacyRandomSource(0L).forkPositional().getClass();
     private static final Class<?> DIRECT_HOLDER = Holder.direct(new Object()).getClass();
-    private static final int MAX_NODES = 65536;
     private static final Class<?> RUNTIME_RULE = runtimeRuleType();
     private static final Class<?> BLOCK = blockSource();
     private static final Class<?> SEQUENCE = sourceRecord(List.class);
@@ -117,36 +117,37 @@ public final class NativeSurfaceProgram {
     private final BlockState[] states;
     private final IdentityHashMap<ResourceKey<Biome>, Integer> biomeIds;
 
-    private NativeSurfaceProgram(Builder builder, int[] entries) {
+    private NativeSurfaceProgram(Builder builder, NativeSurfaceGraph.Code graph) {
+        int[] entries = graph.entries();
         int offset = (64 + entries.length * 4 + 7) & ~7;
         NativeSurfaceData data = builder.data;
-        int noiseOffset = offset + builder.nodes.size() * 32 + builder.randoms.size() * 32;
+        int noiseOffset = offset + graph.nodes().size() * NativeSurfaceGraph.NODE_BYTES + builder.randoms.size() * 32;
         int simplexOffset = noiseOffset + data.noises.size() * 64;
         int climateOffset = simplexOffset + data.simplexes.size() * 32;
         int indexOffset = climateOffset + data.climates.size() * 24;
-        int simplexDataOffset = (indexOffset + data.indices.size() * 4 + 7) & ~7;
+        int simplexDataOffset = (indexOffset + graph.tables().size() * 4 + 7) & ~7;
         this.bytecode = ByteBuffer.allocateDirect(simplexDataOffset + data.simplexBytes()).order(ByteOrder.nativeOrder());
-        this.bytecode.putInt(7).putInt(entries.length).putInt(builder.nodes.size()).putInt(offset)
+        this.bytecode.putInt(7).putInt(entries.length).putInt(graph.nodes().size()).putInt(offset)
             .putInt(builder.randoms.size()).putInt(data.noises.size()).putInt(data.simplexes.size()).putInt(data.climates.size())
             .putInt(noiseOffset).putInt(simplexOffset).putInt(climateOffset).putInt(indexOffset)
-            .putInt(data.indices.size()).putInt(simplexDataOffset).putInt(data.simplexBytes()).putInt(0);
+            .putInt(graph.tables().size()).putInt(simplexDataOffset).putInt(data.simplexBytes()).putInt(0);
         for (int entry : entries) {
             this.bytecode.putInt(entry);
         }
         this.bytecode.position(offset);
-        for (Node node : builder.nodes) {
-            this.bytecode.putInt(node.op).putInt(node.a).putInt(node.b).putInt(node.c).putInt(node.d)
-                .putInt(node.yes).putInt(node.no).putInt(0);
+        for (Node node : graph.nodes()) {
+            this.bytecode.putInt(node.op()).putInt(node.a()).putInt(node.b()).putInt(node.c()).putInt(node.d())
+                .putInt(node.yes()).putInt(node.no()).putInt(0);
         }
         for (RandomConfig config : builder.randoms) {
             this.bytecode.putLong(config.low).putLong(config.high).putInt(config.type).putInt(0).putLong(0L);
         }
-        data.write(this.bytecode, noiseOffset, simplexOffset, climateOffset, indexOffset, simplexDataOffset);
+        data.write(this.bytecode, graph.tables(), noiseOffset, simplexOffset, climateOffset, indexOffset, simplexDataOffset);
         this.steep = builder.steep;
-        Node first = builder.nodes.get(entries[0]);
-        this.firstInput = switch (first.op) {
-            case 0 -> first.a <= MINIMUM && first.a >= TEMPERATURE ? first.a : 0;
-            case 1 -> first.c == 0 ? 0 : SECONDARY;
+        Node first = graph.nodes().get(entries[0]);
+        this.firstInput = switch (first.op()) {
+            case 0 -> first.a() <= MINIMUM && first.a() >= TEMPERATURE ? first.a() : 0;
+            case 1 -> first.c() == 0 ? 0 : SECONDARY;
             case 5 -> MINIMUM;
             case 7 -> BIOME;
             case 11 -> TEMPERATURE;
@@ -186,7 +187,7 @@ public final class NativeSurfaceProgram {
                 builder.memo.clear();
                 entries[biome] = builder.rule(source, original, keys.get(biome), biome == 0, miss, 0);
             }
-            return new NativeSurfaceProgram(builder, builder.compact(entries));
+            return new NativeSurfaceProgram(builder, NativeSurfaceGraph.compact(builder.nodes, builder.data.tables, entries));
         } catch (ReflectiveOperationException | RuntimeException exception) {
             return null;
         }
@@ -330,98 +331,6 @@ public final class NativeSurfaceProgram {
     private record RandomConfig(long low, long high, int type) {
     }
 
-    private record Node(int op, int a, int b, int c, int d, int yes, int no) {
-    }
-
-    private static final class GraphCompactor {
-
-        private static final int BIOME_PENDING = 1;
-        private static final int BIOME_USED = 2;
-
-        private final List<Node> original;
-        private final List<Integer> indices;
-        private final List<Node> nodes = new ArrayList<>();
-        private final NativeSurfaceData tables = new NativeSurfaceData();
-        private final Map<Node, Integer> intern = new HashMap<>();
-
-        private GraphCompactor(List<Node> original, List<Integer> indices) {
-            this.original = original;
-            this.indices = indices;
-        }
-
-        private int[] compact(int[] entries) {
-            int size = this.original.size();
-            byte[] states = new byte[size];
-            for (int entry : entries) {
-                states[entry] = BIOME_PENDING;
-            }
-            for (int i = size - 1; i >= 0; i--) {
-                if (states[i] == 0) {
-                    continue;
-                }
-                Node node = this.original.get(i);
-                switch (node.op) {
-                    case 0, 12 -> { }
-                    case 7 -> states[node.yes] |= BIOME_USED;
-                    case 14 -> {
-                        for (int j = 0; j < 256; j++) {
-                            states[this.indices.get(node.a + j)] |= states[i];
-                        }
-                    }
-                    default -> {
-                        states[node.yes] |= states[i];
-                        states[node.no] |= states[i];
-                    }
-                }
-            }
-
-            int[] pending = new int[size];
-            int[] used = new int[size];
-            for (int i = 0; i < size; i++) {
-                Node node = this.original.get(i);
-                if ((states[i] & BIOME_USED) != 0) {
-                    used[i] = node.op == 7 ? used[node.yes] : this.remap(node, used);
-                }
-                if ((states[i] & BIOME_PENDING) != 0) {
-                    pending[i] = node.op == 7 ? this.remap(node, used) : this.remap(node, pending);
-                }
-            }
-            int[] compacted = new int[entries.length];
-            for (int i = 0; i < entries.length; i++) {
-                compacted[i] = pending[entries[i]];
-            }
-            return compacted;
-        }
-
-        private int remap(Node node, int[] successors) {
-            boolean localCondition = node.op == 1 && node.c == 0 || node.op >= 2 && node.op <= 4;
-            if (localCondition && successors[node.yes] == successors[node.no]) {
-                return successors[node.yes];
-            }
-            Node mapped = switch (node.op) {
-                case 0 -> node;
-                case 7 -> new Node(7, 0, 0, 0, 0, successors[node.yes], 0);
-                case 12 -> new Node(12, node.a, this.tables.table(this.indices.subList(node.b, node.b + node.c)), node.c, node.d, 0, 0);
-                case 14 -> {
-                    var table = new ArrayList<Integer>(256);
-                    for (int i = 0; i < 256; i++) {
-                        table.add(successors[this.indices.get(node.a + i)]);
-                    }
-                    yield new Node(14, this.tables.table(table), 0, 0, 0, 0, 0);
-                }
-                default -> new Node(node.op, node.a, node.b, node.c, node.d, successors[node.yes], successors[node.no]);
-            };
-            Integer previous = this.intern.get(mapped);
-            if (previous != null) {
-                return previous;
-            }
-            int index = this.nodes.size();
-            this.nodes.add(mapped);
-            this.intern.put(mapped, index);
-            return index;
-        }
-    }
-
     private record Memo(Object source, Object runtime, int fail) {
         @Override
         public int hashCode() {
@@ -465,31 +374,12 @@ public final class NativeSurfaceProgram {
             this.contextReusable = !this.holderHooks;
         }
 
-        private int[] compact(int[] entries) {
-            var compacted = new GraphCompactor(this.nodes, this.data.indices);
-            int[] roots;
-            try {
-                roots = compacted.compact(entries);
-            } catch (IllegalArgumentException ignored) {
-                return entries;
-            }
-            if (compacted.nodes.size() > MAX_NODES
-                || compacted.nodes.size() * 8 + compacted.tables.indices.size() >= this.nodes.size() * 8 + this.data.indices.size()) {
-                return entries;
-            }
-            this.nodes.clear();
-            this.nodes.addAll(compacted.nodes);
-            this.data.indices.clear();
-            this.data.indices.addAll(compacted.tables.indices);
-            return roots;
-        }
-
         private int node(Node node) {
             Integer previous = this.intern.get(node);
             if (previous != null) {
                 return previous;
             }
-            if (this.nodes.size() >= MAX_NODES) {
+            if (this.nodes.size() >= NativeSurfaceGraph.NODE_LIMIT) {
                 throw new IllegalArgumentException("Surface program size");
             }
             int index = this.nodes.size();
@@ -514,7 +404,7 @@ public final class NativeSurfaceProgram {
         }
 
         private int biomeUse(int target) {
-            if (this.nodes.get(target).op == 7) {
+            if (this.nodes.get(target).op() == 7) {
                 return target;
             }
             return this.node(new Node(7, 0, 0, 0, 0, target, 0));
@@ -560,7 +450,7 @@ public final class NativeSurfaceProgram {
                     var palette = new ArrayList<Integer>();
                     for (BlockState state : access.adrenaline$getClayBands()) palette.add(this.state(state));
                     result = noise < 0 ? this.result(FALLBACK)
-                        : this.node(new Node(12, noise, this.data.table(palette), palette.size(), this.data.noiseSlot(noise), 0, 0));
+                        : this.node(new Node(12, noise, this.data.tables.add(palette), palette.size(), this.data.noiseSlot(noise), 0, 0));
                 }
             } else if (type == TEST && runtime.getClass() == RUNTIME_TEST) {
                 result = this.condition(component(source, 0), component(runtime, 0), biome, unresolved,
@@ -595,7 +485,7 @@ public final class NativeSurfaceProgram {
                         if (row.length != 16) throw new IllegalArgumentException("Surface dispatch dimensions");
                         for (Object applied : row) table.add(this.runtimeRule(applied, biome, unresolved, fail, depth + 1));
                     }
-                    result = this.node(new Node(14, this.data.table(table), 0, 0, 0, 0, 0));
+                    result = this.node(new Node(14, this.data.tables.add(table), 0, 0, 0, 0, 0));
                 } else {
                     result = this.result(FALLBACK);
                 }

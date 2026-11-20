@@ -43,14 +43,13 @@ final class NativeSurfaceData {
     final List<Noise> noises = new ArrayList<>();
     final List<Simplex> simplexes = new ArrayList<>();
     final List<Climate> climates = new ArrayList<>();
-    final List<Integer> indices = new ArrayList<>();
+    final NativeSurfaceGraph.Tables tables = new NativeSurfaceGraph.Tables();
     final IdentityHashMap<Biome, Integer> climateIds = new IdentityHashMap<>();
     private final Map<Noise, Integer> noiseIds = new HashMap<>();
     private final Map<NoiseSample, Integer> noiseSamples = new HashMap<>();
     private final List<Integer> noiseSlots = new ArrayList<>();
     private final IdentityHashMap<PerlinSimplexNoise, Integer> simplexIds = new IdentityHashMap<>();
     private final Map<Climate, Integer> climateValues = new HashMap<>();
-    private final Map<List<Integer>, Integer> tables = new HashMap<>();
     private boolean loadedClimates;
     java.lang.invoke.MethodHandle temperatureTransform;
 
@@ -79,17 +78,6 @@ final class NativeSurfaceData {
 
     int noiseSlot(int index) {
         return this.noiseSlots.get(index);
-    }
-
-    int table(List<Integer> values) {
-        Integer existing = this.tables.get(values);
-        if (existing != null) return existing;
-        if (this.indices.size() + values.size() > 262144) throw new IllegalArgumentException("Surface lookup table size");
-        int offset = this.indices.size();
-        List<Integer> copy = List.copyOf(values);
-        this.tables.put(copy, offset);
-        this.indices.addAll(copy);
-        return offset;
     }
 
     boolean climates(Registry<Biome> registry) throws ReflectiveOperationException {
@@ -157,7 +145,7 @@ final class NativeSurfaceData {
         return this.simplexes.stream().mapToInt(value -> value.packed.length).sum();
     }
 
-    void write(ByteBuffer buffer, int noiseOffset, int simplexOffset, int climateOffset, int indexOffset, int dataOffset) {
+    void write(ByteBuffer buffer, NativeSurfaceGraph.Tables indices, int noiseOffset, int simplexOffset, int climateOffset, int indexOffset, int dataOffset) {
         buffer.position(noiseOffset);
         for (Noise noise : this.noises) {
             buffer.putLong(noise.first.address()).putLong(noise.second.address()).putInt(noise.first.octaves()).putInt(noise.second.octaves())
@@ -174,7 +162,7 @@ final class NativeSurfaceData {
             buffer.putFloat(climate.base).putInt(climate.modifier).putInt(climate.temperature).putInt(climate.frozen).putInt(climate.information).putInt(0);
         }
         buffer.position(indexOffset);
-        for (int index : this.indices) buffer.putInt(index);
+        indices.write(buffer);
         buffer.position(dataOffset);
         for (Simplex simplex : this.simplexes) buffer.put(simplex.packed);
     }
