@@ -11,6 +11,9 @@ const density_air_column = @import("../density/air_column.zig");
 const density_height = @import("../density/height.zig");
 const density_program = @import("../density/program.zig");
 
+const lattice_value_limit = 1280;
+threadlocal var density_output: [@max(lattice_value_limit, core_limits.max_density_values, core_limits.max_grid_axis)]f64 align(32) = undefined;
+
 pub fn native_density_sampler_evaluate0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) callconv(.c) c.jboolean {
     return evaluate_density_jni(env, program_buffer, program_length, null, 0, base_x, base_y, base_z, cell_width, cell_height, output);
 }
@@ -47,7 +50,7 @@ pub fn native_density_sampler_preliminary_surface_level0(env: ?*c.JNIEnv, _: c.j
 
 pub fn evaluate_density_jni(env: ?*c.JNIEnv, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, base_x: c.jint, base_y: c.jint, base_z: c.jint, cell_width: c.jint, cell_height: c.jint, output: c.jdoubleArray) c.jboolean {
     @setFloatMode(.strict);
-    if (program_length <= 0 or program_length > core_limits.max_density_program_size or cell_width <= 0 or cell_width > 32 or cell_height <= 0 or cell_height > core_limits.max_density_values or input_count < 0 or input_count > 8192) {
+    if (program_buffer == null or output == null or program_length <= 0 or program_length > core_limits.max_density_program_size or cell_width <= 0 or cell_width > 32 or cell_height <= 0 or cell_height > core_limits.max_density_values or input_count < 0 or input_count > 8192) {
         return c.JNI_FALSE;
     }
     const width: usize = @intCast(cell_width);
@@ -62,8 +65,7 @@ pub fn evaluate_density_jni(env: ?*c.JNIEnv, program_buffer: c.jobject, program_
     const get_direct_buffer_address = functions.GetDirectBufferAddress orelse return c.JNI_FALSE;
     const get_direct_buffer_capacity = functions.GetDirectBufferCapacity orelse return c.JNI_FALSE;
     const get_array_length = functions.GetArrayLength orelse return c.JNI_FALSE;
-    const get_primitive_array_critical = functions.GetPrimitiveArrayCritical orelse return c.JNI_FALSE;
-    const release_primitive_array_critical = functions.ReleasePrimitiveArrayCritical orelse return c.JNI_FALSE;
+    const set_region = functions.SetDoubleArrayRegion orelse return c.JNI_FALSE;
     const length: usize = @intCast(program_length);
     if (get_direct_buffer_capacity(env, program_buffer) < @as(c.jlong, @intCast(length)) or get_array_length(env, output) < @as(c.jsize, @intCast(total))) {
         return c.JNI_FALSE;
@@ -77,12 +79,11 @@ pub fn evaluate_density_jni(env: ?*c.JNIEnv, program_buffer: c.jobject, program_
         const input_values: [*]const f64 = @ptrCast(@alignCast(input_address));
         inputs = input_values[0..input_length];
     }
-    const output_address = get_primitive_array_critical(env, output, null) orelse return c.JNI_FALSE;
-    defer release_primitive_array_critical(env, output, output_address, 0);
-
     const program: [*]const u8 = @ptrCast(@alignCast(program_address));
-    const values: [*]c.jdouble = @ptrCast(@alignCast(output_address));
-    return if (backend_density.evaluate(program[0..length], base_x, base_y, base_z, width, height, values[0..total], inputs)) c.JNI_TRUE else c.JNI_FALSE;
+    const values = density_output[0..total];
+    if (!backend_density.evaluate(program[0..length], base_x, base_y, base_z, width, height, values, inputs)) return c.JNI_FALSE;
+    set_region(env, output, 0, @intCast(total), values.ptr);
+    return c.JNI_TRUE;
 }
 
 pub fn native_density_sampler_evaluate_slice0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, x: c.jint, y: c.jint, z: c.jint, step: c.jint, count: c.jint, output: c.jdoubleArray) callconv(.c) c.jboolean {
@@ -94,8 +95,7 @@ pub fn native_density_sampler_evaluate_slice0(env: ?*c.JNIEnv, _: c.jclass, prog
     const get_address = f.GetDirectBufferAddress orelse return c.JNI_FALSE;
     const get_capacity = f.GetDirectBufferCapacity orelse return c.JNI_FALSE;
     const get_length = f.GetArrayLength orelse return c.JNI_FALSE;
-    const pin = f.GetPrimitiveArrayCritical orelse return c.JNI_FALSE;
-    const release = f.ReleasePrimitiveArrayCritical orelse return c.JNI_FALSE;
+    const set_region = f.SetDoubleArrayRegion orelse return c.JNI_FALSE;
     if (get_capacity(env, program_buffer) < program_length or get_length(env, output) < count) return c.JNI_FALSE;
     const program_address = get_address(env, program_buffer) orelse return c.JNI_FALSE;
     const program: [*]const u8 = @ptrCast(program_address);
@@ -107,16 +107,16 @@ pub fn native_density_sampler_evaluate_slice0(env: ?*c.JNIEnv, _: c.jclass, prog
         const values: [*]const f64 = @ptrCast(@alignCast(address));
         inputs = values[0..n];
     }
-    const address = pin(env, output, null) orelse return c.JNI_FALSE;
-    defer release(env, output, address, 0);
-    const values: [*]f64 = @ptrCast(@alignCast(address));
-    return @intFromBool(backend_density.evaluate_slice(program[0..@intCast(program_length)], x, y, z, step, values[0..@intCast(count)], inputs));
+    const values = density_output[0..@intCast(count)];
+    if (!backend_density.evaluate_slice(program[0..@intCast(program_length)], x, y, z, step, values, inputs)) return c.JNI_FALSE;
+    set_region(env, output, 0, @intCast(count), values.ptr);
+    return c.JNI_TRUE;
 }
 
 pub fn native_density_sampler_evaluate_lattice0(env: ?*c.JNIEnv, _: c.jclass, program_buffer: c.jobject, program_length: c.jint, input_buffer: c.jobject, input_count: c.jint, x: c.jint, y: c.jint, z: c.jint, step_xz: c.jint, step_y: c.jint, width: c.jint, height: c.jint, output: c.jdoubleArray) callconv(.c) c.jboolean {
     if (program_buffer == null or output == null or program_length <= 0 or program_length > core_limits.max_density_program_size or input_count < 0 or input_count > 128 or width <= 0 or width > 16 or height <= 0 or height > 256 or step_xz <= 0 or step_y <= 0) return c.JNI_FALSE;
     const count = @as(i64, width) * width * height;
-    if (count > 1280) return c.JNI_FALSE;
+    if (count > lattice_value_limit) return c.JNI_FALSE;
     const last_x = @as(i64, x) + @as(i64, width - 1) * step_xz;
     const last_z = @as(i64, z) + @as(i64, width - 1) * step_xz;
     if (last_x > std.math.maxInt(i32) or last_z > std.math.maxInt(i32)) return c.JNI_FALSE;
@@ -127,8 +127,7 @@ pub fn native_density_sampler_evaluate_lattice0(env: ?*c.JNIEnv, _: c.jclass, pr
     const get_address = f.GetDirectBufferAddress orelse return c.JNI_FALSE;
     const get_capacity = f.GetDirectBufferCapacity orelse return c.JNI_FALSE;
     const get_length = f.GetArrayLength orelse return c.JNI_FALSE;
-    const pin = f.GetPrimitiveArrayCritical orelse return c.JNI_FALSE;
-    const release = f.ReleasePrimitiveArrayCritical orelse return c.JNI_FALSE;
+    const set_region = f.SetDoubleArrayRegion orelse return c.JNI_FALSE;
     if (get_capacity(env, program_buffer) < program_length or get_length(env, output) < count) return c.JNI_FALSE;
     const program_address = get_address(env, program_buffer) orelse return c.JNI_FALSE;
     const program: [*]const u8 = @ptrCast(program_address);
@@ -140,10 +139,10 @@ pub fn native_density_sampler_evaluate_lattice0(env: ?*c.JNIEnv, _: c.jclass, pr
         const values: [*]const f64 = @ptrCast(@alignCast(address));
         inputs = values[0..n];
     }
-    const address = pin(env, output, null) orelse return c.JNI_FALSE;
-    defer release(env, output, address, 0);
-    const values: [*]f64 = @ptrCast(@alignCast(address));
-    return @intFromBool(backend_density.evaluate_lattice(program[0..@intCast(program_length)], x, y, z, @intCast(width), @intCast(height), step_xz, step_y, values[0..@intCast(count)], inputs));
+    const values = density_output[0..@intCast(count)];
+    if (!backend_density.evaluate_lattice(program[0..@intCast(program_length)], x, y, z, @intCast(width), @intCast(height), step_xz, step_y, values, inputs)) return c.JNI_FALSE;
+    set_region(env, output, 0, @intCast(count), values.ptr);
+    return c.JNI_TRUE;
 }
 
 pub fn density_scalar_entry(program: [*]const u8, program_length: usize, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: [*]f64) callconv(.c) c_int {
