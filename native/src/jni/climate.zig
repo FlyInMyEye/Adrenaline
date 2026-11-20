@@ -64,10 +64,8 @@ fn sampleBatch0(env: ?*c.JNIEnv, _: c.jclass, plan: c.jobject, x: c.jint, z: c.j
         value.* = sample;
     }
 
-    const raw = f.GetPrimitiveArrayCritical.?(env, output, null) orelse return c.JNI_FALSE;
-    defer f.ReleasePrimitiveArrayCritical.?(env, output, raw, 0);
-    const out: [*]f64 = @ptrCast(@alignCast(raw));
-    @memcpy(out[0..results.len], results);
+    const set_region = f.SetDoubleArrayRegion orelse return c.JNI_FALSE;
+    set_region(env, output, 0, count, results.ptr);
     return c.JNI_TRUE;
 }
 
