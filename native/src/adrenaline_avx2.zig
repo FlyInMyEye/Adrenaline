@@ -1,6 +1,7 @@
 pub const native_backend: @import("backend/options.zig").Options = .{ .instruction_set = .avx2 };
 const aquifer_cell = @import("aquifer/cell.zig");
 const density_fused = @import("density/fused.zig");
+const density_overlay = @import("density/overlay.zig");
 const density_program = @import("density/program.zig");
 const noise_approximate = @import("noise/approximate.zig");
 const noise_batch = @import("noise/batch.zig");
@@ -32,6 +33,10 @@ pub export fn adrenaline_all_solid_avx2(density: [*]const f64, count: usize) cal
 
 pub export fn adrenaline_density_cell_avx2(program: [*]const u8, program_length: usize, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: [*]f64) callconv(.c) c_int {
     return if (density_program.evaluate_density_cell(program[0..program_length], base_x, base_y, base_z, width, height, output[0 .. width * width * height], &.{})) 1 else 0;
+}
+
+pub export fn adrenaline_terrain_overlay_avx2(program: [*]const u8, length: usize, y: i32, inputs: [*]const f64, input_length: usize, output: [*]f64) callconv(.c) c.jint {
+    return @intFromBool(density_overlay.evaluate(program[0..length], y, inputs[0..input_length], output[0..128]));
 }
 
 pub export fn adrenaline_terrain_prefix_avx2(program: [*]const u8, height: usize, terrain: [*]f64, noodle: [*]f64) callconv(.c) void {

@@ -10,6 +10,11 @@ const density_validation = @import("../density/validation.zig");
 const density_program = @import("../density/program.zig");
 
 pub inline fn evaluate(program: []const u8, base_x: c.jint, base_y: c.jint, base_z: c.jint, width: usize, height: usize, output: []c.jdouble, inputs: []const f64) bool {
+    if (comptime builtin.cpu.arch == .x86_64 and !backend_options.is_simd_backend) {
+        if (width == 4 and height == 8 and program.len > 575 and program[0] == 15 and program[376] == 2 and backend_runtime.supports(.avx2)) {
+            if (backend_abi.adrenaline_terrain_overlay_avx2(program.ptr, program.len, base_y, inputs.ptr, inputs.len, output.ptr) != 0) return true;
+        }
+    }
     if (width == 4 and density_validation.is_fused_terrain_program(program)) {
         if (comptime builtin.cpu.arch == .x86_64 and !backend_options.is_simd_backend) {
             if (backend_runtime.supports(.avx2)) {
