@@ -84,8 +84,9 @@ public final class SectionTerrainGenerator {
                 noiseProfile.add(NoiseSubstage.SLICE_SAMPLING, System.nanoTime() - sampleStarted);
             }
             long airBoundsStarted = noiseProfile == null ? 0L : System.nanoTime();
-            int[] firstAirCells = lattice.firstAirCells(
-                sectionNoise.adrenaline$sectionDensityProgram(), aquifer, baseX, baseZ, minCellY, cellCountY);
+            var airCells = lattice.airCells(sectionNoise.adrenaline$sectionDensityProgram(), aquifer, baseX, baseZ, minCellY, cellCountY);
+            int[] firstAirCells = airCells.unconditional();
+            int[] airCandidates = airCells.needsInput();
             int cellLimit = 0;
             for (int firstAirCell : firstAirCells) {
                 cellLimit = Math.max(cellLimit, firstAirCell);
@@ -108,7 +109,17 @@ public final class SectionTerrainGenerator {
                                 continue;
                             }
                             long startedNanos = noiseProfile == null ? 0L : System.nanoTime();
-                            noise.selectCellYZ(sectionIndex * 2 + half, cellZ);
+                            int cellY = sectionIndex * 2 + half;
+                            if (airCandidates != null && cellY >= airCandidates[cellX * 4 + cellZ]) {
+                                if (sectionNoise.adrenaline$selectSectionCell(cellY, cellZ)) {
+                                    if (noiseProfile != null) {
+                                        noiseProfile.add(NoiseSubstage.CELL_CACHE, System.nanoTime() - startedNanos);
+                                    }
+                                    continue;
+                                }
+                            } else {
+                                noise.selectCellYZ(cellY, cellZ);
+                            }
                             double[] density = material.adrenaline$finalDensityValues();
                             boolean prepared = aquifer.adrenaline$prepareNativeMaterials(noise, density, baseX + cellX * 4,
                                 sectionY + half * 8, baseZ + cellZ * 4, 4, 8);

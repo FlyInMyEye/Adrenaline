@@ -48,6 +48,7 @@ public final class NativeDensityProgram {
     public static final byte COLUMN_RETURN = 33;
     public static final byte COLUMN_INPUT = 34;
 
+    private final DensityFunction root;
     private final ByteBuffer bytecode;
     private final int length;
     private final Object[] keepAlive;
@@ -56,17 +57,12 @@ public final class NativeDensityProgram {
     private final boolean emptyBlender;
     private ByteBuffer inputValues;
     private double[] sliceInput;
+    private double[] cellInput;
     private final int columnCacheCount;
 
-    NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators) {
-        this(bytecode, keepAlive, interpolators, new DensityFunction[0], false);
-    }
-
-    NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators, DensityFunction[] inputs, boolean emptyBlender) {
-        this(bytecode, keepAlive, interpolators, inputs, emptyBlender, 0);
-    }
-
-    NativeDensityProgram(ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators, DensityFunction[] inputs, boolean emptyBlender, int columnCacheCount) {
+    NativeDensityProgram(DensityFunction root, ByteBuffer bytecode, Object[] keepAlive, InterpolatorBinding[] interpolators,
+                         DensityFunction[] inputs, boolean emptyBlender, int columnCacheCount) {
+        this.root = root;
         this.bytecode = bytecode;
         this.length = bytecode.remaining();
         this.keepAlive = keepAlive;
@@ -82,6 +78,29 @@ public final class NativeDensityProgram {
     AdrenalineNativeInterpolatorAccess firstTerrainInterpolator() {
         return this.length == 388 && this.inputs.length == 0 && this.interpolators.length > 0 && this.interpolators[0].offset == 1
             ? this.interpolators[0].source : null;
+    }
+
+    DensityFunction root() {
+        return this.root;
+    }
+
+    DensityFunction terrainBeforeInput() {
+        if (this.inputs.length != 1 || this.inputs[0].source instanceof AdrenalineCachedDensityAccess
+            || !(this.root instanceof AdrenalineBinaryFunctionAccess binary)) {
+            return null;
+        }
+        try {
+            if (DensityFunctionOperation.ordinal(this.root) == 0) {
+                if (binary.adrenaline$secondArgument() == this.inputs[0].source) {
+                    return binary.adrenaline$firstArgument();
+                }
+                if (binary.adrenaline$firstArgument() == this.inputs[0].source) {
+                    return binary.adrenaline$secondArgument();
+                }
+            }
+        } catch (ReflectiveOperationException | IllegalArgumentException ignored) {
+        }
+        return null;
     }
 
     public ByteBuffer bytecode() {
@@ -118,13 +137,30 @@ public final class NativeDensityProgram {
         return true;
     }
 
-    public boolean prepare(DensityFunction.ContextProvider provider, int count) {
+    Preparation prepare(DensityFunction.ContextProvider provider, int count, boolean checkDryAir) {
         if (this.emptyBlender && provider.forIndex(0).getBlender() != Blender.empty()) {
-            return false;
+            return Preparation.FAILED;
         }
         if (this.inputs.length > 0) {
             if (!(provider instanceof AdrenalineCellGridAccess grid)) {
-                return false;
+                return Preparation.FAILED;
+            }
+            double[] sampled = null;
+            if (checkDryAir && this.inputs.length == 1 && !(this.inputs[0].source instanceof AdrenalineCachedDensityAccess)) {
+                if (this.cellInput == null || this.cellInput.length != count) {
+                    this.cellInput = new double[count];
+                }
+                sampled = this.cellInput;
+                DensityFunction source = this.inputs[0].source;
+                boolean dryAir = true;
+                for (int j = 0; j < count; j++) {
+                    double value = source.compute(provider.forIndex(j));
+                    sampled[j] = value;
+                    dryAir &= value <= CellDensityBounds.INPUT_LIMIT && Double.isFinite(value);
+                }
+                if (dryAir) {
+                    return Preparation.DRY_AIR;
+                }
             }
             int bytes = Math.multiplyExact(Math.multiplyExact(this.inputs.length, count), Double.BYTES);
             if (this.inputValues == null || this.inputValues.capacity() != bytes) {
@@ -135,7 +171,11 @@ public final class NativeDensityProgram {
                 int offset = i * count * Double.BYTES;
                 if (input.source instanceof AdrenalineCachedDensityAccess cache) {
                     if (provider != input.owner || !cache.adrenaline$writeNativeInput(this.inputValues, offset, input.owner, grid, count)) {
-                        return false;
+                        return Preparation.FAILED;
+                    }
+                } else if (sampled != null) {
+                    for (int j = 0; j < count; j++) {
+                        this.inputValues.putDouble(j * Double.BYTES, sampled[j]);
                     }
                 } else {
                     for (int j = 0; j < count; j++) {
@@ -145,7 +185,7 @@ public final class NativeDensityProgram {
             }
         }
         this.prepare();
-        return true;
+        return Preparation.READY;
     }
 
     public boolean prepareSlice(DensityFunction.ContextProvider provider, int count) {
@@ -244,6 +284,12 @@ public final class NativeDensityProgram {
             this.bytecode.putDouble(offset + 48, source.adrenaline$getNoise110());
             this.bytecode.putDouble(offset + 56, source.adrenaline$getNoise111());
         }
+    }
+
+    enum Preparation {
+        FAILED,
+        READY,
+        DRY_AIR
     }
 
     static final class InterpolatorBinding {

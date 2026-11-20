@@ -2,6 +2,7 @@ package net.fly.adrenaline.worldgen;
 
 import net.fly.adrenaline.config.AdrenalineConfig;
 import net.fly.adrenaline.natives.NativeDensitySampler;
+import net.fly.adrenaline.worldgen.NativeDensityProgram.Preparation;
 import net.minecraft.world.level.levelgen.DensityFunction;
 
 public final class NativeCellDensityEvaluator implements CellDensityEvaluator {
@@ -20,18 +21,27 @@ public final class NativeCellDensityEvaluator implements CellDensityEvaluator {
 
     @Override
     public void fill(double[] values, DensityFunction.ContextProvider contextProvider) {
+        this.fillSection(values, contextProvider, false);
+    }
+
+    public boolean fillSection(double[] values, DensityFunction.ContextProvider contextProvider, boolean checkDryAir) {
         boolean nativeResult = false;
         if (AdrenalineConfig.nativeDensityEvaluationEnabled() && contextProvider instanceof AdrenalineCellGridAccess grid
             && values.length == grid.adrenaline$getCellWidth() * grid.adrenaline$getCellWidth() * grid.adrenaline$getCellHeight()) {
-            if (this.program.prepare(contextProvider, values.length)) {
+            Preparation prepared = this.program.prepare(contextProvider, values.length, checkDryAir);
+            if (prepared == Preparation.DRY_AIR) {
+                return true;
+            }
+            if (prepared == Preparation.READY) {
                 nativeResult = NativeDensitySampler.evaluate(this.program, grid.adrenaline$getCellStartBlockX(), grid.adrenaline$getCellStartBlockY(), grid.adrenaline$getCellStartBlockZ(), grid.adrenaline$getCellWidth(), grid.adrenaline$getCellHeight(), values);
             }
         }
         if (!nativeResult) {
             this.fallback.fill(values, contextProvider);
-            return;
+            return false;
         }
         contextProvider.forIndex(values.length - 1);
+        return false;
     }
 
     /*
