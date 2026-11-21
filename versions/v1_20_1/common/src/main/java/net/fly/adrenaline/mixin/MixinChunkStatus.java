@@ -163,8 +163,12 @@ public class MixinChunkStatus {
                 fullChunkConverter,
                 chunks
             );
-            CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future =
-                BuildConfig.DEBUG ? WorldgenStageStats.track(status, centerPos, task) : task.get();
+            CompletableFuture<Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure>> future;
+            try {
+                future = BuildConfig.DEBUG ? WorldgenStageStats.track(status, centerPos, task) : task.get();
+            } catch (Throwable throwable) {
+                future = CompletableFuture.failedFuture(throwable);
+            }
             future.whenComplete((value, throwable) -> {
                 if (throwable != null) {
                     result.completeExceptionally(throwable);
