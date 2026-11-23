@@ -85,6 +85,11 @@ public class MixinMinecraft {
         this.adrenaline$cancelWorldLoad(ci);
     }
 
+    @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;runTick(Z)V", shift = At.Shift.AFTER), cancellable = true)
+    private void adrenaline$cancelAfterLoadingFrame(CallbackInfo ci) {
+        this.adrenaline$cancelWorldLoad(ci);
+    }
+
     @Inject(method = "doWorldLoad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/server/IntegratedServer;getConnection()Lnet/minecraft/server/network/ServerConnectionListener;"), cancellable = true)
     private void adrenaline$cancelBeforeConnecting(CallbackInfo ci) {
         this.adrenaline$cancelWorldLoad(ci);
