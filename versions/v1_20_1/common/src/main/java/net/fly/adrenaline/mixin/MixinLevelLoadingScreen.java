@@ -1,9 +1,12 @@
 package net.fly.adrenaline.mixin;
 
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.fly.adrenaline.BuildConfig;
 import net.fly.adrenaline.GlobalCommon;
 import net.fly.adrenaline.client.AprilFoolsEasterEgg;
+import net.fly.adrenaline.client.ChunkMapRenderer;
 import net.fly.adrenaline.client.LevelLoadingScreenExtension;
 import net.fly.adrenaline.client.WorldDeletion;
 import net.fly.adrenaline.config.AdrenalineConfig;
@@ -34,7 +37,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LevelLoadingScreen.class)
-public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoadingScreenExtension {
+public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoadingScreenExtension, ChunkMapRenderer {
 
     private static final int DEFAULT_SPAWN_ZONE_RADIUS = 11;
     private static final int DEFAULT_DIAMETER = (DEFAULT_SPAWN_ZONE_RADIUS + ChunkStatus.maxDistance()) * 2 + 1;
@@ -138,8 +141,32 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         WorldgenChunkPreview.end();
     }
 
-    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screens/LevelLoadingScreen;renderChunks(Lnet/minecraft/client/gui/GuiGraphics;Lnet/minecraft/server/level/progress/StoringChunkProgressListener;IIII)V"))
-    private void adrenaline$renderScaledChunkMap(GuiGraphics guiGraphics, StoringChunkProgressListener progressListener, int centerX, int centerY, int cellSize, int padding) {
+    @WrapMethod(method = "renderChunks")
+    private static void adrenaline$renderChunkMap(GuiGraphics graphics, StoringChunkProgressListener progressListener,
+            int centerX, int centerY, int cellSize, int padding, Operation<Void> original) {
+        if (Minecraft.getInstance().screen instanceof ChunkMapRenderer renderer) {
+            renderer.adrenaline$renderChunkMap(graphics, progressListener, centerX, centerY, cellSize, padding,
+                () -> original.call(graphics, progressListener, centerX, centerY, cellSize, padding));
+        } else {
+            original.call(graphics, progressListener, centerX, centerY, cellSize, padding);
+        }
+    }
+
+    @Inject(method = "renderChunks", at = @At("TAIL"))
+    private static void adrenaline$renderChunkMapOverlays(GuiGraphics graphics, StoringChunkProgressListener progressListener,
+            int centerX, int centerY, int cellSize, int padding, CallbackInfo ci) {
+        if (Minecraft.getInstance().screen instanceof ChunkMapRenderer renderer) {
+            renderer.adrenaline$renderChunkMapOverlays(graphics, progressListener, centerX, centerY, cellSize, padding);
+        }
+    }
+
+    @Override
+    public void adrenaline$renderChunkMap(GuiGraphics guiGraphics, StoringChunkProgressListener progressListener,
+            int centerX, int centerY, int cellSize, int padding, Runnable renderStages) {
+        if (progressListener != this.progressListener) {
+            renderStages.run();
+            return;
+        }
         if (AprilFoolsEasterEgg.shouldRender()) {
             int mapSize = DEFAULT_DIAMETER * (cellSize + padding) - padding;
             AprilFoolsEasterEgg.render(guiGraphics, centerX, centerY, mapSize);
@@ -153,15 +180,11 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         }
 
         boolean showChunkPreview = AdrenalineConfig.showChunkPreview();
-        int renderCellSize = showChunkPreview ? WorldgenChunkPreview.SIZE : cellSize;
-        int renderPadding = showChunkPreview ? 0 : padding;
-        int step = renderCellSize + renderPadding;
+        int step = cellSize + padding;
         int diameter = progressListener.getDiameter();
-        int pixels = diameter * step - renderPadding;
+        int pixels = diameter * step - padding;
         if (pixels <= 0) {
-            LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
-            this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
-            this.adrenaline$renderProcessingChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
+            renderStages.run();
             return;
         }
 
@@ -181,7 +204,7 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
                 )
             );
         } else {
-            float basePixels = (float) (DEFAULT_DIAMETER * step - renderPadding);
+            float basePixels = (float) (DEFAULT_DIAMETER * step - padding);
             scale = basePixels / (float) pixels;
         }
 
@@ -190,11 +213,18 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         guiGraphics.pose().scale(scale, scale, 1.0F);
         guiGraphics.pose().translate(-centerX, -centerY, 0.0F);
         try {
-            LevelLoadingScreen.renderChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
-            this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
-            this.adrenaline$renderProcessingChunks(guiGraphics, progressListener, centerX, centerY, renderCellSize, renderPadding);
+            renderStages.run();
         } finally {
             guiGraphics.pose().popPose();
+        }
+    }
+
+    @Override
+    public void adrenaline$renderChunkMapOverlays(GuiGraphics guiGraphics, StoringChunkProgressListener progressListener,
+            int centerX, int centerY, int cellSize, int padding) {
+        if (progressListener == this.progressListener) {
+            this.adrenaline$renderChunkPreviews(guiGraphics, progressListener, centerX, centerY, cellSize, padding);
+            this.adrenaline$renderProcessingChunks(guiGraphics, progressListener, centerX, centerY, cellSize, padding);
         }
     }
 
@@ -270,17 +300,25 @@ public abstract class MixinLevelLoadingScreen extends Screen implements LevelLoa
         }
 
         int textureSize = diameter * WorldgenChunkPreview.SIZE;
-        guiGraphics.blit(
-            this.adrenaline$chunkPreviewTextureLocation,
-            centerX - textureSize / 2,
-            centerY - textureSize / 2,
-            0.0F,
-            0.0F,
-            textureSize,
-            textureSize,
-            textureSize,
-            textureSize
-        );
+        int step = cellSize + padding;
+        int mapSize = diameter * step - padding;
+        int mapStartX = centerX - mapSize / 2;
+        int mapStartY = centerY - mapSize / 2;
+        if (padding == 0) {
+            guiGraphics.blit(this.adrenaline$chunkPreviewTextureLocation, mapStartX, mapStartY, mapSize, mapSize,
+                0.0F, 0.0F, textureSize, textureSize, textureSize, textureSize);
+        } else {
+            for (int z = 0; z < diameter; z++) {
+                for (int x = 0; x < diameter; x++) {
+                    if (this.adrenaline$uploadedChunkPreviews[z * diameter + x] != null) {
+                        guiGraphics.blit(this.adrenaline$chunkPreviewTextureLocation,
+                            mapStartX + x * step, mapStartY + z * step, cellSize, cellSize,
+                            (float) (x * WorldgenChunkPreview.SIZE), (float) (z * WorldgenChunkPreview.SIZE),
+                            WorldgenChunkPreview.SIZE, WorldgenChunkPreview.SIZE, textureSize, textureSize);
+                    }
+                }
+            }
+        }
     }
 
     @Unique
