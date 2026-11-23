@@ -66,7 +66,9 @@ public abstract class MixinMinecraftServer implements InitialWorldCreationAccess
     private void adrenaline$cancelWorldgenJobsOnStop(CallbackInfo ci) {
         MinecraftServer server = (MinecraftServer) (Object) this;
         DeferredSpawnSearch.reset();
-        ChunkJobScheduler.get().cancel(server);
+        ChunkJobScheduler scheduler = ChunkJobScheduler.get();
+        server.managedBlock(scheduler::isDrained);
+        scheduler.resume();
         AdaptiveWorldgenWorkers.stop(server);
     }
 
@@ -95,7 +97,12 @@ public abstract class MixinMinecraftServer implements InitialWorldCreationAccess
 
     @WrapMethod(method = "stopServer")
     private void adrenaline$discardWarmupWorldOnStop(Operation<Void> original) {
-        WarmupWorldDiscard.runShutdown((MinecraftServer) (Object) this, () -> original.call());
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        try {
+            WarmupWorldDiscard.runShutdown(server, () -> original.call());
+        } finally {
+            ChunkJobScheduler.get().cancel(server);
+        }
     }
 
     @Inject(method = "saveAllChunks", at = @At("HEAD"), cancellable = true)

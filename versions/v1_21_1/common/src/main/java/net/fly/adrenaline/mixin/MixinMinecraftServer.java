@@ -64,6 +64,7 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
         try {
             WarmupWorldDiscard.runShutdown(server, () -> original.call());
         } finally {
+            ChunkJobScheduler.get().cancel(server);
             FeatureSafety.stop(server);
         }
     }
@@ -189,8 +190,11 @@ public abstract class MixinMinecraftServer implements DeferredSpawnSearch.Access
     @Inject(method = "stopServer", at = @At("HEAD"))
     private void adrenaline$stopAdaptiveWorkers(CallbackInfo ci) {
         this.adrenaline$spawnSearch.reset();
-        ChunkJobScheduler.get().cancel((MinecraftServer) (Object) this);
-        AdaptiveWorldgenWorkers.stop((MinecraftServer) (Object) this);
+        MinecraftServer server = (MinecraftServer) (Object) this;
+        ChunkJobScheduler scheduler = ChunkJobScheduler.get();
+        server.managedBlock(scheduler::isDrained);
+        scheduler.resume();
+        AdaptiveWorldgenWorkers.stop(server);
     }
 
     @Inject(method = "tickServer", at = @At("HEAD"))
