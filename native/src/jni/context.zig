@@ -78,7 +78,7 @@ pub fn aquifer_context_prepare_jni(env: ?*c.JNIEnv, _: c.jclass, buffer: c.jobje
     if (backend_abi.adrenaline_aquifer_context_validate(memory, @intCast(capacity)) == 0) return -1;
     const cell = &scratch.cell;
     get_density(env, density, 0, @intCast(total), &cell.density);
-    const n = if ((global_type == 2 or global_type == 3) and cell.density[0] > 0.0 and backend_abi.adrenaline_all_solid_avx2(&cell.density, total) != 0) solid: {
+    const n = if ((global_type == 2 or global_type == 3 or global_type == 4) and cell.density[0] > 0.0 and backend_abi.adrenaline_all_solid_avx2(&cell.density, total) != 0) solid: {
         @memset(cell.materials[0..total], 0);
         break :solid 0;
     } else backend_abi.adrenaline_aquifer_context_prepare(memory, &cell.density, &cell.candidates, global_level, global_type, base_x, base_y, base_z, width, height, &cell.deferred, &cell.materials);

@@ -177,7 +177,7 @@ pub fn prepare_aquifer_context(ctx: *const AquiferContext, density: []const f64,
     if (comptime avx2) {
         if (height > 0 and width > 0 and fluid_levels.len > 0 and
             @as(i64, base_y) >= @as(i64, global_fluid_level) + 5 and
-            (global_fluid_type == 2 or global_fluid_type == 3) and grid_size_x > 1 and grid_size_z > 1)
+            (global_fluid_type == 2 or global_fluid_type == 3 or global_fluid_type == 4) and grid_size_x > 1 and grid_size_z > 1)
         {
             const min_x = @divFloor(@as(i64, base_x) - 5, 16) - @as(i64, min_grid_x);
             const max_x = @divFloor(@as(i64, base_x) + @as(i64, @intCast(width)) - 6, 16) - @as(i64, min_grid_x) + 1;
@@ -230,7 +230,7 @@ pub fn prepare_aquifer_context(ctx: *const AquiferContext, density: []const f64,
     }
     if (!avx2 and @as(i64, base_y) >= @as(i64, global_fluid_level) + 5 and
         height > 0 and width > 0 and fluid_levels.len > 0 and fluid_levels.len <= core_limits.max_density_values and
-        (global_fluid_type == 2 or global_fluid_type == 3) and grid_size_x > 1 and grid_size_z > 1)
+        (global_fluid_type == 2 or global_fluid_type == 3 or global_fluid_type == 4) and grid_size_x > 1 and grid_size_z > 1)
     {
         var level_index: usize = 0;
         var max0: core_vectors.Vec8i = @splat(std.math.minInt(i32));
@@ -272,7 +272,7 @@ pub fn prepare_aquifer_context(ctx: *const AquiferContext, density: []const f64,
     const plane = width * width;
     const lava_level = @min(@as(i32, -54), global_fluid_level);
     const global_type_code: u8 = @bitCast(global_fluid_type);
-    const below_lava_boundary = if (global_type_code == 3) global_fluid_level else lava_level;
+    const below_lava_boundary = if (global_type_code == 4) std.math.minInt(i32) else if (global_type_code == 3) global_fluid_level else lava_level;
     var global_material_cache: [core_limits.max_density_values]u8 = undefined;
     var grid_y_cache: [core_limits.max_density_values]i32 = undefined;
     @memset(global_material_cache[0..height], 0);
@@ -412,7 +412,7 @@ const UniformAquiferShortTileGroup = struct {
 };
 
 fn try_context_short_tile(ctx: *const AquiferContext, density: []const f64, global_level: i32, global_type: i8, base_x: i32, base_y: i32, base_z: i32, materials: []i8) bool {
-    if (global_type != 2 and global_type != 3) return false;
+    if (global_type != 2 and global_type != 3 and global_type != 4) return false;
     const gx = @divFloor(base_x - 5, 16);
     const gz = @divFloor(base_z - 5, 16);
     if (gx != @divFloor(base_x - 2, 16) or gz != @divFloor(base_z - 2, 16)) return false;
@@ -505,7 +505,7 @@ const UniformAquiferTileGroup = struct {
 
 fn try_context_uniform_tile_wide(ctx: *const AquiferContext, density: []const f64, global_level: i32, global_type: i8, base_x: i32, base_y: i32, base_z: i32, materials: []i8) bool {
     if (ctx.flags & 1 != 0) return try_context_short_tile(ctx, density, global_level, global_type, base_x, base_y, base_z, materials);
-    if (global_type != 2 and global_type != 3) return false;
+    if (global_type != 2 and global_type != 3 and global_type != 4) return false;
     const gx = @divFloor(base_x - 5, 16);
     const gz = @divFloor(base_z - 5, 16);
     if (gx != @divFloor(base_x - 2, 16) or gz != @divFloor(base_z - 2, 16)) return false;
@@ -600,7 +600,7 @@ const ContextShortBoundaryGroup = struct {
     count: usize,
 };
 fn try_context_short_boundary_tile(ctx: *const AquiferContext, density: []const f64, global_level: i32, global_type: i8, base_x: i32, base_y: i32, base_z: i32, materials: []i8) bool {
-    if (global_type != 2 and global_type != 3) return false;
+    if (global_type != 2 and global_type != 3 and global_type != 4) return false;
     const top_y = base_y + 7;
     var groups: [2]ContextShortBoundaryGroup = undefined;
     var group_count: usize = 0;

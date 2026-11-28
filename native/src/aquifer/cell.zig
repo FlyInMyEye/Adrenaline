@@ -215,7 +215,7 @@ pub fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, densi
     if (comptime avx2) {
         if (height > 0 and width > 0 and fluid_levels.len > 0 and
             @as(i64, base_y) >= @as(i64, global_fluid_level) + 5 and
-            (global_fluid_type == 2 or global_fluid_type == 3) and grid_size_x > 1 and grid_size_z > 1)
+            (global_fluid_type == 2 or global_fluid_type == 3 or global_fluid_type == 4) and grid_size_x > 1 and grid_size_z > 1)
         {
             const min_x = @divFloor(@as(i64, base_x) - 5, 16) - @as(i64, min_grid_x);
             const max_x = @divFloor(@as(i64, base_x) + @as(i64, @intCast(width)) - 6, 16) - @as(i64, min_grid_x) + 1;
@@ -268,7 +268,7 @@ pub fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, densi
     }
     if (!avx2 and @as(i64, base_y) >= @as(i64, global_fluid_level) + 5 and
         height > 0 and width > 0 and fluid_levels.len > 0 and fluid_levels.len <= core_limits.max_density_values and
-        (global_fluid_type == 2 or global_fluid_type == 3) and grid_size_x > 1 and grid_size_z > 1)
+        (global_fluid_type == 2 or global_fluid_type == 3 or global_fluid_type == 4) and grid_size_x > 1 and grid_size_z > 1)
     {
         var level_index: usize = 0;
         var max0: core_vectors.Vec8i = @splat(std.math.minInt(i32));
@@ -311,7 +311,7 @@ pub fn prepare_aquifer_cell_impl(comptime avx2: bool, comptime neon: bool, densi
     const plane = width * width;
     const lava_level = @min(@as(i32, -54), global_fluid_level);
     const global_type_code: u8 = @bitCast(global_fluid_type);
-    const below_lava_boundary = if (global_type_code == 3) global_fluid_level else lava_level;
+    const below_lava_boundary = if (global_type_code == 4) std.math.minInt(i32) else if (global_type_code == 3) global_fluid_level else lava_level;
     var global_material_cache: [core_limits.max_density_values]u8 = undefined;
     var grid_y_cache: [core_limits.max_density_values]i32 = undefined;
     var fluid_max_cache: [core_limits.max_density_values]i32 = undefined;

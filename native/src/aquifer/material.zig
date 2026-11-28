@@ -79,14 +79,14 @@ pub fn aquifer_type_at(level: c.jint, fluid_type: c.jbyte, y: i32) ?u8 {
 
 pub fn global_aquifer_material(y: i32, fluid_level: c.jint, fluid_type: c.jbyte) ?u8 {
     const type_code: u8 = @bitCast(fluid_type);
-    if (type_code != 2 and type_code != 3) {
+    if (type_code != 2 and type_code != 3 and type_code != 4) {
         return null;
     }
     const lava_level = @min(@as(i32, -54), fluid_level);
-    if (y < lava_level) {
+    if (type_code != 4 and y < lava_level) {
         return 3;
     }
-    return if (y < fluid_level) type_code else 1;
+    return if (y < fluid_level) (if (type_code == 4) 2 else type_code) else 1;
 }
 
 pub fn aquifer_similarity(first_distance: i32, second_distance: i32) f64 {

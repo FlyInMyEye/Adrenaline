@@ -205,6 +205,9 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
             return false;
         }
 
+        byte globalFluidType = this.adrenaline$nativeLavaType(baseX, baseY, baseZ, cellWidth, cellHeight);
+        if (globalFluidType == 0) return false;
+
         int count = densityValues.length;
         if (adrenaline$nativeBarrierValues == null || adrenaline$nativeBarrierValues.length < count) {
             adrenaline$nativeBarrierValues = new double[count];
@@ -229,10 +232,10 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         }
         boolean prepared = adrenaline$nativeContext != null
             ? NativeAquiferSampler.prepareContext(adrenaline$nativeContext, densityValues, adrenaline$nativeCandidates,
-                adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, baseX, baseY, baseZ, cellWidth, cellHeight,
+                adrenaline$nativeGlobalFluidLevel, globalFluidType, baseX, baseY, baseZ, cellWidth, cellHeight,
                 adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials)
             : NativeAquiferSampler.prepare(densityValues, adrenaline$nativeCandidates, adrenaline$packedAquiferLocations,
-                adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ,
+                adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, globalFluidType, minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ,
                 baseX, baseY, baseZ, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, adrenaline$nativeDeferredCount, adrenaline$nativeMaterials);
         if (!prepared) {
             return false;
@@ -250,7 +253,7 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         }
         contextProvider.forIndex(count - 1);
         return deferredCount == 0 || NativeAquiferSampler.evaluate(densityValues, adrenaline$nativeBarrierValues, adrenaline$nativeCandidates,
-            adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, adrenaline$nativeGlobalFluidType, baseY, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, deferredCount, adrenaline$nativeMaterials);
+            adrenaline$nativeFluidLevels, adrenaline$nativeFluidTypes, adrenaline$nativeGlobalFluidLevel, globalFluidType, baseY, cellWidth, cellHeight, adrenaline$nativeDeferredIndices, deferredCount, adrenaline$nativeMaterials);
     }
 
     @Override
@@ -258,8 +261,22 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         if (!AdrenalineConfig.nativeAquiferBatchingEnabled() || !adrenaline$prepareNativeFluidTable() || !adrenaline$prepareNativeGlobalFluid()) {
             return cellCountY;
         }
-        return AquiferAirBounds.firstDryCell(adrenaline$nativeFluidLevels.length, adrenaline$nativeMaximumFluidLevel, adrenaline$nativeGlobalFluidLevel,
+        int firstDryCell = AquiferAirBounds.firstDryCell(adrenaline$nativeFluidLevels.length, adrenaline$nativeMaximumFluidLevel, adrenaline$nativeGlobalFluidLevel,
             minGridX, minGridY, minGridZ, gridSizeX, gridSizeZ, x, z, minCellY, cellCountY);
+        for (int cell = cellCountY - 1; cell >= firstDryCell; cell--) {
+            int baseY = (minCellY + cell) * 8;
+            for (int dx = 0; dx < 4; dx++) {
+                for (int dz = 0; dz < 4; dz++) {
+                    for (int dy = 0; dy < 8; dy++) {
+                        int y = baseY + dy;
+                        if (this.globalFluidPicker.computeFluid(x + dx, y, z + dz).at(y).is(Blocks.LAVA)) {
+                            return cell + 1;
+                        }
+                    }
+                }
+            }
+        }
+        return firstDryCell;
     }
 
     @Override
@@ -316,6 +333,25 @@ public abstract class MixinNoiseBasedAquifer implements AdrenalineFastAquiferAcc
         adrenaline$nativeGlobalFluidType = (byte) material;
         adrenaline$nativeGlobalFluidReady = true;
         return true;
+    }
+
+    @Unique
+    private byte adrenaline$nativeLavaType(int baseX, int baseY, int baseZ, int width, int height) {
+        int lavaLevel = Math.min(-54, this.adrenaline$nativeGlobalFluidLevel);
+        boolean matchesVanilla = true;
+        boolean noLava = true;
+        for (int x = 0; x < width; x++) {
+            for (int z = 0; z < width; z++) {
+                for (int y = baseY - 1; y < baseY + height; y++) {
+                    boolean expected = y < lavaLevel || this.adrenaline$nativeGlobalFluidType == 3 && y < this.adrenaline$nativeGlobalFluidLevel;
+                    boolean actual = this.globalFluidPicker.computeFluid(baseX + x, y, baseZ + z).at(y).is(Blocks.LAVA);
+                    matchesVanilla &= actual == expected;
+                    noLava &= !actual;
+                    if (!matchesVanilla && !noLava) return 0;
+                }
+            }
+        }
+        return matchesVanilla ? this.adrenaline$nativeGlobalFluidType : noLava ? (byte) 4 : 0;
     }
 
     @Unique

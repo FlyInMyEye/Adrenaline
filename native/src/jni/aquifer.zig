@@ -172,7 +172,7 @@ pub fn native_aquifer_sampler_prepare0(env: ?*c.JNIEnv, _: c.jclass, density_val
     defer release_primitive_array_critical(env, density_values, density_address, 0);
     if (comptime builtin.cpu.arch == .x86_64 and !backend_options.is_simd_backend) {
         const density: [*]const f64 = @ptrCast(@alignCast(density_address));
-        if (density[0] > 0.0 and (global_fluid_type == 2 or global_fluid_type == 3) and backend_runtime.supports(.avx2) and backend_abi.adrenaline_all_solid_avx2(density, total) != 0) {
+        if (density[0] > 0.0 and (global_fluid_type == 2 or global_fluid_type == 3 or global_fluid_type == 4) and backend_runtime.supports(.avx2) and backend_abi.adrenaline_all_solid_avx2(density, total) != 0) {
             const count_address = get_primitive_array_critical(env, deferred_count, null) orelse return c.JNI_FALSE;
             defer release_primitive_array_critical(env, deferred_count, count_address, 0);
             const output_address = get_primitive_array_critical(env, output, null) orelse return c.JNI_FALSE;
@@ -189,7 +189,7 @@ pub fn native_aquifer_sampler_prepare0(env: ?*c.JNIEnv, _: c.jclass, density_val
     if (comptime builtin.cpu.arch == .x86_64 and !backend_options.is_simd_backend) {
         if (@as(i64, base_y) >= @as(i64, global_fluid_level) + 5 and
             @as(i64, base_y) + @as(i64, @intCast(height - 1)) <= std.math.maxInt(i32) and
-            (global_fluid_type == 2 or global_fluid_type == 3) and backend_runtime.supports(.avx2))
+            (global_fluid_type == 2 or global_fluid_type == 3 or global_fluid_type == 4) and backend_runtime.supports(.avx2))
         {
             const early_levels: [*]const i32 = @ptrCast(@alignCast(levels_address));
             if (backend_abi.adrenaline_aquifer_air_bounds_avx2(early_levels, @intCast(location_count), min_grid_x, min_grid_y, min_grid_z, grid_size_x, grid_size_z, base_x, base_y, base_z, width, height) != 0) {
