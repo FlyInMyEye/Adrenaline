@@ -1,5 +1,6 @@
 package net.fly.adrenaline.mixin;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 import net.fly.adrenaline.BuildConfig;
@@ -42,6 +43,9 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
+        if (mixinClassName.equals("net.fly.adrenaline.mixin.compat.MixinZombieAwareness")) {
+            return supportsZombieAwarenessData(targetClassName);
+        }
         if (mixinClassName.equals("net.fly.adrenaline.mixin.MixinTectonicInvert") && !MixinPlatform.isModLoaded("tectonic")) {
             return false;
         }
@@ -53,6 +57,18 @@ public final class AdrenalineMixinPlugin implements IMixinConfigPlugin {
             return supportsExpressionInjectors();
         }
         return BuildConfig.DEBUG || !DEBUG_MIXINS.contains(mixinClassName);
+    }
+
+    private static boolean supportsZombieAwarenessData(String targetClassName) {
+        if (!MixinPlatform.isModLoaded("zombieawareness")) return false;
+        try {
+            ClassNode target = MixinService.getService().getBytecodeProvider().getClassNode(targetClassName, false);
+            return target.fields.stream().anyMatch(field -> field.name.equals("entityData") && field.desc.equals("Ljava/util/HashMap;"))
+                && target.methods.stream().anyMatch(method -> method.name.equals("getPersistentData"))
+                && target.methods.stream().anyMatch(method -> method.name.equals("setPersistentData"));
+        } catch (ClassNotFoundException | IOException ignored) {
+            return false;
+        }
     }
 
     private static boolean supportsExpressionInjectors() {

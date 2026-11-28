@@ -6,6 +6,7 @@
   "plugin": "net.fly.adrenaline.mixin.AdrenalineMixinPlugin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
+    "compat.MixinZombieAwareness",
     "MixinWarmupReloadListener",
     "MixinWorldLoader",
     "MixinChunkMap",

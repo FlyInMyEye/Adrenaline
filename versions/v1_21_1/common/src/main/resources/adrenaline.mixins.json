@@ -5,6 +5,7 @@
   "package": "net.fly.adrenaline.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "compat.MixinZombieAwareness",
     "MixinChunkMap",
     "MixinChunkMapMaintenanceInvoker",
     "MixinGenerationChunkHolder",
